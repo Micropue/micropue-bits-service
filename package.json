@@ -1,0 +1,23 @@
+{
+  "name": "bits",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@primeicons/vue": "^8.0.2",
+    "@primeuix/themes": "^2.0.3",
+    "nuxt": "^4.5.2",
+    "primevue": "^4.5.5",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "@primevue/nuxt-module": "^4.5.5"
+  }
+}
