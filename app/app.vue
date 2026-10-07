@@ -1,12 +1,9 @@
 <template>
-  <div>
-    <NuxtRouteAnnouncer />
-
-    <Button label="Verify" />
-
-  </div>
+  <NuxtRouteAnnouncer />
+  <NuxtLoadingIndicator :height="2" color="var(--p-primary-color)" :throttle="0" :hide-delay="300" />
+  <NuxtLayout>
+    <NuxtPage />
+  </NuxtLayout>
 </template>
-
-<script setup lang="ts">
-
-</script>
+<style lang="scss" scoped>
+</style>

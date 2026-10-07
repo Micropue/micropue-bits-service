@@ -1,0 +1,29 @@
+html {
+  font-size: 13px;
+  height: 100%;
+}
+
+html,
+body,
+#__nuxt {
+  height: 100%;
+}
+
+@font-face {
+  font-family: 'Dancing Script';
+  src: url('../fonts/DancingScript-VariableFont_wght.ttf');
+  font-weight: 100 900;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('../fonts/Montserrat-VariableFont_wght.ttf');
+  font-weight: 100 900;
+}
+
+body {
+  margin: 0;
+  background: var(--p-content-background);
+  color: var(--p-text-color);
+  font-family: 'Montserrat';
+  height: 100%;
+}

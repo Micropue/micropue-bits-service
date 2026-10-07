@@ -1,0 +1,73 @@
+
+> dev
+> nuxt dev
+
+│
+●  Nuxt 4.5.2 (with Nitro 2.13.4, Vite 8.3.2 and Vue 3.5.43)
+
+  ➜ Local:    http://localhost:3500/
+  ➜ Network:  use --host to expose
+
+  ➜ DevTools: press Shift + Option + D in the browser (v3.4.2)
+
+
+ WARN  Plugin "nuxt:devtools:config-retriever" defines Vite-specific hooks (configResolved) in a plugin returned from applyToEnvironment. These hooks will be ignored.
+
+✔ Vite client built in 19ms
+
+ WARN  Plugin "nuxt:devtools:config-retriever" defines Vite-specific hooks (configResolved) in a plugin returned from applyToEnvironment. These hooks will be ignored. (x2)
+
+✔ Vite server built in 7ms
+[nitro] ✔ Nuxt Nitro server built in 796ms
+ℹ Vite server warmed up in 51ms
+ℹ Vite client warmed up in 63ms
+[db] users 表已就绪
+
+> dev
+> nuxt dev
+
+│
+●  Nuxt 4.5.2 (with Nitro 2.13.4, Vite 8.3.2 and Vue 3.5.43)
+
+  ➜ Local:    http://localhost:3500/
+  ➜ Network:  use --host to expose
+
+  ➜ DevTools: press Shift + Option + D in the browser (v3.4.2)
+
+
+ WARN  Plugin "nuxt:devtools:config-retriever" defines Vite-specific hooks (configResolved) in a plugin returned from applyToEnvironment. These hooks will be ignored.
+
+✔ Vite client built in 20ms
+
+ WARN  Plugin "nuxt:devtools:config-retriever" defines Vite-specific hooks (configResolved) in a plugin returned from applyToEnvironment. These hooks will be ignored. (x2)
+
+✔ Vite server built in 5ms
+[nitro] ✔ Nuxt Nitro server built in 844ms
+ℹ Vite server warmed up in 64ms
+ℹ Vite client warmed up in 73ms
+[db] users 表已就绪
+
+> dev
+> nuxt dev
+
+│
+●  Nuxt 4.5.2 (with Nitro 2.13.4, Vite 8.3.2 and Vue 3.5.43)
+
+  ➜ Local:    http://localhost:3500/
+  ➜ Network:  use --host to expose
+
+  ➜ DevTools: press Shift + Option + D in the browser (v3.4.2)
+
+
+ WARN  Plugin "nuxt:devtools:config-retriever" defines Vite-specific hooks (configResolved) in a plugin returned from applyToEnvironment. These hooks will be ignored.
+
+✔ Vite client built in 22ms
+
+ WARN  Plugin "nuxt:devtools:config-retriever" defines Vite-specific hooks (configResolved) in a plugin returned from applyToEnvironment. These hooks will be ignored. (x2)
+
+✔ Vite server built in 5ms
+[nitro] ✔ Nuxt Nitro server built in 984ms
+ℹ Vite server warmed up in 59ms
+ℹ Vite client warmed up in 66ms
+[db] users 表已就绪
+ℹ dependencies optimized: @vue/devtools-core, @vue/devtools-kit

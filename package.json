@@ -12,6 +12,7 @@
   "dependencies": {
     "@primeicons/vue": "^8.0.2",
     "@primeuix/themes": "^2.0.3",
+    "mysql2": "^3.24.5",
     "nuxt": "^4.5.2",
     "primevue": "^4.5.5",
     "vue": "^3.5.43",
