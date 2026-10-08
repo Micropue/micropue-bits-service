@@ -27,3 +27,29 @@ body {
   font-family: 'Montserrat';
   height: 100%;
 }
+
+// RotatingText 依赖的少量工具类（项目未引入 Tailwind，只补必需项）
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.rotating-chip {
+  display: flex;
+  overflow: hidden;
+  padding: 0 0.3em;
+  border-radius: 0.5rem;
+  background: var(--p-primary-color);
+  color: var(--p-primary-contrast-color);
+}
+
+.rotating-chip .rt-split {
+  display: inline-flex;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+}

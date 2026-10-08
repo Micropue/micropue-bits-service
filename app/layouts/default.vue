@@ -11,7 +11,7 @@
                     <Github aria-hidden="true" />
                     <span>{{ starLabel }} Stars</span>
                 </Button>
-                <Button label="登录 / 注册" class="auth-button" />
+                <Button label="Log In / Sign Up" class="auth-button" />
             </div>
         </nav>
     </header>
@@ -36,7 +36,7 @@ header {
         font-family: 'Dancing Script';
     }
 
-    height: 80px;
+    height: 70px;
 
     a {
         text-decoration: none;
