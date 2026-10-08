@@ -41,6 +41,30 @@ const Noir = definePreset(Aura, {
         }
       }
     }
+  },
+
+  // Aura 默认是红/蓝/绿/黄四色渐变圈，改为灰阶
+  components: {
+    progressspinner: {
+      colorScheme: {
+        light: {
+          root: {
+            colorOne: '{zinc.300}',
+            colorTwo: '{zinc.500}',
+            colorThree: '{zinc.700}',
+            colorFour: '{zinc.900}'
+          }
+        },
+        dark: {
+          root: {
+            colorOne: '{zinc.700}',
+            colorTwo: '{zinc.500}',
+            colorThree: '{zinc.300}',
+            colorFour: '{zinc.100}'
+          }
+        }
+      }
+    }
   }
 })
 export default defineNuxtConfig({

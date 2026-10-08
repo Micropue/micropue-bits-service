@@ -56,6 +56,8 @@ const columnFactor = (index: number, variance: number): number => {
   return 1 + variance * pseudo;
 };
 
+const emit = defineEmits<{ ready: [] }>()
+
 const props = withDefaults(defineProps<DriftWallProps>(), {
   items: () =>
     Array.from({ length: 15 }, (_, i) => {
@@ -115,6 +117,30 @@ const columnItems = computed<DriftWallItem[][]>(() => {
   props.items.forEach((item, i) => cols[i % props.columns].push(item));
   return cols.map(col => (col.length ? col : props.items.slice(0, 1)));
 });
+
+// 背景“可正常显示”的判定：按 URL 去重统计加载完成的图片（同一张图的多个副本只算一次），
+// 达到简单多数（60%）即视为可展示，不等待全部加载；加载失败也计入，避免永远卡在加载态
+const settledUrls = new Set<string>();
+const uniqueImageCount = computed(() => new Set(props.items.map(item => item.image)).size);
+let readyEmitted = false;
+let readyTimer: ReturnType<typeof setTimeout> | null = null;
+
+const emitReady = () => {
+  if (readyEmitted) return;
+  readyEmitted = true;
+  if (readyTimer) {
+    clearTimeout(readyTimer);
+    readyTimer = null;
+  }
+  emit('ready');
+};
+
+const markSettled = (url: string) => {
+  if (readyEmitted || settledUrls.has(url)) return;
+  settledUrls.add(url);
+  const threshold = Math.max(1, Math.ceil(uniqueImageCount.value * 0.6));
+  if (settledUrls.size >= threshold) emitReady();
+};
 
 const columnMeta = computed<ColumnMeta[]>(() => {
   const unit = props.tileHeight + props.gap;
@@ -248,6 +274,14 @@ let onReducedChange: ((e: MediaQueryListEvent) => void) | null = null;
 let ro: ResizeObserver | null = null;
 
 onMounted(() => {
+  // 兜底：图片迟迟未加载（网络差/懒加载未触发）时也放开页面
+  readyTimer = setTimeout(emitReady, 8000);
+
+  // SSR 输出的 <img> 在挂载前就可能已加载完（如缓存命中），不会再触发 load 事件，这里补记
+  containerRef.value?.querySelectorAll<HTMLImageElement>('img.dw-tile-img').forEach(img => {
+    if (img.complete) markSettled(img.getAttribute('src') ?? img.src);
+  });
+
   reduced.value = prefersReducedMotion();
   if (typeof window !== 'undefined') {
     mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -272,6 +306,10 @@ onUnmounted(() => {
   if (raf) cancelAnimationFrame(raf);
   raf = null;
   lastTs = null;
+  if (readyTimer) {
+    clearTimeout(readyTimer);
+    readyTimer = null;
+  }
   ro?.disconnect();
   if (mq && onReducedChange) mq.removeEventListener('change', onReducedChange);
 });
@@ -345,6 +383,8 @@ const cssVars = computed<CSSProperties>(
                 decoding="async"
                 :draggable="false"
                 class="dw-tile-img"
+                @load="markSettled(tile.item.image)"
+                @error="markSettled(tile.item.image)"
               />
               <span class="dw-tile-overlay" aria-hidden="true" />
             </span>
