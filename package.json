@@ -13,14 +13,17 @@
     "@primeicons/vue": "^8.0.2",
     "@primeuix/themes": "^2.0.3",
     "gsap": "^3.15.0",
+    "ioredis": "^5.11.1",
     "motion-v": "^1.10.3",
     "mysql2": "^3.24.5",
+    "nodemailer": "^10.0.16",
     "nuxt": "^4.5.2",
     "primevue": "^4.5.5",
     "vue": "^3.5.43",
     "vue-router": "^5.3.1"
   },
   "devDependencies": {
-    "@primevue/nuxt-module": "^4.5.5"
+    "@primevue/nuxt-module": "^4.5.5",
+    "@types/nodemailer": "^8.0.2"
   }
 }

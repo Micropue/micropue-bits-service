@@ -1,4 +1,4 @@
-import mysql from 'mysql2/promise'
+import mysql, { type RowDataPacket } from 'mysql2/promise'
 
 // 用户账户表：所有用户数据统一存这一张表，以账户 UUID 作为唯一标识
 // 规范详见 项目综合设计.md「二、数据结构与开发规范」
@@ -14,10 +14,18 @@ CREATE TABLE IF NOT EXISTS \`users\` (
   \`last_login_at\` DATETIME NULL COMMENT '最近登录时间（每次新登录会话产生时覆盖）',
   \`login_devices\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '登录设备列表 [{type,token,loginAt}]',
   \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
+  \`status\` ENUM('normal','disabled') NOT NULL DEFAULT 'normal' COMMENT '账户状态（正常/禁用，客户端不可修改）',
   PRIMARY KEY (\`uuid\`),
   UNIQUE KEY \`uk_users_email\` (\`email\`),
   UNIQUE KEY \`uk_users_github_id\` (\`github_id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户账户表';
+`
+
+// 幂等迁移：为已存在的旧表补充 status 列
+const USERS_STATUS_MIGRATION_SQL = `
+ALTER TABLE \`users\`
+  ADD COLUMN \`status\` ENUM('normal','disabled') NOT NULL DEFAULT 'normal'
+  COMMENT '账户状态（正常/禁用，客户端不可修改）' AFTER \`created_at\`
 `
 
 const pool = mysql.createPool({
@@ -36,7 +44,15 @@ export function useDb() {
   return pool
 }
 
-// 幂等：首次启动检测到表不存在时自动创建，已存在则无操作
+// 幂等：首次启动检测到表不存在时自动创建；已存在则检查迁移
 export async function ensureSchema() {
   await pool.query(USERS_TABLE_SQL)
+
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'status'`
+  )
+  if (!rows[0]?.count) {
+    await pool.query(USERS_STATUS_MIGRATION_SQL)
+  }
 }

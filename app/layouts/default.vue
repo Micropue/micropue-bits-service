@@ -13,7 +13,9 @@
                     <Github aria-hidden="true" />
                     <span>{{ starLabel }} Stars</span>
                 </Button>
-                <Button label="Log In / Sign Up" class="auth-button" />
+                <Button as-child v-slot="slotProps">
+                    <NuxtLink to="/sign" :class="[slotProps.class, 'auth-button']" v-bind="slotProps.a11yAttrs">Sign In / Sign Up</NuxtLink>
+                </Button>
             </div>
         </nav>
     </header>
@@ -111,6 +113,10 @@ header {
 
     a {
         text-decoration: none;
+    }
+
+    // 仅普通链接重置颜色；p-button 链接保留主题文字色
+    a:not(.p-button) {
         color: initial;
     }
 

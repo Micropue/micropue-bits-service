@@ -61,7 +61,7 @@ const emit = defineEmits<{ ready: [] }>()
 const props = withDefaults(defineProps<DriftWallProps>(), {
   items: () =>
     Array.from({ length: 15 }, (_, i) => {
-      const ids = [1015, 1025, 1039, 1043, 1044, 1050, 1062, 1069, 1074, 1080, 1084, 106, 110, 133, 164];
+      const ids = [1015, 1025, 1039, 1043, 1044, 1050, 1062, 1069, 1074, 1080, 1084, 106, 110, 133, 164, 1232, 1324, 54, 654, 346, 564, 902, 235, 754, 8756, 412, 86, 543];
       return {
         image: `https://picsum.photos/id/${ids[i % ids.length]}/600/400`,
         title: `Tile ${i + 1}`,
@@ -342,50 +342,23 @@ const cssVars = computed<CSSProperties>(
 </script>
 
 <template>
-  <div
-    ref="containerRef"
-    class="dw-root"
-    :class="className"
-    :style="cssVars"
-    role="group"
-    aria-label="Drifting wall of tiles"
-    @pointermove="handlePointerMove"
-    @pointerenter="handlePointerEnter"
-    @pointerleave="handlePointerLeaveWall"
-  >
+  <div ref="containerRef" class="dw-root" :class="className" :style="cssVars" role="group"
+    aria-label="Drifting wall of tiles" @pointermove="handlePointerMove" @pointerenter="handlePointerEnter"
+    @pointerleave="handlePointerLeaveWall">
     <div ref="planeRef" class="dw-plane">
       <div v-for="colData in renderColumns" :key="`col-${colData.column}`" class="dw-col">
-        <div
-          :ref="(el: Element | ComponentPublicInstance | null) => setTrackRef(el, colData.column)"
-          class="dw-track"
-        >
-          <component
-            :is="tile.item.href ? 'a' : 'div'"
-            v-for="tile in colData.tiles"
-            :key="tile.id"
-            :href="tile.item.href"
-            :target="tile.item.href ? '_blank' : undefined"
-            :rel="tile.item.href ? 'noreferrer noopener' : undefined"
-            :tabindex="tile.item.href ? undefined : 0"
+        <div :ref="(el: Element | ComponentPublicInstance | null) => setTrackRef(el, colData.column)" class="dw-track">
+          <component :is="tile.item.href ? 'a' : 'div'" v-for="tile in colData.tiles" :key="tile.id"
+            :href="tile.item.href" :target="tile.item.href ? '_blank' : undefined"
+            :rel="tile.item.href ? 'noreferrer noopener' : undefined" :tabindex="tile.item.href ? undefined : 0"
             :role="tile.item.href ? undefined : 'button'"
             :aria-label="tile.item.href ? undefined : (tile.item.title ?? 'tile')"
-            :class="['dw-tile', activeId === tile.id ? 'is-active' : '']"
-            :data-tile-id="tile.id"
-            :data-col="colData.column"
-            @focus="activate(tile.id, colData.column)"
-            @blur="release"
-          >
+            :class="['dw-tile', activeId === tile.id ? 'is-active' : '']" :data-tile-id="tile.id"
+            :data-col="colData.column" @focus="activate(tile.id, colData.column)" @blur="release">
             <span class="dw-tile-inner">
-              <img
-                :src="tile.item.image"
-                :alt="tile.item.title ?? ''"
-                loading="lazy"
-                decoding="async"
-                :draggable="false"
-                class="dw-tile-img"
-                @load="markSettled(tile.item.image)"
-                @error="markSettled(tile.item.image)"
-              />
+              <img :src="tile.item.image" :alt="tile.item.title ?? ''" loading="lazy" decoding="async"
+                :draggable="false" class="dw-tile-img" @load="markSettled(tile.item.image)"
+                @error="markSettled(tile.item.image)" />
               <span class="dw-tile-overlay" aria-hidden="true" />
             </span>
           </component>

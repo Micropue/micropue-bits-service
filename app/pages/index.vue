@@ -6,8 +6,9 @@
         :tile-width="200"
         :tile-height="132"
         :gap="18"
-        :tilt="16"
-        :turn="-14"
+        :tilt="40"
+        :turn="0"
+        :roll="0"
         :perspective="1200"
         :depth="120"
         :speed="28"
@@ -19,6 +20,8 @@
         @ready="backgroundReady = true"
       />
       <div class="wall-fade" aria-hidden="true" />
+      <div class="wall-fade-left" aria-hidden="true" />
+      <div class="wall-fade-right" aria-hidden="true" />
     </div>
 
     <div class="hero-section" :inert="!backgroundReady">
@@ -155,7 +158,10 @@ function onSearchFocusOut(event: FocusEvent) {
   position: absolute;
   inset: 0 0 auto 0;
   height: 85vh;
+  max-height:1080px;
   pointer-events: none;
+  max-width: 1920px;
+  margin: auto;
 }
 
 /* 背景就绪前盖住整页（含背景墙），就绪后淡出 */
@@ -185,6 +191,23 @@ function onSearchFocusOut(event: FocusEvent) {
   position: absolute;
   inset: 0;
   background: linear-gradient(to bottom, transparent 30%, var(--p-content-background) 70%);
+}
+.wall-fade-left {
+  position: absolute;
+  right: 0;
+  height: 100%;
+  width: 30%;
+  top: 0;
+  background: linear-gradient(to right, transparent 30%, var(--p-content-background) 70%);
+}
+
+.wall-fade-right {
+  position: absolute;
+  left:0;
+  height: 100%;
+  width: 30%;
+  top: 0;
+  background: linear-gradient(to left, transparent 30%, var(--p-content-background) 70%);
 }
 
 .hero-section {
