@@ -10,14 +10,6 @@ const HOURLY_LIMIT = 5 // 每邮箱每小时最多 5 次
 const IP_HOURLY_LIMIT = 5 // 每 IP 每小时最多 5 次
 const QUOTA_WINDOW_SECONDS = 3600
 
-const KEYS = {
-  session: (uid: string) => `auth:email:session:${uid}`,
-  active: (email: string) => `auth:email:active:${email}`,
-  cooldown: (email: string) => `auth:email:cooldown:${email}`,
-  quota: (email: string) => `auth:email:quota:${email}`,
-  ipQuota: (ip: string) => `auth:ip:quota:${ip}`
-}
-
 export default defineEventHandler(async event => {
   const body = await readBody<{ email?: string }>(event)
   const email = String(body?.email ?? '').trim().toLowerCase()
@@ -36,7 +28,7 @@ export default defineEventHandler(async event => {
   }
 
   // 1) 重发冷却：1 分钟一次
-  const cooldownKey = KEYS.cooldown(email)
+  const cooldownKey = AUTH_KEYS.cooldown(email)
   const acquired = await redis.set(cooldownKey, '1', 'EX', RESEND_COOLDOWN_SECONDS, 'NX')
   if (!acquired) {
     const ttl = await redis.ttl(cooldownKey)
@@ -48,7 +40,7 @@ export default defineEventHandler(async event => {
   }
 
   // 2) IP 小时限额：每 IP 最多 5 次
-  const ipKey = KEYS.ipQuota(ip)
+  const ipKey = AUTH_KEYS.ipQuota(ip)
   const ipUsed = await redis.incr(ipKey)
   if (ipUsed === 1) await redis.expire(ipKey, QUOTA_WINDOW_SECONDS)
   if (ipUsed > IP_HOURLY_LIMIT) {
@@ -63,7 +55,7 @@ export default defineEventHandler(async event => {
   }
 
   // 3) 邮箱小时限额：每邮箱最多 5 次
-  const quotaKey = KEYS.quota(email)
+  const quotaKey = AUTH_KEYS.quota(email)
   const used = await redis.incr(quotaKey)
   if (used === 1) await redis.expire(quotaKey, QUOTA_WINDOW_SECONDS)
   if (used > HOURLY_LIMIT) {
@@ -81,11 +73,11 @@ export default defineEventHandler(async event => {
   // 4) 新建校验会话，同时使该邮箱的旧会话（旧验证码）失效
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0')
   const sessionId = randomUUID()
-  const previousUid = await redis.get(KEYS.active(email))
-  if (previousUid) await redis.del(KEYS.session(previousUid))
+  const previousUid = await redis.get(AUTH_KEYS.active(email))
+  if (previousUid) await redis.del(AUTH_KEYS.session(previousUid))
 
-  await redis.set(KEYS.session(sessionId), JSON.stringify({ email, code }), 'EX', CODE_TTL_SECONDS)
-  await redis.set(KEYS.active(email), sessionId, 'EX', CODE_TTL_SECONDS)
+  await redis.set(AUTH_KEYS.session(sessionId), JSON.stringify({ email, code }), 'EX', CODE_TTL_SECONDS)
+  await redis.set(AUTH_KEYS.active(email), sessionId, 'EX', CODE_TTL_SECONDS)
 
   // 5) 检测电子邮件注册状态
   const [rows] = await useDb().query<RowDataPacket[]>(
@@ -98,9 +90,9 @@ export default defineEventHandler(async event => {
   try {
     await sendVerificationCodeMail(email, code)
   } catch (err) {
-    const currentUid = await redis.get(KEYS.active(email))
-    if (currentUid === sessionId) await redis.del(KEYS.active(email))
-    await redis.del(KEYS.session(sessionId))
+    const currentUid = await redis.get(AUTH_KEYS.active(email))
+    if (currentUid === sessionId) await redis.del(AUTH_KEYS.active(email))
+    await redis.del(AUTH_KEYS.session(sessionId))
     await refund(quotaKey)
     await refund(ipKey)
     await redis.del(cooldownKey)

@@ -6,8 +6,13 @@
       <template v-if="step === 'email'">
         <p class="auth-hint">Enter your email to sign in or create an account</p>
 
-        <InputText v-model="email" class="auth-input" :class="{ 'p-invalid': !!error }" type="email"
-          autocomplete="email" autofocus placeholder="you@example.com" aria-label="Email" />
+        <IconField>
+          <InputIcon>
+            <Envelope :size="16" />
+          </InputIcon>
+          <InputText v-model="email" class="auth-input" :class="{ 'p-invalid': !!error }" type="email"
+            autocomplete="email" autofocus placeholder="you@example.com" aria-label="Email" />
+        </IconField>
         <small v-if="error" class="auth-error" role="alert">{{ error }}</small>
         <Button type="submit" label="Next" :loading="submitting" fluid />
 
@@ -17,13 +22,15 @@
         </Button>
       </template>
 
-      <template v-else>
+      <template v-else-if="step === 'code'">
         <p class="auth-hint">Enter the 6-digit code sent to <strong>{{ email }}</strong></p>
 
-        <InputOtp ref="otpEl" v-model="code" class="auth-otp" :length="6" integer-only />
+        <div class="otp-row">
+          <Key :size="16" class="otp-key" />
+          <InputOtp ref="otpEl" v-model="code" :length="6" integer-only />
+        </div>
         <small v-if="error" class="auth-error" role="alert">{{ error }}</small>
-        <!-- TODO: 校验验证码：已注册用户校验通过后登录；未注册暂不继续 -->
-        <Button type="submit" label="Verify" :disabled="code.length !== 6" fluid />
+        <Button type="submit" label="Verify" :disabled="code.length !== 6" :loading="submitting" fluid />
 
         <div class="code-actions">
           <Button type="button" variant="text" severity="secondary" size="small" :label="resendLabel"
@@ -32,30 +39,72 @@
             @click="backToEmail" />
         </div>
       </template>
+
+      <template v-else>
+        <p class="auth-hint">Set up your profile for <strong>{{ email }}</strong> — optional, you can also do this later</p>
+
+        <IconField>
+          <InputIcon>
+            <User :size="16" />
+          </InputIcon>
+          <InputText v-model="nickname" class="auth-input" :class="{ 'p-invalid': !!error }" autocomplete="nickname"
+            placeholder="Nickname" aria-label="Nickname" />
+        </IconField>
+        <IconField>
+          <InputIcon>
+            <Lock :size="16" />
+          </InputIcon>
+          <InputText v-model="password" class="auth-input" :class="{ 'p-invalid': !!error }" type="password"
+            autocomplete="new-password" placeholder="Password" aria-label="Password" />
+        </IconField>
+        <IconField>
+          <InputIcon>
+            <Lock :size="16" />
+          </InputIcon>
+          <InputText v-model="confirmPassword" class="auth-input" :class="{ 'p-invalid': !!error }" type="password"
+            autocomplete="new-password" placeholder="Confirm password" aria-label="Confirm password" />
+        </IconField>
+        <small v-if="error" class="auth-error" role="alert">{{ error }}</small>
+        <Button type="submit" label="Save" :loading="submitting" fluid />
+
+        <Button type="button" variant="text" severity="secondary" size="small" label="Skip for now" @click="skipInit" />
+      </template>
     </form>
   </div>
 </template>
 
 <script setup lang="ts">
+import type { AuthUser } from '~/composables/useAuthUser'
 import Github from '@primeicons/vue/github'
+import Envelope from '@primeicons/vue/envelope'
+import Key from '@primeicons/vue/key'
+import Lock from '@primeicons/vue/lock'
+import User from '@primeicons/vue/user'
 
 useHead({ title: 'Sign In / Sign Up' })
 
-type Step = 'email' | 'code'
+const { user: authUser, refresh: refreshAuth } = useAuthUser()
+
+type Step = 'email' | 'code' | 'init'
 
 const step = ref<Step>('email')
 const email = ref('')
 const code = ref('')
+const nickname = ref('')
+const password = ref('')
+const confirmPassword = ref('')
 const error = ref('')
 const submitting = ref(false)
 const sessionId = ref('')
-const registered = ref(false)
 const resendIn = ref(0)
 const otpEl = ref<{ $el?: HTMLElement } | null>(null)
 
 let resendTimer: ReturnType<typeof setInterval> | undefined
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// 与后端一致：昵称 2-20 位；密码 6-20 位且必须同时含数字与字母（字符集均为数字/字母/下划线/短横线）
+const NICKNAME_RE = /^[A-Za-z0-9_-]{2,20}$/
+const PASSWORD_RE = /^(?=.*[0-9])(?=.*[A-Za-z])[A-Za-z0-9_-]{6,20}$/
 
 const resendLabel = computed(() =>
   resendIn.value > 0 ? `Resend code in ${resendIn.value}s` : 'Resend code'
@@ -63,6 +112,9 @@ const resendLabel = computed(() =>
 
 // 输入时清除旧错误
 watch(email, () => {
+  if (error.value) error.value = ''
+})
+watch([nickname, password, confirmPassword], () => {
   if (error.value) error.value = ''
 })
 
@@ -105,7 +157,6 @@ async function requestCode() {
     }>('/api/auth/email/send-code', { method: 'POST', body: { email: email.value } })
 
     sessionId.value = res.sessionId
-    registered.value = res.registered
     code.value = ''
     step.value = 'code'
     startCountdown(res.resendAfterSeconds)
@@ -123,9 +174,88 @@ async function requestCode() {
   }
 }
 
+// 校验验证码：通过即登录（未注册邮箱后端已自动完成基础注册）→ 账户页；新账户先显示可选初始化提醒
+async function verifyCode() {
+  if (submitting.value) return
+  submitting.value = true
+  error.value = ''
+  try {
+    const res = await $fetch<{ email: string; registered: boolean }>('/api/auth/email/verify-code', {
+      method: 'POST',
+      body: { sessionId: sessionId.value, code: code.value }
+    })
+    email.value = res.email
+    await refreshAuth()
+    if (res.registered) {
+      await navigateTo('/account')
+    } else {
+      step.value = 'init'
+    }
+  } catch (err) {
+    const e = err as { statusCode?: number; data?: { data?: { attemptsLeft?: number } } }
+    if (e.statusCode === 410) {
+      error.value = 'This code has expired. Please request a new one.'
+    } else if (e.statusCode === 403) {
+      error.value = 'This account has been disabled.'
+    } else if (e.statusCode === 400 && e.data?.data?.attemptsLeft != null) {
+      const left = e.data.data.attemptsLeft
+      error.value = `Incorrect code. ${left} attempt${left === 1 ? '' : 's'} left.`
+    } else {
+      error.value = 'Something went wrong. Please try again.'
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+// 初始化提醒（可选）：昵称与密码均可留空，留空等同跳过
+async function saveProfile() {
+  if (submitting.value) return
+  const nick = nickname.value.trim()
+  if (nick && !NICKNAME_RE.test(nick)) {
+    error.value = 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
+    return
+  }
+  if (password.value && !PASSWORD_RE.test(password.value)) {
+    error.value = 'Password must be 6-20 characters with at least one letter and one number (letters, numbers, _ or -).'
+    return
+  }
+  if (password.value !== confirmPassword.value) {
+    error.value = 'Passwords do not match.'
+    return
+  }
+
+  submitting.value = true
+  error.value = ''
+  try {
+    await $fetch('/api/auth/profile', {
+      method: 'PATCH',
+      body: { nickname: nick || undefined, password: password.value || undefined }
+    })
+    await navigateTo('/account')
+  } catch (err) {
+    const e = err as { statusCode?: number; data?: { data?: { field?: string } } }
+    if (e.statusCode === 401) {
+      error.value = 'Your session has expired. Please sign in again.'
+    } else if (e.statusCode === 400) {
+      const field = e.data?.data?.field
+      error.value = field === 'nickname'
+        ? 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
+        : field === 'password'
+          ? 'Password must be 6-20 characters with at least one letter and one number (letters, numbers, _ or -).'
+          : 'Please check your input.'
+    } else {
+      error.value = 'Something went wrong. Please try again.'
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
 function onSubmit() {
   if (step.value === 'email') return handleNext()
-  // TODO: 验证码校验 + 已注册用户登录
+  if (step.value === 'code') return verifyCode()
+  if (step.value === 'init') return saveProfile()
 }
 
 function handleNext() {
@@ -144,6 +274,17 @@ function backToEmail() {
   error.value = ''
   resendIn.value = 0
   clearInterval(resendTimer)
+}
+
+async function skipInit() {
+  await navigateTo('/account')
+}
+
+// 已登录（含刷新场景）直接进入账户页，并同步导航栏登录态
+const { data: session } = await useFetch<{ user: AuthUser }>('/api/auth/me')
+if (session.value?.user) {
+  authUser.value = session.value.user
+  await navigateTo('/account')
 }
 </script>
 
@@ -196,8 +337,15 @@ function backToEmail() {
   height: 1.25em;
 }
 
-.auth-otp {
+.otp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   align-self: center;
+}
+
+.otp-key {
+  color: var(--p-text-muted-color);
 }
 
 .code-actions {

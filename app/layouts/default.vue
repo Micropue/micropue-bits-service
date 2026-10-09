@@ -14,7 +14,8 @@
                     <span>{{ starLabel }} Stars</span>
                 </Button>
                 <Button as-child v-slot="slotProps">
-                    <NuxtLink to="/sign" :class="[slotProps.class, 'auth-button']" v-bind="slotProps.a11yAttrs">Sign In / Sign Up</NuxtLink>
+                    <NuxtLink :to="authUser ? '/account' : '/sign'" :class="[slotProps.class, 'auth-button']"
+                        v-bind="slotProps.a11yAttrs">{{ authUser ? 'My Account' : 'Log In / Sign Up' }}</NuxtLink>
                 </Button>
             </div>
         </nav>
@@ -24,6 +25,7 @@
     </main>
 </template>
 <script setup lang="ts">
+import type { AuthUser } from '~/composables/useAuthUser'
 import Github from '@primeicons/vue/github'
 const githubUrl = 'https://github.com/Micropue/micropue-bits-service'
 import Button from 'primevue/button'
@@ -85,6 +87,15 @@ onMounted(async () => {
 watch(loaderDone, done => {
     if (done) play()
 })
+
+// 导航栏登录态：SSR 拉取一次（useFetch 会转发 Cookie），登录/登出后由页面更新
+const { user: authUser } = useAuthUser()
+const authLoaded = useState('auth-user-loaded', () => false)
+if (!authLoaded.value) {
+    const { data: authData } = await useFetch<{ user: AuthUser }>('/api/auth/me')
+    authUser.value = authData.value?.user ?? null
+    authLoaded.value = true
+}
 </script>
 <style lang="scss" scoped>
 header {
