@@ -14,6 +14,8 @@
             autocomplete="email" autofocus placeholder="you@example.com" aria-label="Email" />
         </IconField>
         <small v-if="error" class="auth-error" role="alert">{{ error }}</small>
+        <small v-if="githubError" class="auth-error" role="alert">{{ githubError }}</small>
+        <small v-if="passkeyError" class="auth-error" role="alert">{{ passkeyError }}</small>
 
         <ClientOnly v-if="hcaptchaSitekey">
           <VueHcaptcha ref="captchaRef" size="invisible" :sitekey="hcaptchaSitekey" @expired="onCaptchaExpired"
@@ -22,12 +24,13 @@
 
         <Button type="submit" label="Next" :loading="submitting" fluid />
 
-        <Button type="button" severity="secondary" outlined fluid class="alt-btn">
+        <Button type="button" severity="secondary" outlined fluid class="alt-btn" @click="githubSignIn">
           <Github aria-hidden="true" />
           <span>Continue with GitHub</span>
         </Button>
 
-        <Button type="button" severity="secondary" outlined fluid class="alt-btn">
+        <Button type="button" severity="secondary" outlined fluid class="alt-btn" :loading="passkeyBusy"
+          @click="passkeySignIn">
           <Key aria-hidden="true" />
           <span>Sign in with Passkey</span>
         </Button>
@@ -48,6 +51,39 @@
             :disabled="resendIn > 0 || submitting" @click="requestCode" />
           <Button type="button" variant="text" severity="secondary" size="small" label="Use a different email"
             @click="backToEmail" />
+        </div>
+      </template>
+
+      <template v-else-if="step === '2fa'">
+        <p class="auth-hint">Two-step verification for <strong>{{ twoFaAccount }}</strong></p>
+
+        <template v-if="!showRecovery">
+          <div v-if="twoFaMethods.includes('app')" class="otp-row">
+            <Key :size="16" class="otp-key" />
+            <InputOtp ref="otpEl" v-model="twoFaCode" :length="6" integer-only />
+          </div>
+        </template>
+        <template v-else>
+          <InputText v-model="recoveryCode" placeholder="Recovery code" aria-label="Recovery code" />
+        </template>
+
+        <small v-if="twoFaError" class="auth-error" role="alert">{{ twoFaError }}</small>
+
+        <Button v-if="!showRecovery && twoFaMethods.includes('app')" type="submit" label="Verify"
+          :disabled="twoFaCode.length !== 6" :loading="twoFaBusy" fluid />
+
+        <Button v-if="!showRecovery && twoFaMethods.includes('passkey')" type="button" severity="secondary" outlined
+          fluid class="alt-btn" :loading="passkeyBusy" @click="twoFaPasskey">
+          <Key aria-hidden="true" />
+          <span>Use a passkey</span>
+        </Button>
+
+        <Button v-if="showRecovery" type="submit" label="Verify" :disabled="!recoveryCode" :loading="twoFaBusy" fluid />
+
+        <div class="code-actions">
+          <Button type="button" variant="text" severity="secondary" size="small"
+            :label="showRecovery ? 'Use an app code' : 'Use a recovery code'"
+            @click="toggleRecovery" />
         </div>
       </template>
 
@@ -132,7 +168,7 @@ function resetCaptcha() {
   captchaRef.value?.reset()
 }
 
-type Step = 'email' | 'code' | 'init'
+type Step = 'email' | 'code' | '2fa' | 'init'
 
 const step = ref<Step>('email')
 const email = ref('')
@@ -149,6 +185,188 @@ const nicknameOpen = ref(false)
 const passwordOpen = ref(false)
 const usernameSet = computed(() => authUser.value?.usernameSet ?? false)
 const hasPassword = computed(() => authUser.value?.hasPassword ?? false)
+
+// GitHub 登录：跳转到后端 OAuth 起跳端点（回调失败时以 ?github_error= 方式带回）
+const route = useRoute()
+const githubError = ref('')
+
+// 两步验证（第二因子）状态
+const twoFaTicket = ref('')
+const twoFaMethods = ref<string[]>([])
+const twoFaAccount = ref('')
+const twoFaCode = ref('')
+const recoveryCode = ref('')
+const twoFaError = ref('')
+const twoFaBusy = ref(false)
+const showRecovery = ref(false)
+
+function enterTwoFactor(ticket: string, methods: string[], account: string) {
+  twoFaTicket.value = ticket
+  twoFaMethods.value = methods
+  twoFaAccount.value = account
+  twoFaCode.value = ''
+  recoveryCode.value = ''
+  twoFaError.value = ''
+  showRecovery.value = false
+  step.value = '2fa'
+  nextTick(() => otpEl.value?.$el?.querySelector('input')?.focus())
+}
+
+function toggleRecovery() {
+  showRecovery.value = !showRecovery.value
+  twoFaError.value = ''
+}
+
+function twoFaErr(err: unknown) {
+  const status = (err as { statusCode?: number })?.statusCode
+  if (status === 410) return 'Too many attempts or expired. Please sign in again.'
+  if (status === 400) return showRecovery.value ? 'Invalid recovery code.' : 'Incorrect code.'
+  if (status === 403) return 'This account has been disabled.'
+  return 'Something went wrong. Please try again.'
+}
+
+async function twoFaAppVerify() {
+  if (twoFaBusy.value) return
+  twoFaBusy.value = true
+  twoFaError.value = ''
+  try {
+    await $fetch('/api/auth/2fa/app/verify', {
+      method: 'POST',
+      body: { ticket: twoFaTicket.value, code: twoFaCode.value }
+    })
+    await refreshAuth()
+    await navigateTo('/account')
+  } catch (err) {
+    twoFaError.value = twoFaErr(err)
+  } finally {
+    twoFaBusy.value = false
+  }
+}
+
+async function twoFaRecoveryVerify() {
+  if (twoFaBusy.value) return
+  twoFaBusy.value = true
+  twoFaError.value = ''
+  try {
+    await $fetch('/api/auth/2fa/recovery/verify', {
+      method: 'POST',
+      body: { ticket: twoFaTicket.value, code: recoveryCode.value }
+    })
+    await refreshAuth()
+    await navigateTo('/account')
+  } catch (err) {
+    twoFaError.value = twoFaErr(err)
+  } finally {
+    twoFaBusy.value = false
+  }
+}
+
+async function twoFaPasskey() {
+  if (passkeyBusy.value) return
+  passkeyBusy.value = true
+  twoFaError.value = ''
+  try {
+    const { startAuthentication, browserSupportsWebAuthn } = await import('@simplewebauthn/browser')
+    if (!browserSupportsWebAuthn()) {
+      twoFaError.value = 'Passkeys are not supported on this device.'
+      return
+    }
+    const { options, challengeId } = await $fetch<{
+      options: Parameters<typeof startAuthentication>[0]
+      challengeId: string
+    }>('/api/auth/2fa/passkey/options', { method: 'POST', body: { ticket: twoFaTicket.value } })
+    let assertion
+    try {
+      assertion = await startAuthentication(options)
+    } catch {
+      twoFaError.value = 'Passkey verification was cancelled.'
+      return
+    }
+    await $fetch('/api/auth/2fa/passkey/verify', {
+      method: 'POST',
+      body: { ticket: twoFaTicket.value, challengeId, response: assertion }
+    })
+    await refreshAuth()
+    await navigateTo('/account')
+  } catch (err) {
+    twoFaError.value = twoFaErr(err)
+  } finally {
+    passkeyBusy.value = false
+  }
+}
+
+onMounted(async () => {
+  const e = route.query.github_error
+  if (e) {
+    githubError.value = String(e)
+    navigateTo({ path: route.path, query: {} }, { replace: true })
+    return
+  }
+  // GitHub 两步验证：回调跳回 ?twofa=<ticket>，读取可用第二因子后进入验证步骤
+  const t = route.query.twofa
+  if (t) {
+    navigateTo({ path: route.path, query: {} }, { replace: true })
+    try {
+      const res = await $fetch<{ account: string; methods: string[] }>('/api/auth/2fa/pending', {
+        method: 'POST',
+        body: { ticket: String(t) }
+      })
+      enterTwoFactor(String(t), res.methods, res.account)
+    } catch (err) {
+      githubError.value =
+        (err as { statusCode?: number })?.statusCode === 410
+          ? 'This sign-in attempt has expired. Please try again.'
+          : 'Sign-in failed. Please try again.'
+    }
+  }
+})
+
+function githubSignIn() {
+  window.location.href = '/api/auth/github/authorize?mode=login'
+}
+
+// Passkey 登录（无用户名）：开始认证 → 浏览器通行密钥 → 服务端校验 → 登录
+const passkeyBusy = ref(false)
+const passkeyError = ref('')
+async function passkeySignIn() {
+  if (passkeyBusy.value) return
+  passkeyBusy.value = true
+  passkeyError.value = ''
+  try {
+    const { startAuthentication, browserSupportsWebAuthn } = await import('@simplewebauthn/browser')
+    if (!browserSupportsWebAuthn()) {
+      passkeyError.value = 'Passkeys are not supported on this device.'
+      return
+    }
+    const { options, challengeId } = await $fetch<{
+      options: Parameters<typeof startAuthentication>[0]
+      challengeId: string
+    }>('/api/auth/passkey/login/options', { method: 'POST' })
+
+    let assertion
+    try {
+      assertion = await startAuthentication(options)
+    } catch {
+      passkeyError.value = 'Passkey sign-in was cancelled.'
+      return
+    }
+
+    await $fetch('/api/auth/passkey/login/verify', {
+      method: 'POST',
+      body: { challengeId, response: assertion }
+    })
+    await refreshAuth()
+    await navigateTo('/account')
+  } catch (err) {
+    const status = (err as { statusCode?: number })?.statusCode
+    if (status === 404) passkeyError.value = 'No account is linked to this passkey.'
+    else if (status === 410) passkeyError.value = 'This sign-in attempt has expired. Please try again.'
+    else if (status === 403) passkeyError.value = 'This account has been disabled.'
+    else passkeyError.value = 'Passkey sign-in failed. Please try again.'
+  } finally {
+    passkeyBusy.value = false
+  }
+}
 
 let resendTimer: ReturnType<typeof setInterval> | undefined
 
@@ -231,7 +449,13 @@ async function verifyCode() {
   submitting.value = true
   error.value = ''
   try {
-    const res = await $fetch<{ email: string; isNewUser: boolean }>('/api/auth/email/verify-code', {
+    const res = await $fetch<{
+      email: string
+      isNewUser: boolean
+      requires2fa?: boolean
+      ticket?: string
+      methods?: string[]
+    }>('/api/auth/email/verify-code', {
       method: 'POST',
       body: { sessionId: sessionId.value, code: code.value }
     })
@@ -239,6 +463,8 @@ async function verifyCode() {
     await refreshAuth()
     if (res.isNewUser) {
       step.value = 'init'
+    } else if (res.requires2fa) {
+      enterTwoFactor(res.ticket ?? '', res.methods ?? [], res.email)
     } else {
       await navigateTo('/account')
     }
@@ -267,6 +493,7 @@ async function verifyCode() {
 function onSubmit() {
   if (step.value === 'email') return handleNext()
   if (step.value === 'code') return verifyCode()
+  if (step.value === '2fa') return showRecovery.value ? twoFaRecoveryVerify() : twoFaAppVerify()
 }
 
 async function handleNext() {

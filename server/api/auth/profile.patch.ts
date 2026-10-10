@@ -4,7 +4,7 @@ export default defineEventHandler(async event => {
   const user = await requireAuth(event)
   const body = await readBody<{ username?: string; nickname?: string; password?: string }>(event)
 
-  let username = typeof body?.username === 'string' ? body.username.trim() : undefined
+  let username = typeof body?.username === 'string' ? body.username.trim().toLowerCase() : undefined
   if (username === '') username = undefined
   let nickname = typeof body?.nickname === 'string' ? body.nickname.trim() : undefined
   if (nickname === '') nickname = undefined

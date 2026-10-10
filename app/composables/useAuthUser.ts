@@ -5,6 +5,13 @@ export interface AuthUser {
   usernameSet: boolean
   nickname: string
   hasPassword: boolean
+  githubLinked: boolean
+  githubLogin: string | null
+  githubAvatarUrl: string | null
+  passkeyCount: number
+  totpEnabled: boolean
+  twoFactorEnabled: boolean
+  recoveryCodesLeft: number
   status: string
   createdAt: string | null
   lastLoginAt: string | null

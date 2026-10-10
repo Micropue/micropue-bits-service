@@ -1,21 +1,28 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import type { H3Event } from 'h3'
 import type { RowDataPacket } from 'mysql2/promise'
 import { useDb } from './db'
 import { verifyPassword } from './password'
+import { describeUserAgent, normalizePasskeys } from './webauthn'
 
 // 登录会话：JWT 载荷含 用户UUID + 登录校验TOKEN + 过期时间（规范详见 项目综合设计.md「三、登录安全」）
 // 登录校验 token 同时写入 users.login_devices，设备被下线后 JWT 立即失效
 
 export const AUTH_COOKIE = 'bits_token'
 const SESSION_SECONDS = 180 * 24 * 60 * 60 // 长时间有效：180 天
-const MAX_DEVICES = 5 // 登录设备上限，超出自动淘汰最久未登录的设备
+export const MAX_DEVICES = 5 // 登录设备上限，超出自动淘汰最久未登录的设备
 
 export interface DeviceEntry {
   type: string
   token: string
   loginAt: string
+  name?: string // User-Agent 推导的设备名（如 "Chrome on macOS"）
+}
+
+// 设备对外标识：token 属会话凭据，仅回传其短哈希，不回传原文
+export function deviceId(token: string): string {
+  return createHash('sha256').update(token).digest('hex').slice(0, 16)
 }
 
 export interface AuthUser {
@@ -24,12 +31,23 @@ export interface AuthUser {
   username: string
   nickname: string
   status: string
+  github_id: string | number | null
+  github_login: string | null
+  totp_secret: string | null
+  two_factor_enabled: number
+  recovery_codes: unknown
+  passkeys: unknown
   created_at: string | null
   last_login_at: string | null
   password_hash: string | null
   login_devices: DeviceEntry[]
   sessionToken: string
 }
+
+const USER_COLUMNS =
+  '`uuid`, `email`, `username`, `nickname`, `status`, `github_id`, `github_login`, `totp_secret`, `two_factor_enabled`, `recovery_codes`, `passkeys`, `created_at`, `last_login_at`, `password_hash`, `login_devices`'
+
+type UserRow = RowDataPacket & Omit<AuthUser, 'login_devices' | 'sessionToken'> & { login_devices: unknown }
 
 function jwtKey() {
   const secret = process.env.JWT_SECRET
@@ -64,9 +82,11 @@ function normalizeDevices(value: unknown): DeviceEntry[] {
 // 签发登录会话：追加设备记录 + 覆盖登录时间 + 写 HttpOnly Cookie
 export async function issueSession(event: H3Event, user: { uuid: string; login_devices?: unknown }) {
   const token = randomUUID()
+  const ua = getRequestHeader(event, 'user-agent') || ''
   let devices = normalizeDevices(user.login_devices)
   devices.push({
-    type: detectDeviceType(getRequestHeader(event, 'user-agent') || ''),
+    type: detectDeviceType(ua),
+    name: describeUserAgent(ua),
     token,
     loginAt: nowString()
   })
@@ -97,6 +117,61 @@ export async function issueSession(event: H3Event, user: { uuid: string; login_d
   return token
 }
 
+// 第一因子（邮箱验证码 / GitHub / 密码）通过后：
+// - 未开启两步验证 → 直接签发会话
+// - 已开启 → 不签发，返回待校验票据，等第二因子（AuthApp / Passkey / 恢复码）通过再签发
+export type SessionOrTwoFactor =
+  | { requires2fa: false }
+  | { requires2fa: true; ticket: string; methods: string[] }
+
+export async function beginSessionOrTwoFactor(
+  event: H3Event,
+  user: { uuid: string; login_devices?: unknown; two_factor_enabled?: number; totp_secret?: string | null; passkeys?: unknown }
+): Promise<SessionOrTwoFactor> {
+  if (user.two_factor_enabled) {
+    const ticket = randomUUID()
+    await useRedis().set(AUTH_KEYS.twoFaTicket(ticket), JSON.stringify({ uuid: user.uuid }), 'EX', 300)
+    return { requires2fa: true, ticket, methods: twoFactorMethods(user) }
+  }
+  await issueSession(event, { uuid: user.uuid, login_devices: user.login_devices })
+  return { requires2fa: false }
+}
+
+// 读取两步验证票据对应的用户（第二因子阶段，尚未签发会话）
+export async function resolveTwoFaTicket(ticket: string): Promise<AuthUser> {
+  if (!ticket) throw createError({ statusCode: 400, statusMessage: 'Missing ticket' })
+  const raw = await useRedis().get(AUTH_KEYS.twoFaTicket(ticket))
+  if (!raw) throw createError({ statusCode: 410, statusMessage: 'Sign-in attempt expired' })
+  const { uuid } = JSON.parse(raw) as { uuid: string }
+  const user = await fetchAuthUserByUuid(uuid)
+  if (!user || user.status !== 'normal') {
+    throw createError({ statusCode: 403, statusMessage: 'This account has been disabled' })
+  }
+  return user
+}
+
+// 第二因子通过：消费票据并签发会话
+export async function completeTwoFactor(event: H3Event, ticket: string, user: AuthUser) {
+  const redis = useRedis()
+  await redis.del(AUTH_KEYS.twoFaTicket(ticket))
+  await redis.del(AUTH_KEYS.twoFaFail(ticket))
+  await issueSession(event, { uuid: user.uuid, login_devices: user.login_devices })
+}
+
+// 第二因子失败：计数，达上限（5 次）作废本次登录，需重新走第一因子
+export async function registerTwoFactorFailure(ticket: string): Promise<never> {
+  const redis = useRedis()
+  const key = AUTH_KEYS.twoFaFail(ticket)
+  const count = await redis.incr(key)
+  if (count === 1) await redis.expire(key, 300)
+  if (count >= 5) {
+    await redis.del(AUTH_KEYS.twoFaTicket(ticket))
+    await redis.del(key)
+    throw createError({ statusCode: 410, statusMessage: 'Too many attempts, please sign in again' })
+  }
+  throw createError({ statusCode: 400, statusMessage: 'Incorrect code' })
+}
+
 // 读取当前登录用户；无效/过期/设备已下线/账户禁用均返回 null
 export async function getAuthUser(event: H3Event): Promise<AuthUser | null> {
   const jwt = getCookie(event, AUTH_COOKIE)
@@ -112,20 +187,8 @@ export async function getAuthUser(event: H3Event): Promise<AuthUser | null> {
   }
   if (!payload.uuid || !payload.token) return null
 
-  const [rows] = await useDb().query<
-    (RowDataPacket & {
-      uuid: string
-      email: string
-      username: string
-      nickname: string
-      status: string
-      created_at: string | null
-      last_login_at: string | null
-      password_hash: string | null
-      login_devices: unknown
-    })[]
-  >(
-    'SELECT `uuid`, `email`, `username`, `nickname`, `status`, `created_at`, `last_login_at`, `password_hash`, `login_devices` FROM `users` WHERE `uuid` = ? LIMIT 1',
+  const [rows] = await useDb().query<UserRow[]>(
+    `SELECT ${USER_COLUMNS} FROM \`users\` WHERE \`uuid\` = ? LIMIT 1`,
     [payload.uuid]
   )
   const user = rows[0]
@@ -136,6 +199,25 @@ export async function getAuthUser(event: H3Event): Promise<AuthUser | null> {
   if (!devices.some(d => d.token === payload.token)) return null
 
   return { ...user, login_devices: devices, sessionToken: payload.token }
+}
+
+// 按 UUID 读取完整用户（用于两步验证第二因子阶段：此时尚未签发会话）
+export async function fetchAuthUserByUuid(uuid: string): Promise<AuthUser | null> {
+  const [rows] = await useDb().query<UserRow[]>(
+    `SELECT ${USER_COLUMNS} FROM \`users\` WHERE \`uuid\` = ? LIMIT 1`,
+    [uuid]
+  )
+  const user = rows[0]
+  if (!user) return null
+  return { ...user, login_devices: normalizeDevices(user.login_devices), sessionToken: '' }
+}
+
+// 账户当前可用的第二因子（app = 已绑定 AuthApp；passkey = 已有通行密钥）
+export function twoFactorMethods(user: { totp_secret?: string | null; passkeys?: unknown }): string[] {
+  const methods: string[] = []
+  if (user.totp_secret) methods.push('app')
+  if (normalizePasskeys(user.passkeys).length > 0) methods.push('passkey')
+  return methods
 }
 
 export async function requireAuth(event: H3Event): Promise<AuthUser> {

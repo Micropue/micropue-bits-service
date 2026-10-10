@@ -19,6 +19,9 @@ interface UserRow extends RowDataPacket {
   nickname: string
   status: string
   login_devices: unknown
+  totp_secret: string | null
+  two_factor_enabled: number
+  passkeys: unknown
 }
 
 export default defineEventHandler(async event => {
@@ -95,7 +98,7 @@ export default defineEventHandler(async event => {
 
   const db = useDb()
   const [rows] = await db.query<UserRow[]>(
-    'SELECT `uuid`, `email`, `nickname`, `status`, `login_devices` FROM `users` WHERE `email` = ? LIMIT 1',
+    'SELECT `uuid`, `email`, `nickname`, `status`, `login_devices`, `totp_secret`, `two_factor_enabled`, `passkeys` FROM `users` WHERE `email` = ? LIMIT 1',
     [session.email]
   )
   let user: UserRow | undefined = rows[0]
@@ -118,12 +121,12 @@ export default defineEventHandler(async event => {
         'INSERT INTO `users` (`uuid`, `email`, `username`, `email_verified_at`, `nickname`, `password_hash`) VALUES (?, ?, ?, NOW(), ?, NULL)',
         [uuid, session.email, session.email, nickname]
       )
-      user = { uuid, email: session.email, nickname, status: 'normal', login_devices: [] } as UserRow
+      user = { uuid, email: session.email, nickname, status: 'normal', login_devices: [], totp_secret: null, two_factor_enabled: 0, passkeys: [] } as UserRow
     } catch (err) {
       // 并发竞态：已被其他请求创建，重新读取
       if ((err as { code?: string }).code !== 'ER_DUP_ENTRY') throw err
       const [again] = await db.query<UserRow[]>(
-        'SELECT `uuid`, `email`, `nickname`, `status`, `login_devices` FROM `users` WHERE `email` = ? LIMIT 1',
+        'SELECT `uuid`, `email`, `nickname`, `status`, `login_devices`, `totp_secret`, `two_factor_enabled`, `passkeys` FROM `users` WHERE `email` = ? LIMIT 1',
         [session.email]
       )
       user = again[0]
@@ -134,8 +137,12 @@ export default defineEventHandler(async event => {
     throw createError({ statusCode: 500, statusMessage: 'Failed to create account' })
   }
 
-  await issueSession(event, { uuid: user.uuid, login_devices: user.login_devices })
+  // 两步验证：已开启则返回待校验票据（前端进入第二因子步骤），否则直接签发会话
+  const result = await beginSessionOrTwoFactor(event, user)
   // isNewUser 仅在验证码通过（已证明邮箱所有权）后返回，不构成存在性泄露
-  return { email: session.email, isNewUser }
+  if (result.requires2fa) {
+    return { email: session.email, isNewUser, requires2fa: true, ticket: result.ticket, methods: result.methods }
+  }
+  return { email: session.email, isNewUser, requires2fa: false }
 })
 

@@ -10,10 +10,14 @@ CREATE TABLE IF NOT EXISTS \`users\` (
   \`email_verified_at\` DATETIME NULL COMMENT '电子邮件真实性验证通过时间',
   \`nickname\` VARCHAR(20) NOT NULL COMMENT '昵称（2-20位，仅数字/字母/下划线/短横线）',
   \`github_id\` BIGINT UNSIGNED NULL COMMENT 'Github账户ID（一对一绑定）',
+  \`github_login\` VARCHAR(39) NULL COMMENT 'Github 用户名（绑定后展示）',
   \`password_hash\` VARCHAR(255) NULL COMMENT '密码哈希（Argon2id/bcrypt/scrypt，禁止明文或普通SHA256）',
+  \`totp_secret\` VARCHAR(255) NULL COMMENT 'AuthApp(TOTP)密钥密文（AES-256-GCM）；存在=已绑定',
+  \`two_factor_enabled\` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '两步验证开关（0/1）',
+  \`recovery_codes\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '恢复码列表（仅存哈希）[{hash,usedAt}]',
   \`passkeys\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT 'Passkey通行密钥列表 [{credentialId,publicKey,...}]',
   \`last_login_at\` DATETIME NULL COMMENT '最近登录时间（每次新登录会话产生时覆盖）',
-  \`login_devices\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '登录设备列表 [{type,token,loginAt}]',
+  \`login_devices\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '登录设备列表 [{type,name,token,loginAt}]',
   \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
   \`status\` ENUM('normal','disabled') NOT NULL DEFAULT 'normal' COMMENT '账户状态（正常/禁用，客户端不可修改）',
   PRIMARY KEY (\`uuid\`),
@@ -43,6 +47,30 @@ ALTER TABLE \`users\`
   COMMENT '用户名（唯一，大小写不敏感；注册默认=电子邮件，一旦设置不可修改）'
 `
 const USERS_USERNAME_INDEX_SQL = `ALTER TABLE \`users\` ADD UNIQUE KEY \`uk_users_username\` (\`username\`)`
+
+// 幂等迁移：为旧表补充 github_login 列（展示 Github 用户名）
+const USERS_GITHUB_LOGIN_SQL = `
+ALTER TABLE \`users\`
+  ADD COLUMN \`github_login\` VARCHAR(39) NULL
+  COMMENT 'Github 用户名（绑定后展示）' AFTER \`github_id\`
+`
+
+// 幂等迁移：两步验证相关列
+const USERS_TOTP_SECRET_SQL = `
+ALTER TABLE \`users\`
+  ADD COLUMN \`totp_secret\` VARCHAR(255) NULL
+  COMMENT 'AuthApp(TOTP)密钥密文（AES-256-GCM）；存在=已绑定' AFTER \`password_hash\`
+`
+const USERS_TWO_FACTOR_ENABLED_SQL = `
+ALTER TABLE \`users\`
+  ADD COLUMN \`two_factor_enabled\` TINYINT(1) NOT NULL DEFAULT 0
+  COMMENT '两步验证开关（0/1）' AFTER \`totp_secret\`
+`
+const USERS_RECOVERY_CODES_SQL = `
+ALTER TABLE \`users\`
+  ADD COLUMN \`recovery_codes\` JSON NOT NULL DEFAULT (JSON_ARRAY())
+  COMMENT '恢复码列表（仅存哈希）[{hash,usedAt}]' AFTER \`two_factor_enabled\`
+`
 
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST,
@@ -90,5 +118,32 @@ export async function ensureSchema() {
   )
   if (!usernameIdx[0]?.count) {
     await pool.query(USERS_USERNAME_INDEX_SQL)
+  }
+
+  // github_login 列
+  const [githubLoginCol] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'github_login'`
+  )
+  if (!githubLoginCol[0]?.count) {
+    await pool.query(USERS_GITHUB_LOGIN_SQL)
+  }
+
+  // 用户名统一存小写（大小写不敏感，避免展示/存储不一致）
+  await pool.query('UPDATE `users` SET `username` = LOWER(`username`) WHERE `username` <> LOWER(`username`)')
+
+  // 两步验证相关列（逐个幂等补充）
+  const twoFactorCols: [string, string][] = [
+    ['totp_secret', USERS_TOTP_SECRET_SQL],
+    ['two_factor_enabled', USERS_TWO_FACTOR_ENABLED_SQL],
+    ['recovery_codes', USERS_RECOVERY_CODES_SQL]
+  ]
+  for (const [col, sql] of twoFactorCols) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?`,
+      [col]
+    )
+    if (!rows[0]?.count) await pool.query(sql)
   }
 }

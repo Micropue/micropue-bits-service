@@ -34,10 +34,15 @@ if (data.value?.user) {
   await navigateTo('/sign')
 }
 
-// warn：待办提醒（用户名未设置 / 密码未设置）
+// warn：待办提醒（用户名未设置 / 密码未设置 / 未开启两步验证）
 const sections = computed(() => [
   { label: 'Account', to: '/account/profile', icon: User, warn: !authUser.value?.usernameSet },
-  { label: 'Login Security', to: '/account/security', icon: Shield, warn: !authUser.value?.hasPassword },
+  {
+    label: 'Login Security',
+    to: '/account/security',
+    icon: Shield,
+    warn: !authUser.value?.hasPassword || !authUser.value?.twoFactorEnabled
+  },
   { label: 'Content Management', to: '/account/content', icon: Folder, warn: false }
 ])
 </script>
