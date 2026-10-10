@@ -68,6 +68,29 @@ const Noir = definePreset(Aura, {
   }
 })
 export default defineNuxtConfig({
+  app: {
+    head: {
+      htmlAttrs: { lang: 'en' },
+      meta: [
+        // 固定缩放：阻止 iOS Safari 聚焦输入框（如首页搜索框）时自动放大页面
+        { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover' },
+        { name: 'description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' },
+        { name: 'robots', content: 'index, follow' },
+        { name: 'theme-color', content: '#ffffff', media: '(prefers-color-scheme: light)' },
+        { name: 'theme-color', content: '#18181b', media: '(prefers-color-scheme: dark)' },
+        // Open Graph
+        { property: 'og:type', content: 'website' },
+        { property: 'og:site_name', content: 'BITS' },
+        { property: 'og:url', content: 'https://bits.micropue.com.cn' },
+        { property: 'og:title', content: 'BITS — Make Your Code Shareable' },
+        { property: 'og:description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' },
+        // Twitter
+        { name: 'twitter:card', content: 'summary' },
+        { name: 'twitter:title', content: 'BITS — Make Your Code Shareable' },
+        { name: 'twitter:description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' }
+      ]
+    }
+  },
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['~/assets/css/main.scss'],
@@ -94,7 +117,7 @@ export default defineNuxtConfig({
   vite: {
     server: {
       // 允许 natapp 内网穿透域名访问开发服务器（前导点匹配所有子域）
-      allowedHosts: true,
+      allowedHosts: ['192.168.31.135'],
     }
   }
 })

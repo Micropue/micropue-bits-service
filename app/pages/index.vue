@@ -222,16 +222,32 @@ function onSearchFocusOut(event: FocusEvent) {
 
   .hero {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     align-items: center;
     gap: 0.25em;
+    max-width: 100%;
     font-size: clamp(2rem, 6vw, 4rem);
     font-weight: 700;
     margin: 0;
     transition: opacity 0.35s ease;
+
+    /* 标题不换行；放不下时让后面的动态单词整体落到第二行 */
+    > span {
+      white-space: nowrap;
+    }
   }
 
   .hero--hidden {
     opacity: 0;
+  }
+
+  /* 窄屏：标题独占一行，动态单词整体落到第二行居中 */
+  @media (max-width: 480px) {
+    .hero > span:first-child {
+      flex-basis: 100%;
+      text-align: center;
+    }
   }
 
   .special {
