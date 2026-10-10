@@ -11,6 +11,11 @@ export function isValidNickname(value: string): boolean {
   return NICKNAME_RE.test(value)
 }
 
+// 用户名与昵称同规则（2-20 字符，仅数字/大小写字母/下划线/短横线），但全局唯一且设置后不可修改
+export function isValidUsername(value: string): boolean {
+  return NICKNAME_RE.test(value)
+}
+
 export function isValidPassword(value: string): boolean {
   return PASSWORD_RE.test(value)
 }

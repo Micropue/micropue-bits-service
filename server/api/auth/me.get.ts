@@ -16,6 +16,9 @@ export default defineEventHandler(async event => {
     user: {
       uuid: user.uuid,
       email: user.email,
+      username: user.username,
+      // 注册默认用户名 = 电子邮件；两者相等即视为「未设置」
+      usernameSet: user.username !== user.email,
       nickname: user.nickname,
       hasPassword: !!user.password_hash,
       status: user.status,

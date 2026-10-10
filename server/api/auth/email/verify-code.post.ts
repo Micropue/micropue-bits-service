@@ -115,8 +115,8 @@ export default defineEventHandler(async event => {
     }
     try {
       await db.execute(
-        'INSERT INTO `users` (`uuid`, `email`, `email_verified_at`, `nickname`, `password_hash`) VALUES (?, ?, NOW(), ?, NULL)',
-        [uuid, session.email, nickname]
+        'INSERT INTO `users` (`uuid`, `email`, `username`, `email_verified_at`, `nickname`, `password_hash`) VALUES (?, ?, ?, NOW(), ?, NULL)',
+        [uuid, session.email, session.email, nickname]
       )
       user = { uuid, email: session.email, nickname, status: 'normal', login_devices: [] } as UserRow
     } catch (err) {

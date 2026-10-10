@@ -21,6 +21,7 @@ export interface DeviceEntry {
 export interface AuthUser {
   uuid: string
   email: string
+  username: string
   nickname: string
   status: string
   created_at: string | null
@@ -115,6 +116,7 @@ export async function getAuthUser(event: H3Event): Promise<AuthUser | null> {
     (RowDataPacket & {
       uuid: string
       email: string
+      username: string
       nickname: string
       status: string
       created_at: string | null
@@ -123,7 +125,7 @@ export async function getAuthUser(event: H3Event): Promise<AuthUser | null> {
       login_devices: unknown
     })[]
   >(
-    'SELECT `uuid`, `email`, `nickname`, `status`, `created_at`, `last_login_at`, `password_hash`, `login_devices` FROM `users` WHERE `uuid` = ? LIMIT 1',
+    'SELECT `uuid`, `email`, `username`, `nickname`, `status`, `created_at`, `last_login_at`, `password_hash`, `login_devices` FROM `users` WHERE `uuid` = ? LIMIT 1',
     [payload.uuid]
   )
   const user = rows[0]

@@ -85,10 +85,11 @@ export default defineEventHandler(async event => {
   if (currentUid === sessionId) await redis.del(AUTH_KEYS.active(newEmail))
 
   try {
-    await db.execute('UPDATE `users` SET `email` = ?, `email_verified_at` = NOW() WHERE `uuid` = ?', [
-      newEmail,
-      user.uuid
-    ])
+    // 若用户名仍为默认值（= 旧邮箱），改邮箱时联动同步，维持「未设置=等于邮箱」判定
+    await db.execute(
+      'UPDATE `users` SET `email` = ?, `email_verified_at` = NOW(), `username` = IF(`username` = ?, ?, `username`) WHERE `uuid` = ?',
+      [newEmail, user.email, newEmail, user.uuid]
+    )
   } catch (err) {
     // 并发竞态：邮箱已被他人抢注
     if ((err as { code?: string }).code === 'ER_DUP_ENTRY') {

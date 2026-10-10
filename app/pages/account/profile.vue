@@ -6,6 +6,21 @@
     <div class="card">
       <div class="row">
         <div class="row-main">
+          <span class="row-label">Username</span>
+          <span class="row-desc">Your unique handle. This cannot be changed once set.</span>
+        </div>
+        <div class="row-control value-action">
+          <template v-if="usernameSet">
+            <span class="row-value">{{ username }}</span>
+          </template>
+          <template v-else>
+            <span class="row-value">Not set</span>
+            <Button label="Set" severity="secondary" outlined size="small" @click="openUsername" />
+          </template>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-main">
           <span class="row-label">Nickname</span>
           <span class="row-desc">This is how others will see you.</span>
         </div>
@@ -58,6 +73,20 @@
       </div>
     </div>
   </section>
+
+  <!-- 设置用户名（一次性） -->
+  <Dialog v-model:visible="usernameOpen" modal :draggable="false" header="Set username" :style="{ width: '26rem' }">
+    <div class="dialog-form">
+      <InputText v-model="usernameInput" :class="{ 'p-invalid': !!usernameError }" maxlength="20"
+        placeholder="Username" aria-label="Username" @keyup.enter="saveUsername" />
+      <small class="dialog-hint">2-20 characters, letters, numbers, _ or -. This cannot be changed once set.</small>
+      <small v-if="usernameError" class="dialog-error" role="alert">{{ usernameError }}</small>
+    </div>
+    <template #footer>
+      <Button label="Cancel" severity="secondary" text @click="usernameOpen = false" />
+      <Button label="Save" :loading="usernameSaving" @click="saveUsername" />
+    </template>
+  </Dialog>
 
   <!-- 修改昵称 -->
   <Dialog v-model:visible="nickOpen" modal :draggable="false" header="Change nickname" :style="{ width: '26rem' }">
@@ -116,6 +145,8 @@ useHead({ title: 'Account' })
 const { user, refresh } = useAuthUser()
 
 const email = computed(() => user.value?.email ?? '')
+const username = computed(() => user.value?.username ?? '')
+const usernameSet = computed(() => user.value?.usernameSet ?? false)
 const nickname = computed(() => user.value?.nickname ?? '')
 const createdAt = computed(() => user.value?.createdAt ?? '')
 const lastLoginAt = computed(() => user.value?.lastLoginAt ?? '')
@@ -125,6 +156,43 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const runtimeConfig = useRuntimeConfig()
 const hcaptchaSitekey = runtimeConfig.public.hcaptchaSitekey
 const devMode = runtimeConfig.public.devMode
+
+/* ---------------- 设置用户名（一次性） ---------------- */
+const usernameOpen = ref(false)
+const usernameInput = ref('')
+const usernameError = ref('')
+const usernameSaving = ref(false)
+
+function openUsername() {
+  usernameInput.value = ''
+  usernameError.value = ''
+  usernameOpen.value = true
+}
+
+async function saveUsername() {
+  if (usernameSaving.value) return
+  const value = usernameInput.value.trim()
+  if (!isValidUsername(value)) {
+    usernameError.value = 'Username must be 2-20 characters (letters, numbers, _ or -).'
+    return
+  }
+  usernameSaving.value = true
+  usernameError.value = ''
+  try {
+    await $fetch('/api/auth/profile', { method: 'PATCH', body: { username: value } })
+    await refresh()
+    usernameOpen.value = false
+  } catch (err) {
+    const e = err as { statusCode?: number; data?: { data?: { field?: string } } }
+    if (e.statusCode === 401) usernameError.value = 'Your session has expired. Please sign in again.'
+    else if (e.statusCode === 409) usernameError.value = 'That username is already taken.'
+    else if (e.statusCode === 403) usernameError.value = 'Username has already been set and cannot be changed.'
+    else if (e.statusCode === 400) usernameError.value = 'Username must be 2-20 characters (letters, numbers, _ or -).'
+    else usernameError.value = 'Something went wrong. Please try again.'
+  } finally {
+    usernameSaving.value = false
+  }
+}
 
 /* ---------------- 修改昵称 ---------------- */
 const nickOpen = ref(false)

@@ -1,6 +1,8 @@
 export interface AuthUser {
   uuid: string
   email: string
+  username: string
+  usernameSet: boolean
   nickname: string
   hasPassword: boolean
   status: string

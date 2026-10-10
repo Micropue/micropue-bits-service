@@ -56,6 +56,13 @@
 
         <IconField>
           <InputIcon>
+            <At :size="16" />
+          </InputIcon>
+          <InputText v-model="username" class="auth-input" :class="{ 'p-invalid': !!error }" autocomplete="username"
+            placeholder="Username" aria-label="Username" />
+        </IconField>
+        <IconField>
+          <InputIcon>
             <User :size="16" />
           </InputIcon>
           <InputText v-model="nickname" class="auth-input" :class="{ 'p-invalid': !!error }" autocomplete="nickname"
@@ -89,6 +96,7 @@ import type { AuthUser } from '~/composables/useAuthUser'
 import VueHcaptcha from '@hcaptcha/vue3-hcaptcha'
 import Github from '@primeicons/vue/github'
 import Envelope from '@primeicons/vue/envelope'
+import At from '@primeicons/vue/at'
 import Key from '@primeicons/vue/key'
 import Lock from '@primeicons/vue/lock'
 import User from '@primeicons/vue/user'
@@ -117,6 +125,7 @@ type Step = 'email' | 'code' | 'init'
 const step = ref<Step>('email')
 const email = ref('')
 const code = ref('')
+const username = ref('')
 const nickname = ref('')
 const password = ref('')
 const confirmPassword = ref('')
@@ -139,7 +148,7 @@ const resendLabel = computed(() =>
 watch(email, () => {
   if (error.value) error.value = ''
 })
-watch([nickname, password, confirmPassword], () => {
+watch([nickname, username, password, confirmPassword], () => {
   if (error.value) error.value = ''
 })
 
@@ -247,7 +256,12 @@ async function verifyCode() {
 // 初始化提醒（可选）：昵称与密码均可留空，留空等同跳过
 async function saveProfile() {
   if (submitting.value) return
+  const uname = username.value.trim()
   const nick = nickname.value.trim()
+  if (uname && !isValidUsername(uname)) {
+    error.value = 'Username must be 2-20 characters (letters, numbers, _ or -).'
+    return
+  }
   if (nick && !isValidNickname(nick)) {
     error.value = 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
     return
@@ -266,20 +280,28 @@ async function saveProfile() {
   try {
     await $fetch('/api/auth/profile', {
       method: 'PATCH',
-      body: { nickname: nick || undefined, password: password.value || undefined }
+      body: {
+        username: uname || undefined,
+        nickname: nick || undefined,
+        password: password.value || undefined
+      }
     })
     await navigateTo('/account')
   } catch (err) {
     const e = err as { statusCode?: number; data?: { data?: { field?: string } } }
     if (e.statusCode === 401) {
       error.value = 'Your session has expired. Please sign in again.'
+    } else if (e.statusCode === 409) {
+      error.value = 'That username is already taken.'
     } else if (e.statusCode === 400) {
       const field = e.data?.data?.field
-      error.value = field === 'nickname'
-        ? 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
-        : field === 'password'
-          ? 'Password must be 6-20 characters with at least one letter and one number (letters, numbers, _ or -).'
-          : 'Please check your input.'
+      error.value = field === 'username'
+        ? 'Username must be 2-20 characters (letters, numbers, _ or -).'
+        : field === 'nickname'
+          ? 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
+          : field === 'password'
+            ? 'Password must be 6-20 characters with at least one letter and one number (letters, numbers, _ or -).'
+            : 'Please check your input.'
     } else {
       error.value = 'Something went wrong. Please try again.'
     }
