@@ -16,9 +16,14 @@
         <small v-if="error" class="auth-error" role="alert">{{ error }}</small>
         <Button type="submit" label="Next" :loading="submitting" fluid />
 
-        <Button type="button" severity="secondary" outlined fluid class="github-btn">
+        <Button type="button" severity="secondary" outlined fluid class="alt-btn">
           <Github aria-hidden="true" />
           <span>Continue with GitHub</span>
+        </Button>
+
+        <Button type="button" severity="secondary" outlined fluid class="alt-btn">
+          <Key aria-hidden="true" />
+          <span>Sign in with Passkey</span>
         </Button>
       </template>
 
@@ -152,7 +157,6 @@ async function requestCode() {
   try {
     const res = await $fetch<{
       sessionId: string
-      registered: boolean
       resendAfterSeconds: number
     }>('/api/auth/email/send-code', { method: 'POST', body: { email: email.value } })
 
@@ -180,20 +184,25 @@ async function verifyCode() {
   submitting.value = true
   error.value = ''
   try {
-    const res = await $fetch<{ email: string; registered: boolean }>('/api/auth/email/verify-code', {
+    const res = await $fetch<{ email: string; isNewUser: boolean }>('/api/auth/email/verify-code', {
       method: 'POST',
       body: { sessionId: sessionId.value, code: code.value }
     })
     email.value = res.email
     await refreshAuth()
-    if (res.registered) {
-      await navigateTo('/account')
-    } else {
+    if (res.isNewUser) {
       step.value = 'init'
+    } else {
+      await navigateTo('/account')
     }
   } catch (err) {
-    const e = err as { statusCode?: number; data?: { data?: { attemptsLeft?: number } } }
-    if (e.statusCode === 410) {
+    const e = err as { statusCode?: number; data?: { data?: { attemptsLeft?: number; retryAfterSeconds?: number } } }
+    if (e.statusCode === 423) {
+      const mins = Math.ceil((e.data?.data?.retryAfterSeconds ?? 0) / 60)
+      error.value = mins > 0
+        ? `Too many incorrect codes. This account is locked for ${mins} min.`
+        : 'Too many incorrect codes. This account is temporarily locked.'
+    } else if (e.statusCode === 410) {
       error.value = 'This code has expired. Please request a new one.'
     } else if (e.statusCode === 403) {
       error.value = 'This account has been disabled.'
@@ -264,6 +273,10 @@ function handleNext() {
     error.value = 'Please enter a valid email address'
     return
   }
+  if (!isAllowedEmail(value)) {
+    error.value = 'Please use a supported email provider'
+    return
+  }
   email.value = value
   return requestCode()
 }
@@ -332,7 +345,7 @@ if (session.value?.user) {
   font-size: 0.9rem;
 }
 
-.github-btn svg {
+.alt-btn svg {
   width: 1.25em;
   height: 1.25em;
 }

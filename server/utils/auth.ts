@@ -9,6 +9,7 @@ import { useDb } from './db'
 
 export const AUTH_COOKIE = 'bits_token'
 const SESSION_SECONDS = 180 * 24 * 60 * 60 // 长时间有效：180 天
+const MAX_DEVICES = 5 // 登录设备上限，超出自动淘汰最久未登录的设备
 
 export interface DeviceEntry {
   type: string
@@ -59,12 +60,17 @@ function normalizeDevices(value: unknown): DeviceEntry[] {
 // 签发登录会话：追加设备记录 + 覆盖登录时间 + 写 HttpOnly Cookie
 export async function issueSession(event: H3Event, user: { uuid: string; login_devices?: unknown }) {
   const token = randomUUID()
-  const devices = normalizeDevices(user.login_devices)
+  let devices = normalizeDevices(user.login_devices)
   devices.push({
     type: detectDeviceType(getRequestHeader(event, 'user-agent') || ''),
     token,
     loginAt: nowString()
   })
+
+  // 设备上限：按登录时间保留最近 MAX_DEVICES 台，自动淘汰最久未登录的
+  if (devices.length > MAX_DEVICES) {
+    devices = devices.sort((a, b) => a.loginAt.localeCompare(b.loginAt)).slice(-MAX_DEVICES)
+  }
 
   await useDb().execute(
     'UPDATE `users` SET `login_devices` = ?, `last_login_at` = NOW() WHERE `uuid` = ?',

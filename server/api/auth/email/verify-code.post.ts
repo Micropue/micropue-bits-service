@@ -1,9 +1,11 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 import type { RowDataPacket } from 'mysql2/promise'
 
-// 校验邮箱验证码：错码计次（5 次销毁会话）
+// 校验邮箱验证码：错码计次（单会话 5 次销毁 + 账户级 3 次锁定 1 小时）
 // 通过 = 登录：未注册邮箱自动完成基础注册（密码为空），已注册邮箱直接登录；随后签发 JWT
-const MAX_ATTEMPTS = 5
+const MAX_ATTEMPTS = 5 // 单会话错码上限（兜底）
+const MAX_LOGIN_FAILURES = 3 // 账户级错码上限：达到即锁定
+const LOCK_SECONDS = 3600 // 账户锁定 1 小时
 
 interface SessionData {
   email: string
@@ -35,11 +37,37 @@ export default defineEventHandler(async event => {
   }
 
   const session = JSON.parse(raw) as SessionData
+
+  // 账户锁定：错码超限被锁定时，即使验证码正确也禁止登录新设备（已登录设备的 JWT 不受影响）
+  const lockTtl = await redis.ttl(AUTH_KEYS.lock(session.email))
+  if (lockTtl > 0) {
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Account temporarily locked',
+      data: { retryAfterSeconds: lockTtl }
+    })
+  }
+
   const matched =
     session.code.length === code.length &&
     timingSafeEqual(Buffer.from(session.code), Buffer.from(code))
 
   if (!matched) {
+    // 账户级错码计数：跨会话累计，达到上限即锁定 1 小时（计数与锁同期失效）
+    const failKey = AUTH_KEYS.fail(session.email)
+    const failCount = await redis.incr(failKey)
+    if (failCount === 1) await redis.expire(failKey, LOCK_SECONDS)
+
+    if (failCount >= MAX_LOGIN_FAILURES) {
+      // 保留会话，使后续校验统一命中锁定分支返回 423（会话最长 5 分钟内自然过期）
+      await redis.set(AUTH_KEYS.lock(session.email), '1', 'EX', LOCK_SECONDS)
+      throw createError({
+        statusCode: 423,
+        statusMessage: 'Account temporarily locked',
+        data: { retryAfterSeconds: LOCK_SECONDS }
+      })
+    }
+
     const attempts = (session.attempts ?? 0) + 1
     if (attempts >= MAX_ATTEMPTS) {
       await redis.del(sessionKey)
@@ -59,8 +87,9 @@ export default defineEventHandler(async event => {
     })
   }
 
-  // 通过：消费会话
+  // 通过：消费会话，清除账户级错码计数
   await redis.del(sessionKey)
+  await redis.del(AUTH_KEYS.fail(session.email))
   const currentUid = await redis.get(AUTH_KEYS.active(session.email))
   if (currentUid === sessionId) await redis.del(AUTH_KEYS.active(session.email))
 
@@ -70,7 +99,7 @@ export default defineEventHandler(async event => {
     [session.email]
   )
   let user: UserRow | undefined = rows[0]
-  const registered = !!user
+  const isNewUser = !user
 
   if (user) {
     if (user.status !== 'normal') {
@@ -102,6 +131,7 @@ export default defineEventHandler(async event => {
   }
 
   await issueSession(event, { uuid: user.uuid, login_devices: user.login_devices })
-  return { email: session.email, registered }
+  // isNewUser 仅在验证码通过（已证明邮箱所有权）后返回，不构成存在性泄露
+  return { email: session.email, isNewUser }
 })
 

@@ -1,25 +1,26 @@
 import { randomInt, randomUUID } from 'node:crypto'
-import type { RowDataPacket } from 'mysql2/promise'
 
-// 发送邮箱验证码：Redis 存「校验会话（uid + code）」，重发使旧会话失效，带冷却与小时限额
+// 发送邮箱验证码：Redis 存「校验会话（uid + code）」，重发使旧会话失效
+// 风控顺序：邮箱后缀白名单 → 账户锁定 → 重发冷却 → 三层限额（IP / IP×邮箱 / 邮箱）
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const CODE_TTL_SECONDS = 300 // 验证码有效期 5 分钟
 const RESEND_COOLDOWN_SECONDS = 60 // 重发冷却 1 分钟
-const HOURLY_LIMIT = 5 // 每邮箱每小时最多 5 次
-const IP_HOURLY_LIMIT = 5 // 每 IP 每小时最多 5 次
+const IP_HOURLY_LIMIT = 10 // 每 IP 每小时最多 10 次
+const PAIR_HOURLY_LIMIT = 3 // 同一 IP + 邮箱每小时最多 3 次
+const EMAIL_HOURLY_LIMIT = 5 // 每邮箱每小时最多 5 次（与 IP 无关，换 IP 也无法绕过）
 const QUOTA_WINDOW_SECONDS = 3600
 
 export default defineEventHandler(async event => {
   const body = await readBody<{ email?: string }>(event)
   const email = String(body?.email ?? '').trim().toLowerCase()
-  if (!EMAIL_RE.test(email)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid email address' })
+  if (!EMAIL_RE.test(email) || !isAllowedEmail(email)) {
+    throw createError({ statusCode: 400, statusMessage: 'Unsupported email address' })
   }
 
   const redis = useRedis()
-  // 内网穿透/代理场景取 x-forwarded-for 中的客户端 IP，直连时取连接地址
-  const ip = getRequestIP(event, { xForwardedFor: true }) || 'unknown'
+  // 取后端连接地址（生产不信任 X-Forwarded-For 等可伪造请求头，详见 clientIp.ts）
+  const ip = getClientIp(event)
 
   // 计数回滚：归零时删除键，避免残留 0 值
   const refund = async (key: string) => {
@@ -27,7 +28,17 @@ export default defineEventHandler(async event => {
     if (left <= 0) await redis.del(key)
   }
 
-  // 1) 重发冷却：1 分钟一次
+  // 1) 账户锁定：错码超限被临时锁定时，发码一并拦截
+  const lockTtl = await redis.ttl(AUTH_KEYS.lock(email))
+  if (lockTtl > 0) {
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Account temporarily locked',
+      data: { retryAfterSeconds: lockTtl }
+    })
+  }
+
+  // 2) 重发冷却：1 分钟一次
   const cooldownKey = AUTH_KEYS.cooldown(email)
   const acquired = await redis.set(cooldownKey, '1', 'EX', RESEND_COOLDOWN_SECONDS, 'NX')
   if (!acquired) {
@@ -39,35 +50,27 @@ export default defineEventHandler(async event => {
     })
   }
 
-  // 2) IP 小时限额：每 IP 最多 5 次
-  const ipKey = AUTH_KEYS.ipQuota(ip)
-  const ipUsed = await redis.incr(ipKey)
-  if (ipUsed === 1) await redis.expire(ipKey, QUOTA_WINDOW_SECONDS)
-  if (ipUsed > IP_HOURLY_LIMIT) {
-    await refund(ipKey)
-    await redis.del(cooldownKey)
-    const ttl = await redis.ttl(ipKey)
-    throw createError({
-      statusCode: 429,
-      statusMessage: 'Too many requests from this network, please try again later',
-      data: { retryAfterSeconds: Math.max(ttl, 1) }
-    })
-  }
-
-  // 3) 邮箱小时限额：每邮箱最多 5 次
-  const quotaKey = AUTH_KEYS.quota(email)
-  const used = await redis.incr(quotaKey)
-  if (used === 1) await redis.expire(quotaKey, QUOTA_WINDOW_SECONDS)
-  if (used > HOURLY_LIMIT) {
-    await refund(quotaKey)
-    await refund(ipKey)
-    await redis.del(cooldownKey)
-    const ttl = await redis.ttl(quotaKey)
-    throw createError({
-      statusCode: 429,
-      statusMessage: 'Too many verification codes requested, please try again later',
-      data: { retryAfterSeconds: Math.max(ttl, 1) }
-    })
+  // 3) 三层限额：任一超限即回滚已计数的层
+  const counters = [
+    { key: AUTH_KEYS.ipQuota(ip), limit: IP_HOURLY_LIMIT },
+    { key: AUTH_KEYS.sendPair(ip, email), limit: PAIR_HOURLY_LIMIT },
+    { key: AUTH_KEYS.quota(email), limit: EMAIL_HOURLY_LIMIT }
+  ]
+  const applied: string[] = []
+  for (const { key, limit } of counters) {
+    const used = await redis.incr(key)
+    if (used === 1) await redis.expire(key, QUOTA_WINDOW_SECONDS)
+    applied.push(key)
+    if (used > limit) {
+      for (const k of applied) await refund(k)
+      await redis.del(cooldownKey)
+      const ttl = await redis.ttl(key)
+      throw createError({
+        statusCode: 429,
+        statusMessage: 'Too many verification codes requested, please try again later',
+        data: { retryAfterSeconds: Math.max(ttl, 1) }
+      })
+    }
   }
 
   // 4) 新建校验会话，同时使该邮箱的旧会话（旧验证码）失效
@@ -79,22 +82,14 @@ export default defineEventHandler(async event => {
   await redis.set(AUTH_KEYS.session(sessionId), JSON.stringify({ email, code }), 'EX', CODE_TTL_SECONDS)
   await redis.set(AUTH_KEYS.active(email), sessionId, 'EX', CODE_TTL_SECONDS)
 
-  // 5) 检测电子邮件注册状态
-  const [rows] = await useDb().query<RowDataPacket[]>(
-    'SELECT uuid FROM `users` WHERE `email` = ? LIMIT 1',
-    [email]
-  )
-  const registered = rows.length > 0
-
-  // 6) 发送验证码邮件；失败则回滚计数与会话，允许立即重试
+  // 5) 发送验证码邮件；失败则回滚计数与会话，允许立即重试
   try {
     await sendVerificationCodeMail(email, code)
   } catch (err) {
     const currentUid = await redis.get(AUTH_KEYS.active(email))
     if (currentUid === sessionId) await redis.del(AUTH_KEYS.active(email))
     await redis.del(AUTH_KEYS.session(sessionId))
-    await refund(quotaKey)
-    await refund(ipKey)
+    for (const k of applied) await refund(k)
     await redis.del(cooldownKey)
     console.error('[auth] 验证码邮件发送失败：', err)
     throw createError({
@@ -114,9 +109,9 @@ export default defineEventHandler(async event => {
     })
   }
 
+  // 不返回注册状态，避免泄露邮箱是否已注册（存在性枚举）
   return {
     sessionId,
-    registered,
     resendAfterSeconds: RESEND_COOLDOWN_SECONDS,
     expiresInSeconds: CODE_TTL_SECONDS
   }
