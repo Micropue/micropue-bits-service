@@ -6,11 +6,15 @@
     <div class="card">
       <div class="row">
         <div class="row-main">
-          <span class="row-label">Password</span>
-          <span class="row-desc">Set or change your sign-in password.</span>
+          <span class="row-label">Password <ExclamationTriangle v-if="!hasPassword" class="row-warn"
+              aria-label="Action required" /></span>
+          <span class="row-desc">
+            {{ hasPassword ? 'Change your sign-in password.' : 'No password set. Set one to sign in without an email code.' }}
+          </span>
         </div>
         <div class="row-control">
-          <Button label="Change password" severity="secondary" outlined size="small" />
+          <Button :label="hasPassword ? 'Change password' : 'Set password'" severity="secondary" outlined size="small"
+            @click="passwordOpen = true" />
         </div>
       </div>
       <div class="row">
@@ -29,6 +33,15 @@
         </div>
         <div class="row-control">
           <Button label="Add passkey" severity="secondary" outlined size="small" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-main">
+          <span class="row-label">Authenticator App</span>
+          <span class="row-desc">Use a time-based one-time code app for two-factor authentication.</span>
+        </div>
+        <div class="row-control">
+          <Button label="Set up" severity="secondary" outlined size="small" />
         </div>
       </div>
     </div>
@@ -63,12 +76,18 @@
       </div>
     </div>
   </section>
+
+  <!-- 设置 / 修改密码 -->
+  <PasswordDialog v-model="passwordOpen" />
 </template>
 
 <script setup lang="ts">
+import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
+
 useHead({ title: 'Login Security' })
 
 const { user: authUser } = useAuthUser()
+const hasPassword = computed(() => authUser.value?.hasPassword ?? false)
 
 const signingOut = ref(false)
 async function signOut() {
@@ -82,4 +101,17 @@ async function signOut() {
   authUser.value = null
   await navigateTo('/')
 }
+
+/* ---------------- 设置 / 修改密码 ---------------- */
+const passwordOpen = ref(false)
 </script>
+
+<style scoped lang="scss">
+.row-warn {
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.35rem;
+  color: var(--p-orange-500);
+  vertical-align: -0.12em;
+}
+</style>

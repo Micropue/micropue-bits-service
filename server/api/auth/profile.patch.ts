@@ -35,6 +35,11 @@ export default defineEventHandler(async event => {
     params.push(nickname)
   }
   if (password !== undefined) {
+    // 此处仅用于「首次设置密码」（注册初始化）。已有密码的修改统一走 PATCH /api/auth/password
+    // （含当前密码校验 + 1 小时限流），避免绕过限流。
+    if (user.password_hash) {
+      throw createError({ statusCode: 403, statusMessage: 'Password already set', data: { field: 'password' } })
+    }
     if (!isValidPassword(password)) {
       throw createError({ statusCode: 400, statusMessage: 'Invalid password', data: { field: 'password' } })
     }

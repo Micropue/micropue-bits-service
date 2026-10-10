@@ -1,6 +1,6 @@
 <template>
   <div class="auth-page">
-    <form class="auth-card" novalidate @submit.prevent="onSubmit">
+    <form class="auth-card" :class="{ 'auth-card--wide': step === 'init' }" novalidate @submit.prevent="onSubmit">
       <h1 class="auth-title">Sign In / Sign Up</h1>
 
       <template v-if="step === 'email'">
@@ -54,38 +54,52 @@
       <template v-else>
         <p class="auth-hint">Set up your profile for <strong>{{ email }}</strong> — optional, you can also do this later</p>
 
-        <IconField>
-          <InputIcon>
-            <At :size="16" />
-          </InputIcon>
-          <InputText v-model="username" class="auth-input" :class="{ 'p-invalid': !!error }" autocomplete="username"
-            placeholder="Username" aria-label="Username" />
-        </IconField>
-        <IconField>
-          <InputIcon>
-            <User :size="16" />
-          </InputIcon>
-          <InputText v-model="nickname" class="auth-input" :class="{ 'p-invalid': !!error }" autocomplete="nickname"
-            placeholder="Nickname" aria-label="Nickname" />
-        </IconField>
-        <IconField>
-          <InputIcon>
-            <Lock :size="16" />
-          </InputIcon>
-          <InputText v-model="password" class="auth-input" :class="{ 'p-invalid': !!error }" type="password"
-            autocomplete="new-password" placeholder="Password" aria-label="Password" />
-        </IconField>
-        <IconField>
-          <InputIcon>
-            <Lock :size="16" />
-          </InputIcon>
-          <InputText v-model="confirmPassword" class="auth-input" :class="{ 'p-invalid': !!error }" type="password"
-            autocomplete="new-password" placeholder="Confirm password" aria-label="Confirm password" />
-        </IconField>
-        <small v-if="error" class="auth-error" role="alert">{{ error }}</small>
-        <Button type="submit" label="Save" :loading="submitting" fluid />
+        <div class="setup">
+          <div class="setup-row">
+            <div class="setup-main">
+              <span class="setup-label">Username
+                <ExclamationTriangle v-if="!usernameSet" class="row-warn" aria-label="Action required" />
+              </span>
+              <span class="setup-desc">Your unique handle. This cannot be changed once set.</span>
+            </div>
+            <div class="setup-control">
+              <span v-if="usernameSet" class="setup-value">{{ authUser?.username }}</span>
+              <Button v-else label="Set" severity="secondary" outlined size="small" @click="usernameOpen = true" />
+            </div>
+          </div>
 
-        <Button type="button" variant="text" severity="secondary" size="small" label="Skip for now" @click="skipInit" />
+          <div class="setup-row">
+            <div class="setup-main">
+              <span class="setup-label">Nickname</span>
+              <span class="setup-desc">This is how others will see you.</span>
+            </div>
+            <div class="setup-control">
+              <Button :label="authUser?.nickname ? 'Change' : 'Set'" severity="secondary" outlined size="small"
+                @click="nicknameOpen = true" />
+            </div>
+          </div>
+
+          <div class="setup-row">
+            <div class="setup-main">
+              <span class="setup-label">Password
+                <ExclamationTriangle v-if="!hasPassword" class="row-warn" aria-label="Action required" />
+              </span>
+              <span class="setup-desc">
+                {{ hasPassword ? 'Change your sign-in password.' : 'No password set. Set one to sign in without an email code.' }}
+              </span>
+            </div>
+            <div class="setup-control">
+              <Button :label="hasPassword ? 'Change password' : 'Set password'" severity="secondary" outlined size="small"
+                @click="passwordOpen = true" />
+            </div>
+          </div>
+        </div>
+
+        <Button type="button" label="Done" fluid @click="finishInit" />
+
+        <UsernameDialog v-model="usernameOpen" />
+        <NicknameDialog v-model="nicknameOpen" />
+        <PasswordDialog v-model="passwordOpen" />
       </template>
     </form>
   </div>
@@ -96,10 +110,8 @@ import type { AuthUser } from '~/composables/useAuthUser'
 import VueHcaptcha from '@hcaptcha/vue3-hcaptcha'
 import Github from '@primeicons/vue/github'
 import Envelope from '@primeicons/vue/envelope'
-import At from '@primeicons/vue/at'
 import Key from '@primeicons/vue/key'
-import Lock from '@primeicons/vue/lock'
-import User from '@primeicons/vue/user'
+import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
 
 useHead({ title: 'Sign In / Sign Up' })
 
@@ -125,20 +137,22 @@ type Step = 'email' | 'code' | 'init'
 const step = ref<Step>('email')
 const email = ref('')
 const code = ref('')
-const username = ref('')
-const nickname = ref('')
-const password = ref('')
-const confirmPassword = ref('')
 const error = ref('')
 const submitting = ref(false)
 const sessionId = ref('')
 const resendIn = ref(0)
 const otpEl = ref<{ $el?: HTMLElement } | null>(null)
 
+// 初始化步骤：用户名 / 昵称 / 密码弹窗开关
+const usernameOpen = ref(false)
+const nicknameOpen = ref(false)
+const passwordOpen = ref(false)
+const usernameSet = computed(() => authUser.value?.usernameSet ?? false)
+const hasPassword = computed(() => authUser.value?.hasPassword ?? false)
+
 let resendTimer: ReturnType<typeof setInterval> | undefined
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-// 昵称 / 密码校验规则统一来自 shared/utils/validators.ts（isValidNickname / isValidPassword）
 
 const resendLabel = computed(() =>
   resendIn.value > 0 ? `Resend code in ${resendIn.value}s` : 'Resend code'
@@ -146,9 +160,6 @@ const resendLabel = computed(() =>
 
 // 输入时清除旧错误
 watch(email, () => {
-  if (error.value) error.value = ''
-})
-watch([nickname, username, password, confirmPassword], () => {
   if (error.value) error.value = ''
 })
 
@@ -253,67 +264,9 @@ async function verifyCode() {
   }
 }
 
-// 初始化提醒（可选）：昵称与密码均可留空，留空等同跳过
-async function saveProfile() {
-  if (submitting.value) return
-  const uname = username.value.trim()
-  const nick = nickname.value.trim()
-  if (uname && !isValidUsername(uname)) {
-    error.value = 'Username must be 2-20 characters (letters, numbers, _ or -).'
-    return
-  }
-  if (nick && !isValidNickname(nick)) {
-    error.value = 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
-    return
-  }
-  if (password.value && !isValidPassword(password.value)) {
-    error.value = 'Password must be 6-20 characters with at least one letter and one number (letters, numbers, _ or -).'
-    return
-  }
-  if (password.value !== confirmPassword.value) {
-    error.value = 'Passwords do not match.'
-    return
-  }
-
-  submitting.value = true
-  error.value = ''
-  try {
-    await $fetch('/api/auth/profile', {
-      method: 'PATCH',
-      body: {
-        username: uname || undefined,
-        nickname: nick || undefined,
-        password: password.value || undefined
-      }
-    })
-    await navigateTo('/account')
-  } catch (err) {
-    const e = err as { statusCode?: number; data?: { data?: { field?: string } } }
-    if (e.statusCode === 401) {
-      error.value = 'Your session has expired. Please sign in again.'
-    } else if (e.statusCode === 409) {
-      error.value = 'That username is already taken.'
-    } else if (e.statusCode === 400) {
-      const field = e.data?.data?.field
-      error.value = field === 'username'
-        ? 'Username must be 2-20 characters (letters, numbers, _ or -).'
-        : field === 'nickname'
-          ? 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
-          : field === 'password'
-            ? 'Password must be 6-20 characters with at least one letter and one number (letters, numbers, _ or -).'
-            : 'Please check your input.'
-    } else {
-      error.value = 'Something went wrong. Please try again.'
-    }
-  } finally {
-    submitting.value = false
-  }
-}
-
 function onSubmit() {
   if (step.value === 'email') return handleNext()
   if (step.value === 'code') return verifyCode()
-  if (step.value === 'init') return saveProfile()
 }
 
 async function handleNext() {
@@ -353,7 +306,7 @@ function backToEmail() {
   resetCaptcha()
 }
 
-async function skipInit() {
+async function finishInit() {
   await navigateTo('/account')
 }
 
@@ -379,6 +332,10 @@ if (session.value?.user) {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
+}
+
+.auth-card--wide {
+  width: min(540px, 100%);
 }
 
 .auth-title {
@@ -430,5 +387,54 @@ if (session.value?.user) {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+/* 初始化步骤：账户设置风格的「左文案右按钮」列表 */
+.setup {
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.setup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+
+  & + .setup-row {
+    border-top: 1px solid var(--p-content-border-color);
+  }
+}
+
+.setup-main {
+  min-width: 0;
+}
+
+.setup-label {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.setup-desc {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+}
+
+.setup-value {
+  font-size: 0.9rem;
+  color: var(--p-text-muted-color);
+}
+
+.row-warn {
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.35rem;
+  color: var(--p-orange-500);
+  vertical-align: -0.12em;
 }
 </style>

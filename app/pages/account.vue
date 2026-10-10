@@ -6,6 +6,7 @@
         <NuxtLink v-for="item in sections" :key="item.to" :to="item.to" class="nav-item">
           <component :is="item.icon" aria-hidden="true" />
           <span>{{ item.label }}</span>
+          <ExclamationTriangle v-if="item.warn" class="nav-warn" aria-label="Action required" />
         </NuxtLink>
       </nav>
     </aside>
@@ -21,6 +22,7 @@ import type { AuthUser } from '~/composables/useAuthUser'
 import User from '@primeicons/vue/user'
 import Folder from '@primeicons/vue/folder'
 import Shield from '@primeicons/vue/shield'
+import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
 
 const { user: authUser } = useAuthUser()
 
@@ -32,11 +34,12 @@ if (data.value?.user) {
   await navigateTo('/sign')
 }
 
-const sections = [
-  { label: 'Account', to: '/account/profile', icon: User },
-  { label: 'Content Management', to: '/account/content', icon: Folder },
-  { label: 'Login Security', to: '/account/security', icon: Shield }
-]
+// warn：待办提醒（用户名未设置 / 密码未设置）
+const sections = computed(() => [
+  { label: 'Account', to: '/account/profile', icon: User, warn: !authUser.value?.usernameSet },
+  { label: 'Login Security', to: '/account/security', icon: Shield, warn: !authUser.value?.hasPassword },
+  { label: 'Content Management', to: '/account/content', icon: Folder, warn: false }
+])
 </script>
 
 <!-- 非 scoped：子路由页面复用本页的卡片/行样式（均在 .settings 作用域内） -->
@@ -95,6 +98,15 @@ const sections = [
       background: var(--active);
       font-weight: 500;
     }
+  }
+
+  /* 待办提醒（用户名 / 密码未设置） */
+  .nav-warn {
+    margin-left: auto;
+    width: 1em;
+    height: 1em;
+    color: var(--p-orange-500);
+    flex-shrink: 0;
   }
 
   /* ---------- Content（子路由页面复用） ---------- */

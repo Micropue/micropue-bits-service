@@ -89,12 +89,12 @@ export default defineNuxtConfig({
     }
   },
   devServer: {
-    port: 3500
+    port: 3500,
   },
   vite: {
     server: {
       // 允许 natapp 内网穿透域名访问开发服务器（前导点匹配所有子域）
-      allowedHosts: ['.natappfree.cc']
+      allowedHosts: true,
     }
   }
 })

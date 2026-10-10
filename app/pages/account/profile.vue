@@ -6,7 +6,8 @@
     <div class="card">
       <div class="row">
         <div class="row-main">
-          <span class="row-label">Username</span>
+          <span class="row-label">Username <ExclamationTriangle v-if="!usernameSet" class="row-warn"
+              aria-label="Action required" /></span>
           <span class="row-desc">Your unique handle. This cannot be changed once set.</span>
         </div>
         <div class="row-control value-action">
@@ -15,7 +16,7 @@
           </template>
           <template v-else>
             <span class="row-value">Not set</span>
-            <Button label="Set" severity="secondary" outlined size="small" @click="openUsername" />
+            <Button label="Set" severity="secondary" outlined size="small" @click="usernameOpen = true" />
           </template>
         </div>
       </div>
@@ -26,7 +27,7 @@
         </div>
         <div class="row-control value-action">
           <span class="row-value">{{ nickname || '—' }}</span>
-          <Button label="Change" severity="secondary" outlined size="small" @click="openNickname" />
+          <Button label="Change" severity="secondary" outlined size="small" @click="nickOpen = true" />
         </div>
       </div>
       <div class="row">
@@ -74,33 +75,8 @@
     </div>
   </section>
 
-  <!-- 设置用户名（一次性） -->
-  <Dialog v-model:visible="usernameOpen" modal :draggable="false" header="Set username" :style="{ width: '26rem' }">
-    <div class="dialog-form">
-      <InputText v-model="usernameInput" :class="{ 'p-invalid': !!usernameError }" maxlength="20"
-        placeholder="Username" aria-label="Username" @keyup.enter="saveUsername" />
-      <small class="dialog-hint">2-20 characters, letters, numbers, _ or -. This cannot be changed once set.</small>
-      <small v-if="usernameError" class="dialog-error" role="alert">{{ usernameError }}</small>
-    </div>
-    <template #footer>
-      <Button label="Cancel" severity="secondary" text @click="usernameOpen = false" />
-      <Button label="Save" :loading="usernameSaving" @click="saveUsername" />
-    </template>
-  </Dialog>
-
-  <!-- 修改昵称 -->
-  <Dialog v-model:visible="nickOpen" modal :draggable="false" header="Change nickname" :style="{ width: '26rem' }">
-    <div class="dialog-form">
-      <InputText v-model="nickInput" :class="{ 'p-invalid': !!nickError }" maxlength="20"
-        placeholder="Nickname" aria-label="Nickname" @keyup.enter="saveNickname" />
-      <small class="dialog-hint">2-20 characters, letters, numbers, _ or -</small>
-      <small v-if="nickError" class="dialog-error" role="alert">{{ nickError }}</small>
-    </div>
-    <template #footer>
-      <Button label="Cancel" severity="secondary" text @click="nickOpen = false" />
-      <Button label="Save" :loading="nickSaving" @click="saveNickname" />
-    </template>
-  </Dialog>
+  <UsernameDialog v-model="usernameOpen" />
+  <NicknameDialog v-model="nickOpen" />
 
   <!-- 修改邮箱 -->
   <Dialog v-model:visible="emailOpen" modal :draggable="false" header="Change email" :style="{ width: '26rem' }">
@@ -139,6 +115,7 @@
 import VueHcaptcha from '@hcaptcha/vue3-hcaptcha'
 import CheckCircle from '@primeicons/vue/check-circle'
 import TimesCircle from '@primeicons/vue/times-circle'
+import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
 
 useHead({ title: 'Account' })
 
@@ -157,81 +134,9 @@ const runtimeConfig = useRuntimeConfig()
 const hcaptchaSitekey = runtimeConfig.public.hcaptchaSitekey
 const devMode = runtimeConfig.public.devMode
 
-/* ---------------- 设置用户名（一次性） ---------------- */
+/* ---------------- 弹窗（用户名 / 昵称） ---------------- */
 const usernameOpen = ref(false)
-const usernameInput = ref('')
-const usernameError = ref('')
-const usernameSaving = ref(false)
-
-function openUsername() {
-  usernameInput.value = ''
-  usernameError.value = ''
-  usernameOpen.value = true
-}
-
-async function saveUsername() {
-  if (usernameSaving.value) return
-  const value = usernameInput.value.trim()
-  if (!isValidUsername(value)) {
-    usernameError.value = 'Username must be 2-20 characters (letters, numbers, _ or -).'
-    return
-  }
-  usernameSaving.value = true
-  usernameError.value = ''
-  try {
-    await $fetch('/api/auth/profile', { method: 'PATCH', body: { username: value } })
-    await refresh()
-    usernameOpen.value = false
-  } catch (err) {
-    const e = err as { statusCode?: number; data?: { data?: { field?: string } } }
-    if (e.statusCode === 401) usernameError.value = 'Your session has expired. Please sign in again.'
-    else if (e.statusCode === 409) usernameError.value = 'That username is already taken.'
-    else if (e.statusCode === 403) usernameError.value = 'Username has already been set and cannot be changed.'
-    else if (e.statusCode === 400) usernameError.value = 'Username must be 2-20 characters (letters, numbers, _ or -).'
-    else usernameError.value = 'Something went wrong. Please try again.'
-  } finally {
-    usernameSaving.value = false
-  }
-}
-
-/* ---------------- 修改昵称 ---------------- */
 const nickOpen = ref(false)
-const nickInput = ref('')
-const nickError = ref('')
-const nickSaving = ref(false)
-
-function openNickname() {
-  nickInput.value = user.value?.nickname ?? ''
-  nickError.value = ''
-  nickOpen.value = true
-}
-
-async function saveNickname() {
-  if (nickSaving.value) return
-  const value = nickInput.value.trim()
-  if (!isValidNickname(value)) {
-    nickError.value = 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
-    return
-  }
-  if (value === user.value?.nickname) {
-    nickOpen.value = false
-    return
-  }
-  nickSaving.value = true
-  nickError.value = ''
-  try {
-    await $fetch('/api/auth/profile', { method: 'PATCH', body: { nickname: value } })
-    await refresh()
-    nickOpen.value = false
-  } catch (err) {
-    const e = err as { statusCode?: number; data?: { data?: { field?: string } } }
-    if (e.statusCode === 401) nickError.value = 'Your session has expired. Please sign in again.'
-    else if (e.statusCode === 400) nickError.value = 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
-    else nickError.value = 'Something went wrong. Please try again.'
-  } finally {
-    nickSaving.value = false
-  }
-}
 
 /* ---------------- 修改邮箱 ---------------- */
 const emailOpen = ref(false)
@@ -414,6 +319,14 @@ async function confirmEmail() {
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+
+.row-warn {
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.35rem;
+  color: var(--p-orange-500);
+  vertical-align: -0.12em;
 }
 
 .dialog-form {

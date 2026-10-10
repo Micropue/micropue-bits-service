@@ -17,5 +17,7 @@ export const AUTH_KEYS = {
   // 账户临时锁定（存在即禁止新设备登录 / 发码）
   lock: (email: string) => `auth:email:lock:${email}`,
   // 邮箱修改冷却：每账户 24 小时内最多修改一次（值为上次修改时间戳）
-  emailChange: (uuid: string) => `auth:email:change:${uuid}`
+  emailChange: (uuid: string) => `auth:email:change:${uuid}`,
+  // 密码修改冷却：每账户 1 小时内最多修改一次
+  passwordChange: (uuid: string) => `auth:password:change:${uuid}`
 }
