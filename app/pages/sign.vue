@@ -129,9 +129,7 @@ const otpEl = ref<{ $el?: HTMLElement } | null>(null)
 let resendTimer: ReturnType<typeof setInterval> | undefined
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-// 与后端一致：昵称 2-20 位；密码 6-20 位且必须同时含数字与字母（字符集均为数字/字母/下划线/短横线）
-const NICKNAME_RE = /^[A-Za-z0-9_-]{2,20}$/
-const PASSWORD_RE = /^(?=.*[0-9])(?=.*[A-Za-z])[A-Za-z0-9_-]{6,20}$/
+// 昵称 / 密码校验规则统一来自 shared/utils/validators.ts（isValidNickname / isValidPassword）
 
 const resendLabel = computed(() =>
   resendIn.value > 0 ? `Resend code in ${resendIn.value}s` : 'Resend code'
@@ -250,11 +248,11 @@ async function verifyCode() {
 async function saveProfile() {
   if (submitting.value) return
   const nick = nickname.value.trim()
-  if (nick && !NICKNAME_RE.test(nick)) {
+  if (nick && !isValidNickname(nick)) {
     error.value = 'Nickname must be 2-20 characters (letters, numbers, _ or -).'
     return
   }
-  if (password.value && !PASSWORD_RE.test(password.value)) {
+  if (password.value && !isValidPassword(password.value)) {
     error.value = 'Password must be 6-20 characters with at least one letter and one number (letters, numbers, _ or -).'
     return
   }

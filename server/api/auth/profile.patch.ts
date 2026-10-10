@@ -1,6 +1,5 @@
 // 更新账户基础信息（登录态）：昵称 / 密码，均可选；全部留空等同跳过
-const NICKNAME_RE = /^[A-Za-z0-9_-]{2,20}$/
-const PASSWORD_RE = /^(?=.*[0-9])(?=.*[A-Za-z])[A-Za-z0-9_-]{6,20}$/
+// 校验规则统一来自 shared/utils/validators.ts
 
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
@@ -17,14 +16,14 @@ export default defineEventHandler(async event => {
   const updates: string[] = []
   const params: unknown[] = []
   if (nickname !== undefined) {
-    if (!NICKNAME_RE.test(nickname)) {
+    if (!isValidNickname(nickname)) {
       throw createError({ statusCode: 400, statusMessage: 'Invalid nickname', data: { field: 'nickname' } })
     }
     updates.push('`nickname` = ?')
     params.push(nickname)
   }
   if (password !== undefined) {
-    if (!PASSWORD_RE.test(password)) {
+    if (!isValidPassword(password)) {
       throw createError({ statusCode: 400, statusMessage: 'Invalid password', data: { field: 'password' } })
     }
     updates.push('`password_hash` = ?')

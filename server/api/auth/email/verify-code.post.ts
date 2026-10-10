@@ -109,6 +109,10 @@ export default defineEventHandler(async event => {
     // 验证通过 = 注册完成：自动建号（密码为空，昵称自动生成）
     const uuid = randomUUID()
     const nickname = `user_${uuid.replace(/-/g, '').slice(0, 8)}`
+    // 兜底：自动生成昵称也须满足 nick 合法性（2-20 位，数字/字母/下划线/短横线）
+    if (!isValidNickname(nickname)) {
+      throw createError({ statusCode: 500, statusMessage: 'Failed to create account' })
+    }
     try {
       await db.execute(
         'INSERT INTO `users` (`uuid`, `email`, `email_verified_at`, `nickname`, `password_hash`) VALUES (?, ?, NOW(), ?, NULL)',

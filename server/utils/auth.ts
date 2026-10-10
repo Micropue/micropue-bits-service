@@ -3,6 +3,7 @@ import { SignJWT, jwtVerify } from 'jose'
 import type { H3Event } from 'h3'
 import type { RowDataPacket } from 'mysql2/promise'
 import { useDb } from './db'
+import { verifyPassword } from './password'
 
 // 登录会话：JWT 载荷含 用户UUID + 登录校验TOKEN + 过期时间（规范详见 项目综合设计.md「三、登录安全」）
 // 登录校验 token 同时写入 users.login_devices，设备被下线后 JWT 立即失效
@@ -22,6 +23,8 @@ export interface AuthUser {
   email: string
   nickname: string
   status: string
+  created_at: string | null
+  last_login_at: string | null
   password_hash: string | null
   login_devices: DeviceEntry[]
   sessionToken: string
@@ -114,11 +117,13 @@ export async function getAuthUser(event: H3Event): Promise<AuthUser | null> {
       email: string
       nickname: string
       status: string
+      created_at: string | null
+      last_login_at: string | null
       password_hash: string | null
       login_devices: unknown
     })[]
   >(
-    'SELECT `uuid`, `email`, `nickname`, `status`, `password_hash`, `login_devices` FROM `users` WHERE `uuid` = ? LIMIT 1',
+    'SELECT `uuid`, `email`, `nickname`, `status`, `created_at`, `last_login_at`, `password_hash`, `login_devices` FROM `users` WHERE `uuid` = ? LIMIT 1',
     [payload.uuid]
   )
   const user = rows[0]
@@ -135,4 +140,20 @@ export async function requireAuth(event: H3Event): Promise<AuthUser> {
   const user = await getAuthUser(event)
   if (!user) throw createError({ statusCode: 401, statusMessage: 'Not signed in' })
   return user
+}
+
+// 敏感操作（如修改邮箱）要求再次确认当前密码
+// - 未设置密码（邮箱验证码注册且未补设）：返回 409，前端提示先设置密码
+// - 密码错误：返回 403
+export async function assertPasswordConfirm(user: AuthUser, password: unknown) {
+  if (!user.password_hash) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Please set a password before changing your email',
+      data: { field: 'password', code: 'NO_PASSWORD' }
+    })
+  }
+  if (typeof password !== 'string' || !(await verifyPassword(password, user.password_hash))) {
+    throw createError({ statusCode: 403, statusMessage: 'Incorrect password', data: { field: 'password' } })
+  }
 }

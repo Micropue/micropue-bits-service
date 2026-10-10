@@ -15,5 +15,7 @@ export const AUTH_KEYS = {
   // 账户级错码计数（跨会话，用于锁定）
   fail: (email: string) => `auth:email:fail:${email}`,
   // 账户临时锁定（存在即禁止新设备登录 / 发码）
-  lock: (email: string) => `auth:email:lock:${email}`
+  lock: (email: string) => `auth:email:lock:${email}`,
+  // 邮箱修改冷却：每账户 24 小时内最多修改一次（值为上次修改时间戳）
+  emailChange: (uuid: string) => `auth:email:change:${uuid}`
 }

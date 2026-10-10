@@ -3,6 +3,9 @@ export interface AuthUser {
   email: string
   nickname: string
   hasPassword: boolean
+  status: string
+  createdAt: string | null
+  lastLoginAt: string | null
 }
 
 // 全局登录态：布局初始化（SSR 友好），登录/登出等事件后由页面刷新或清空
