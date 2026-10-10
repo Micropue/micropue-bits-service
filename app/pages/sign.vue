@@ -14,6 +14,12 @@
             autocomplete="email" autofocus placeholder="you@example.com" aria-label="Email" />
         </IconField>
         <small v-if="error" class="auth-error" role="alert">{{ error }}</small>
+
+        <ClientOnly v-if="hcaptchaSitekey">
+          <VueHcaptcha ref="captchaRef" size="invisible" :sitekey="hcaptchaSitekey" @expired="onCaptchaExpired"
+            @error="onCaptchaExpired" />
+        </ClientOnly>
+
         <Button type="submit" label="Next" :loading="submitting" fluid />
 
         <Button type="button" severity="secondary" outlined fluid class="alt-btn">
@@ -80,6 +86,7 @@
 
 <script setup lang="ts">
 import type { AuthUser } from '~/composables/useAuthUser'
+import VueHcaptcha from '@hcaptcha/vue3-hcaptcha'
 import Github from '@primeicons/vue/github'
 import Envelope from '@primeicons/vue/envelope'
 import Key from '@primeicons/vue/key'
@@ -89,6 +96,21 @@ import User from '@primeicons/vue/user'
 useHead({ title: 'Sign In / Sign Up' })
 
 const { user: authUser, refresh: refreshAuth } = useAuthUser()
+
+// hCaptcha：sitekey 未配置（未填写 .env）时不渲染、不校验
+const runtimeConfig = useRuntimeConfig()
+const hcaptchaSitekey = runtimeConfig.public.hcaptchaSitekey
+const devMode = runtimeConfig.public.devMode
+const captchaRef = ref<{ reset: () => void; executeAsync: () => Promise<{ response: string; key: string }> } | null>(null)
+const captchaToken = ref('')
+
+function onCaptchaExpired() {
+  captchaToken.value = ''
+}
+function resetCaptcha() {
+  captchaToken.value = ''
+  captchaRef.value?.reset()
+}
 
 type Step = 'email' | 'code' | 'init'
 
@@ -158,7 +180,10 @@ async function requestCode() {
     const res = await $fetch<{
       sessionId: string
       resendAfterSeconds: number
-    }>('/api/auth/email/send-code', { method: 'POST', body: { email: email.value } })
+    }>('/api/auth/email/send-code', {
+      method: 'POST',
+      body: { email: email.value, captchaToken: captchaToken.value || undefined }
+    })
 
     sessionId.value = res.sessionId
     code.value = ''
@@ -168,11 +193,15 @@ async function requestCode() {
     await nextTick()
     otpEl.value?.$el?.querySelector('input')?.focus()
   } catch (err) {
-    const retry = Math.ceil(
-      Number((err as { data?: { data?: { retryAfterSeconds?: number } } })?.data?.data?.retryAfterSeconds ?? 0)
-    )
-    error.value = apiErrorMessage(err, retry)
-    if (retry > 0) startCountdown(retry)
+    resetCaptcha()
+    const e = err as { statusCode?: number; data?: { data?: { captcha?: boolean; retryAfterSeconds?: number } } }
+    if (e.data?.data?.captcha) {
+      error.value = 'Human verification failed. Please try again.'
+    } else {
+      const retry = Math.ceil(Number(e.data?.data?.retryAfterSeconds ?? 0))
+      error.value = apiErrorMessage(err, retry)
+      if (retry > 0) startCountdown(retry)
+    }
   } finally {
     submitting.value = false
   }
@@ -267,7 +296,7 @@ function onSubmit() {
   if (step.value === 'init') return saveProfile()
 }
 
-function handleNext() {
+async function handleNext() {
   const value = email.value.trim().toLowerCase()
   if (!EMAIL_RE.test(value)) {
     error.value = 'Please enter a valid email address'
@@ -278,6 +307,20 @@ function handleNext() {
     return
   }
   email.value = value
+
+  // 人机校验：隐藏式组件，点击 Next 时用内置方法调起（dev 环境同样调起）
+  // 生产环境必须有 token；开发环境（MODE=dev）取不到也放行，由后端跳过校验
+  if (hcaptchaSitekey) {
+    try {
+      captchaToken.value = (await captchaRef.value?.executeAsync())?.response ?? ''
+    } catch {
+      captchaToken.value = ''
+    }
+    if (!devMode && !captchaToken.value) {
+      error.value = 'Human verification failed. Please try again.'
+      return
+    }
+  }
   return requestCode()
 }
 
@@ -287,6 +330,7 @@ function backToEmail() {
   error.value = ''
   resendIn.value = 0
   clearInterval(resendTimer)
+  resetCaptcha()
 }
 
 async function skipInit() {

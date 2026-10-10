@@ -80,6 +80,14 @@ export default defineNuxtConfig({
       }
     }
   },
+  runtimeConfig: {
+    public: {
+      // hCaptcha 前端 sitekey（来自 .env 的 HCAPTCHA_SITEKEY）
+      hcaptchaSitekey: process.env.HCAPTCHA_SITEKEY || '',
+      // 开发模式（MODE=dev）：前端仍调起人机校验，但取不到 token 时不拦截（后端跳过校验）
+      devMode: process.env.MODE === 'dev'
+    }
+  },
   devServer: {
     port: 3500
   },

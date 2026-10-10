@@ -12,7 +12,7 @@ const EMAIL_HOURLY_LIMIT = 5 // 每邮箱每小时最多 5 次（与 IP 无关�
 const QUOTA_WINDOW_SECONDS = 3600
 
 export default defineEventHandler(async event => {
-  const body = await readBody<{ email?: string }>(event)
+  const body = await readBody<{ email?: string; captchaToken?: string }>(event)
   const email = String(body?.email ?? '').trim().toLowerCase()
   if (!EMAIL_RE.test(email) || !isAllowedEmail(email)) {
     throw createError({ statusCode: 400, statusMessage: 'Unsupported email address' })
@@ -21,6 +21,12 @@ export default defineEventHandler(async event => {
   const redis = useRedis()
   // 取后端连接地址（生产不信任 X-Forwarded-For 等可伪造请求头，详见 clientIp.ts）
   const ip = getClientIp(event)
+
+  // 人机校验：仅当该邮箱无活跃会话（发起新会话）时要求；重发沿用已通过校验的会话
+  const activeSession = await redis.get(AUTH_KEYS.active(email))
+  if (!activeSession) {
+    await verifyHcaptcha(event, body?.captchaToken)
+  }
 
   // 计数回滚：归零时删除键，避免残留 0 值
   const refund = async (key: string) => {
