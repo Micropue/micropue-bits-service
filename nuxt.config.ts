@@ -1,0 +1,124 @@
+import { definePreset } from '@primeuix/themes'
+import Aura from '@primeuix/themes/aura'
+
+// 黑/白单色主题：primary 映射到中性色阶
+// light：近黑按钮 + 白字；dark：白按钮 + 黑字
+
+// https://nuxt.com/docs/api/configuration/nuxt-config
+
+const Noir = definePreset(Aura, {
+  semantic: {
+    primary: {
+      50: '{zinc.50}',
+      100: '{zinc.100}',
+      200: '{zinc.200}',
+      300: '{zinc.300}',
+      400: '{zinc.400}',
+      500: '{zinc.500}',
+      600: '{zinc.600}',
+      700: '{zinc.700}',
+      800: '{zinc.800}',
+      900: '{zinc.900}',
+      950: '{zinc.950}'
+    },
+
+    colorScheme: {
+      light: {
+        primary: {
+          color: '{zinc.950}',
+          inverseColor: '#ffffff',
+          hoverColor: '{zinc.900}',
+          activeColor: '{zinc.800}'
+        }
+      },
+
+      dark: {
+        primary: {
+          color: '{zinc.50}',
+          inverseColor: '{zinc.950}',
+          hoverColor: '{zinc.100}',
+          activeColor: '{zinc.200}'
+        }
+      }
+    }
+  },
+
+  // Aura 默认是红/蓝/绿/黄四色渐变圈，改为灰阶
+  components: {
+    progressspinner: {
+      colorScheme: {
+        light: {
+          root: {
+            colorOne: '{zinc.300}',
+            colorTwo: '{zinc.500}',
+            colorThree: '{zinc.700}',
+            colorFour: '{zinc.900}'
+          }
+        },
+        dark: {
+          root: {
+            colorOne: '{zinc.700}',
+            colorTwo: '{zinc.500}',
+            colorThree: '{zinc.300}',
+            colorFour: '{zinc.100}'
+          }
+        }
+      }
+    }
+  }
+})
+export default defineNuxtConfig({
+  app: {
+    head: {
+      htmlAttrs: { lang: 'en' },
+      meta: [
+        // 固定缩放：阻止 iOS Safari 聚焦输入框（如首页搜索框）时自动放大页面
+        { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover' },
+        { name: 'description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' },
+        { name: 'robots', content: 'index, follow' },
+        { name: 'theme-color', content: '#ffffff', media: '(prefers-color-scheme: light)' },
+        { name: 'theme-color', content: '#18181b', media: '(prefers-color-scheme: dark)' },
+        // Open Graph
+        { property: 'og:type', content: 'website' },
+        { property: 'og:site_name', content: 'BITS' },
+        { property: 'og:url', content: 'https://bits.micropue.com.cn' },
+        { property: 'og:title', content: 'BITS — Make Your Code Shareable' },
+        { property: 'og:description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' },
+        // Twitter
+        { name: 'twitter:card', content: 'summary' },
+        { name: 'twitter:title', content: 'BITS — Make Your Code Shareable' },
+        { name: 'twitter:description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' }
+      ]
+    }
+  },
+  compatibilityDate: '2025-07-15',
+  devtools: { enabled: true },
+  css: ['~/assets/css/main.scss'],
+  modules: ['@primevue/nuxt-module'],
+  primevue: {
+    options: {
+      ripple: false,
+      theme: {
+        preset: Noir
+      }
+    }
+  },
+  runtimeConfig: {
+    public: {
+      // hCaptcha 前端 sitekey（公开值）。用 NUXT_PUBLIC_ 前缀，使其可在运行时由 .env 覆盖（无需重新构建）
+      hcaptchaSitekey: process.env.NUXT_PUBLIC_HCAPTCHA_SITEKEY || '',
+      // 开发模式（MODE=dev）：前端仍调起人机校验，但取不到 token 时不拦截（后端跳过校验）
+      // 构建期值；如需运行期覆盖可用 NUXT_PUBLIC_DEV_MODE=true/false
+      devMode: process.env.MODE === 'dev'
+    }
+  },
+  devServer: {
+    port: 3500,
+  },
+  vite: {
+    server: {
+      // 允许 natapp 内网穿透域名访问开发服务器（前导点匹配所有子域）
+      allowedHosts: ['192.168.31.135'],
+    }
+  }
+})
