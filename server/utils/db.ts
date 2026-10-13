@@ -1,4 +1,6 @@
 import mysql, { type RowDataPacket } from 'mysql2/promise'
+import { shortId } from './id'
+import { LANGUAGE_SEED } from './languages'
 
 // 用户账户表：所有用户数据统一存这一张表，以账户 UUID 作为唯一标识
 // 规范详见 项目综合设计.md「二、数据结构与开发规范」
@@ -9,6 +11,7 @@ CREATE TABLE IF NOT EXISTS \`users\` (
   \`username\` VARCHAR(254) NOT NULL COMMENT '用户名（唯一，大小写不敏感；注册默认=电子邮件，一旦设置不可修改）',
   \`email_verified_at\` DATETIME NULL COMMENT '电子邮件真实性验证通过时间',
   \`nickname\` VARCHAR(20) NOT NULL COMMENT '昵称（2-20位，仅数字/字母/下划线/短横线）',
+  \`bio\` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '个人介绍',
   \`github_id\` BIGINT UNSIGNED NULL COMMENT 'Github账户ID（一对一绑定）',
   \`github_login\` VARCHAR(39) NULL COMMENT 'Github 用户名（绑定后展示）',
   \`password_hash\` VARCHAR(255) NULL COMMENT '密码哈希（Argon2id/bcrypt/scrypt，禁止明文或普通SHA256）',
@@ -72,6 +75,221 @@ ALTER TABLE \`users\`
   COMMENT '恢复码列表（仅存哈希）[{hash,usedAt}]' AFTER \`two_factor_enabled\`
 `
 
+// 幂等迁移：为旧表补充 bio 列（个人介绍）
+const USERS_BIO_SQL = `
+ALTER TABLE \`users\`
+  ADD COLUMN \`bio\` VARCHAR(500) NOT NULL DEFAULT ''
+  COMMENT '个人介绍' AFTER \`nickname\`
+`
+
+// 短 UUID 列定义：所有内容表的主键与外键统一使用（生成见 server/utils/id.ts）
+const SID = 'CHAR(16) CHARACTER SET ascii COLLATE ascii_bin'
+
+// 内容管理系统数据表（幂等建表），规范详见 项目综合设计.md「二、数据结构与开发规范」
+// 引用规则：指向用户 → *_uuid CHAR(36)（与 users.uuid 同字符集）；指向内容 → *_sid；两者都可能 → target_kind + target_ref
+const CONTENT_TABLES_SQL: string[] = [
+  // 用户开放链接
+  `CREATE TABLE IF NOT EXISTS \`user_links\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '账户UUID',
+    \`platform\` VARCHAR(32) NOT NULL COMMENT '平台键（github/website/... 或 custom）',
+    \`label\` VARCHAR(32) NOT NULL COMMENT '展示名称',
+    \`url\` VARCHAR(512) NOT NULL COMMENT '链接地址',
+    \`sort_order\` INT NOT NULL DEFAULT 0 COMMENT '展示排序',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    KEY \`idx_user_links_user\` (\`user_uuid\`,\`sort_order\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户开放链接表'`,
+
+  // 用户流量统计（统计数据不作账户基础数据）
+  `CREATE TABLE IF NOT EXISTS \`user_stats\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '账户UUID',
+    \`follower_count\` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '粉丝量',
+    \`following_count\` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '关注量',
+    \`received_favorite_count\` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '内容被收藏量',
+    \`received_copy_count\` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '内容被拷贝量',
+    \`snippet_count\` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '代码段数量',
+    \`group_count\` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '分组数量',
+    \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_user_stats_user\` (\`user_uuid\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户流量统计表'`,
+
+  // 编程语言（系统维护，代码段必选其一）
+  `CREATE TABLE IF NOT EXISTS \`languages\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`slug\` VARCHAR(32) NOT NULL COMMENT '标识（小写，如 typescript）',
+    \`name\` VARCHAR(64) NOT NULL COMMENT '语言名称',
+    \`logo_url\` VARCHAR(512) NULL COMMENT 'LOGO地址',
+    \`intro\` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '语言介绍',
+    \`link_url\` VARCHAR(512) NULL COMMENT '外部链接',
+    \`sort_order\` INT NOT NULL DEFAULT 0 COMMENT '展示排序',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_languages_slug\` (\`slug\`),
+    UNIQUE KEY \`uk_languages_name\` (\`name\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='编程语言表'`,
+
+  // 依赖（系统维护，归属一个语言/生态）
+  `CREATE TABLE IF NOT EXISTS \`dependencies\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`language_sid\` ${SID} NOT NULL COMMENT '所属编程语言/生态短UUID',
+    \`name\` VARCHAR(64) NOT NULL COMMENT '依赖名称',
+    \`intro\` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '介绍',
+    \`link_url\` VARCHAR(512) NULL COMMENT '外部链接',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_dependencies_lang_name\` (\`language_sid\`,\`name\`),
+    KEY \`idx_dependencies_name\` (\`name\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='依赖表'`,
+
+  // 标签（tag_key 为规范化键，name 为展示名）
+  `CREATE TABLE IF NOT EXISTS \`tags\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`tag_key\` VARCHAR(32) NOT NULL COMMENT '规范化键（小写、短横线）',
+    \`name\` VARCHAR(32) NOT NULL COMMENT '展示名',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_tags_key\` (\`tag_key\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='标签表'`,
+
+  // 内容表：代码段与分组共享用户目录命名空间 /[username]/{slug}
+  `CREATE TABLE IF NOT EXISTS \`contents\` (
+    \`sid\` ${SID} NOT NULL COMMENT '内容短UUID',
+    \`owner_uuid\` CHAR(36) NOT NULL COMMENT '作者账户UUID',
+    \`kind\` ENUM('snippet','group') NOT NULL COMMENT '内容类型（snippet=代码段 group=分组）',
+    \`slug\` VARCHAR(40) NOT NULL COMMENT '目录名（用户内唯一，可修改；改名留别名重定向）',
+    \`name\` VARCHAR(60) NOT NULL COMMENT '名称',
+    \`intro\` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '介绍',
+    \`visibility\` ENUM('public','private','unlisted') NOT NULL DEFAULT 'private' COMMENT '公开/私有/不可搜索',
+    \`pinned_at\` DATETIME NULL COMMENT '置顶时间（NULL=未置顶，多个置顶按此倒序）',
+    \`sort_order\` INT NOT NULL DEFAULT 0 COMMENT '个人内容拖拽排序',
+    \`fork_from_sid\` ${SID} NULL COMMENT 'Fork来源内容短UUID',
+    \`group_sid\` ${SID} NULL COMMENT '所属分组短UUID（仅代码段）',
+    \`language_sid\` ${SID} NULL COMMENT '主要编程语言短UUID（仅代码段）',
+    \`code\` MEDIUMTEXT NOT NULL DEFAULT ('') COMMENT '代码内容（仅代码段，应用层限制1MB）',
+    \`favorite_count\` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '收藏量',
+    \`copy_count\` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '拷贝量',
+    \`fork_count\` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Fork量',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
+    \`deleted_at\` DATETIME NULL COMMENT '删除时间（非空=已删除，原地址410）',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_contents_owner_slug\` (\`owner_uuid\`,\`slug\`),
+    KEY \`idx_contents_owner\` (\`owner_uuid\`,\`kind\`,\`deleted_at\`),
+    KEY \`idx_contents_group\` (\`group_sid\`),
+    KEY \`idx_contents_language\` (\`language_sid\`),
+    KEY \`idx_contents_explore\` (\`kind\`,\`visibility\`,\`deleted_at\`,\`created_at\`),
+    CONSTRAINT \`chk_contents_kind\` CHECK (
+      (\`kind\` = 'snippet' AND \`language_sid\` IS NOT NULL AND \`code\` <> '')
+      OR (\`kind\` = 'group' AND \`language_sid\` IS NULL AND \`group_sid\` IS NULL AND \`code\` = '')
+    )
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='内容表（代码段+分组，共享用户目录命名空间）'`,
+
+  // 内容历史目录名：改名后旧链接 301 重定向
+  `CREATE TABLE IF NOT EXISTS \`content_aliases\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`owner_uuid\` CHAR(36) NOT NULL COMMENT '内容作者账户UUID',
+    \`slug\` VARCHAR(40) NOT NULL COMMENT '历史目录名',
+    \`content_sid\` ${SID} NOT NULL COMMENT '当前内容短UUID',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '重定向登记时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_content_aliases_owner_slug\` (\`owner_uuid\`,\`slug\`),
+    KEY \`idx_content_aliases_content\` (\`content_sid\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='内容历史目录名表'`,
+
+  // 内容-标签关联
+  `CREATE TABLE IF NOT EXISTS \`content_tags\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`content_sid\` ${SID} NOT NULL COMMENT '内容短UUID',
+    \`tag_sid\` ${SID} NOT NULL COMMENT '标签短UUID',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_content_tags\` (\`content_sid\`,\`tag_sid\`),
+    KEY \`idx_content_tags_tag\` (\`tag_sid\`,\`created_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='内容标签关联表'`,
+
+  // 代码段-依赖关联
+  `CREATE TABLE IF NOT EXISTS \`snippet_dependencies\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`snippet_sid\` ${SID} NOT NULL COMMENT '代码段内容短UUID',
+    \`dependency_sid\` ${SID} NOT NULL COMMENT '依赖短UUID',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_snippet_deps\` (\`snippet_sid\`,\`dependency_sid\`),
+    KEY \`idx_snippet_deps_dep\` (\`dependency_sid\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='代码段依赖关联表'`,
+
+  // 收藏（代码段/分组，不复制内容）
+  `CREATE TABLE IF NOT EXISTS \`favorites\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '账户UUID',
+    \`content_sid\` ${SID} NOT NULL COMMENT '内容短UUID',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_favorites\` (\`user_uuid\`,\`content_sid\`),
+    KEY \`idx_favorites_content\` (\`content_sid\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收藏表'`,
+
+  // 关注关系
+  `CREATE TABLE IF NOT EXISTS \`follows\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`follower_uuid\` CHAR(36) NOT NULL COMMENT '关注者账户UUID',
+    \`followee_uuid\` CHAR(36) NOT NULL COMMENT '被关注者账户UUID',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '关注时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_follows\` (\`follower_uuid\`,\`followee_uuid\`),
+    KEY \`idx_follows_followee\` (\`followee_uuid\`,\`created_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='关注关系表'`,
+
+  // 内容反馈（轻量，不做 Issue 系统）
+  `CREATE TABLE IF NOT EXISTS \`feedback\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '提交者账户UUID',
+    \`content_sid\` ${SID} NOT NULL COMMENT '内容短UUID',
+    \`type\` VARCHAR(32) NOT NULL COMMENT '预设类型键（应用常量）',
+    \`detail\` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '反馈说明',
+    \`status\` ENUM('open','read','closed') NOT NULL DEFAULT 'open' COMMENT '处理状态',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
+    PRIMARY KEY (\`sid\`),
+    KEY \`idx_feedback_content\` (\`content_sid\`,\`created_at\`),
+    KEY \`idx_feedback_user\` (\`user_uuid\`,\`created_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='内容反馈表'`,
+
+  // 举报（可举报用户/内容，进后台处理）
+  `CREATE TABLE IF NOT EXISTS \`reports\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`reporter_uuid\` CHAR(36) NOT NULL COMMENT '举报者账户UUID',
+    \`target_kind\` ENUM('user','content') NOT NULL COMMENT '举报对象类型',
+    \`target_ref\` VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '举报对象（账户UUID或内容短UUID）',
+    \`type\` VARCHAR(32) NOT NULL COMMENT '预设类型键（应用常量）',
+    \`detail\` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '举报说明',
+    \`status\` ENUM('pending','ignored','removed','restricted') NOT NULL DEFAULT 'pending' COMMENT '处理状态',
+    \`handler_uuid\` CHAR(36) NULL COMMENT '处理管理员账户UUID',
+    \`handled_at\` DATETIME NULL COMMENT '处理时间',
+    \`result\` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '处理结果说明',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '举报时间',
+    PRIMARY KEY (\`sid\`),
+    KEY \`idx_reports_status\` (\`status\`,\`created_at\`),
+    KEY \`idx_reports_target\` (\`target_kind\`,\`target_ref\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='举报表'`,
+
+  // 通知（只记必要信息，不做消息流）
+  `CREATE TABLE IF NOT EXISTS \`notifications\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '接收者账户UUID',
+    \`type\` ENUM('follow','feedback','report_result','fork') NOT NULL COMMENT '通知类型',
+    \`actor_uuid\` CHAR(36) NULL COMMENT '触发者账户UUID',
+    \`target_kind\` ENUM('user','content') NULL COMMENT '目标类型',
+    \`target_ref\` VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT '目标（账户UUID或内容短UUID）',
+    \`read_at\` DATETIME NULL COMMENT '已读时间',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    KEY \`idx_notifications_user\` (\`user_uuid\`,\`read_at\`,\`created_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表'`
+]
+
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST,
   port: Number(process.env.MYSQL_PORT || 3306),
@@ -88,8 +306,51 @@ export function useDb() {
   return pool
 }
 
-// 幂等：首次启动检测到表不存在时自动创建；已存在则检查迁移
-export async function ensureSchema() {
+// 编程语言基础数据检测：缺失的补记录、已有记录的空字段（介绍/外部链接）回填
+// 已填写过的内容不覆盖，保留后续维护成果；返回本次补写的记录数
+export async function ensureLanguages(): Promise<number> {
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT `slug`, `intro`, `link_url` FROM `languages`')
+  const existing = new Map(rows.map(row => [row.slug as string, row]))
+  let changed = 0
+
+  const missing = LANGUAGE_SEED
+    .map((lang, index) => ({ ...lang, sort_order: index * 10 }))
+    .filter(lang => !existing.has(lang.slug))
+  if (missing.length) {
+    const placeholders = missing.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')
+    const values = missing.flatMap(lang => [
+      shortId(), lang.slug, lang.name, lang.logo_url, lang.intro, lang.link_url, lang.sort_order
+    ])
+    try {
+      await pool.query(
+        `INSERT INTO \`languages\` (\`sid\`,\`slug\`,\`name\`,\`logo_url\`,\`intro\`,\`link_url\`,\`sort_order\`)
+         VALUES ${placeholders}`,
+        values
+      )
+      changed += missing.length
+    } catch (err) {
+      // 多实例并发启动时另一实例已补齐
+      if ((err as { code?: string }).code !== 'ER_DUP_ENTRY') throw err
+    }
+  }
+
+  // 已存在的记录：只回填空字段
+  for (const lang of LANGUAGE_SEED) {
+    const row = existing.get(lang.slug)
+    if (!row || (row.intro && row.link_url)) continue
+    await pool.query(
+      'UPDATE `languages` SET `intro` = IF(`intro` = \'\', ?, `intro`), `link_url` = IFNULL(`link_url`, ?) WHERE `slug` = ?',
+      [lang.intro, lang.link_url, lang.slug]
+    )
+    changed++
+  }
+
+  return changed
+}
+
+// 幂等：首次启动检测到表不存在时自动创建；已存在则检查迁移；最后补齐编程语言基础数据
+// 返回本次补齐的编程语言数量
+export async function ensureSchema(): Promise<number> {
   await pool.query(USERS_TABLE_SQL)
 
   const [statusCol] = await pool.query<RowDataPacket[]>(
@@ -132,13 +393,14 @@ export async function ensureSchema() {
   // 用户名统一存小写（大小写不敏感，避免展示/存储不一致）
   await pool.query('UPDATE `users` SET `username` = LOWER(`username`) WHERE `username` <> LOWER(`username`)')
 
-  // 两步验证相关列（逐个幂等补充）
-  const twoFactorCols: [string, string][] = [
+  // 逐个幂等补充的可选列（两步验证 + 个人介绍）
+  const extraCols: [string, string][] = [
     ['totp_secret', USERS_TOTP_SECRET_SQL],
     ['two_factor_enabled', USERS_TWO_FACTOR_ENABLED_SQL],
-    ['recovery_codes', USERS_RECOVERY_CODES_SQL]
+    ['recovery_codes', USERS_RECOVERY_CODES_SQL],
+    ['bio', USERS_BIO_SQL]
   ]
-  for (const [col, sql] of twoFactorCols) {
+  for (const [col, sql] of extraCols) {
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT COUNT(*) AS count FROM information_schema.COLUMNS
        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?`,
@@ -146,4 +408,9 @@ export async function ensureSchema() {
     )
     if (!rows[0]?.count) await pool.query(sql)
   }
+
+  // 内容管理系统数据表（幂等建表）
+  for (const sql of CONTENT_TABLES_SQL) await pool.query(sql)
+
+  return await ensureLanguages()
 }
