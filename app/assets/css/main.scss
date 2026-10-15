@@ -28,6 +28,22 @@ body {
   height: 100%;
 }
 
+// LOGO 表现：浅色主题 = 白底 + 品牌原色；深色主题 = 深色面板 + 反白单色
+// 深色下白色/浅灰底座都很刺眼；反白后深色品牌 LOGO（Next.js、COBOL 等）也不会看不见
+:root {
+  --logo-plate: #ffffff;
+  --logo-tint: none;
+  --logo-ink: #18181b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --logo-plate: #1f1f23;
+    --logo-tint: brightness(0) invert(1);
+    --logo-ink: var(--p-text-color);
+  }
+}
+
 // RotatingText 依赖的少量工具类（项目未引入 Tailwind，只补必需项）
 .sr-only {
   position: absolute;
@@ -52,4 +68,8 @@ body {
   display: inline-flex;
   overflow: hidden;
   padding-bottom: 0.08em;
+}
+
+::-webkit-scrollbar{
+  display: none;
 }

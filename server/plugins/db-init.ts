@@ -6,9 +6,9 @@ const RETRY_DELAY_MS = 1000
 export default defineNitroPlugin(async () => {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const addedLanguages = await ensureSchema()
-      console.log(addedLanguages > 0
-        ? `[db] 数据表已就绪，补齐编程语言 ${addedLanguages} 项`
+      const added = await ensureSchema()
+      console.log(added > 0
+        ? `[db] 数据表已就绪，补齐基础数据 ${added} 项`
         : '[db] 数据表已就绪')
       return
     } catch (err) {

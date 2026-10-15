@@ -29,3 +29,5 @@ docs-internal/
 
 # Dev logs
 nohup.out
+
+.playwright-mcp/

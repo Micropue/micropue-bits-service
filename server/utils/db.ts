@@ -1,6 +1,7 @@
 import mysql, { type RowDataPacket } from 'mysql2/promise'
 import { shortId } from './id'
 import { LANGUAGE_SEED } from './languages'
+import { DEPENDENCY_SEED } from './dependencies'
 
 // 用户账户表：所有用户数据统一存这一张表，以账户 UUID 作为唯一标识
 // 规范详见 项目综合设计.md「二、数据结构与开发规范」
@@ -131,18 +132,35 @@ const CONTENT_TABLES_SQL: string[] = [
     UNIQUE KEY \`uk_languages_name\` (\`name\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='编程语言表'`,
 
-  // 依赖（系统维护，归属一个语言/生态）
+  // 依赖/框架目录（系统维护；框架与库同表，用 kind 区分）
   `CREATE TABLE IF NOT EXISTS \`dependencies\` (
     \`sid\` ${SID} NOT NULL COMMENT '短UUID',
-    \`language_sid\` ${SID} NOT NULL COMMENT '所属编程语言/生态短UUID',
-    \`name\` VARCHAR(64) NOT NULL COMMENT '依赖名称',
+    \`slug\` VARCHAR(40) NOT NULL COMMENT '标识（全局唯一，用于检索与页面链接）',
+    \`name\` VARCHAR(64) NOT NULL COMMENT '名称',
+    \`kind\` ENUM('framework','library','tool','runtime') NOT NULL DEFAULT 'library' COMMENT '技术类型（框架/库/工具/运行时）',
     \`intro\` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '介绍',
+    \`logo_url\` VARCHAR(512) NULL COMMENT 'LOGO地址',
     \`link_url\` VARCHAR(512) NULL COMMENT '外部链接',
+    \`sort_order\` INT NOT NULL DEFAULT 0 COMMENT '展示排序',
     \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (\`sid\`),
-    UNIQUE KEY \`uk_dependencies_lang_name\` (\`language_sid\`,\`name\`),
+    UNIQUE KEY \`uk_dependencies_slug\` (\`slug\`),
+    KEY \`idx_dependencies_kind\` (\`kind\`,\`sort_order\`),
     KEY \`idx_dependencies_name\` (\`name\`)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='依赖表'`,
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='依赖/框架目录表'`,
+
+  // 依赖-编程语言关联（多对多：一个条目可适用多种语言，首项为提交顺序里的主语言）
+  `CREATE TABLE IF NOT EXISTS \`dependency_languages\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`dependency_sid\` ${SID} NOT NULL COMMENT '依赖/框架条目短UUID',
+    \`language_sid\` ${SID} NOT NULL COMMENT '编程语言短UUID',
+    \`is_primary\` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '主语言（1=卡面展示与默认归属）',
+    \`sort_order\` INT NOT NULL DEFAULT 0 COMMENT '展示排序',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_dependency_languages\` (\`dependency_sid\`,\`language_sid\`),
+    KEY \`idx_dependency_languages_language\` (\`language_sid\`,\`sort_order\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='依赖-编程语言关联表'`,
 
   // 标签（tag_key 为规范化键，name 为展示名）
   `CREATE TABLE IF NOT EXISTS \`tags\` (
@@ -290,6 +308,31 @@ const CONTENT_TABLES_SQL: string[] = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表'`
 ]
 
+// dependencies 表增量列（旧表升级为「依赖/框架目录」：标识、类型、LOGO、排序）
+const DEPENDENCIES_COLUMNS_SQL: [string, string][] = [
+  ['slug', `
+    ALTER TABLE \`dependencies\`
+      ADD COLUMN \`slug\` VARCHAR(40) NOT NULL
+      COMMENT '标识（全局唯一，用于检索与页面链接）' AFTER \`sid\``],
+  ['kind', `
+    ALTER TABLE \`dependencies\`
+      ADD COLUMN \`kind\` ENUM('framework','library','tool','runtime') NOT NULL DEFAULT 'library'
+      COMMENT '技术类型（框架/库/工具/运行时）' AFTER \`language_sid\``],
+  ['logo_url', `
+    ALTER TABLE \`dependencies\`
+      ADD COLUMN \`logo_url\` VARCHAR(512) NULL
+      COMMENT 'LOGO地址' AFTER \`intro\``],
+  ['sort_order', `
+    ALTER TABLE \`dependencies\`
+      ADD COLUMN \`sort_order\` INT NOT NULL DEFAULT 0
+      COMMENT '展示排序' AFTER \`link_url\``]
+]
+
+const DEPENDENCIES_INDEXES_SQL: [string, string][] = [
+  ['uk_dependencies_slug', 'ALTER TABLE `dependencies` ADD UNIQUE KEY `uk_dependencies_slug` (`slug`)'],
+  ['idx_dependencies_kind', 'ALTER TABLE `dependencies` ADD KEY `idx_dependencies_kind` (`kind`,`sort_order`)']
+]
+
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST,
   port: Number(process.env.MYSQL_PORT || 3306),
@@ -306,10 +349,10 @@ export function useDb() {
   return pool
 }
 
-// 编程语言基础数据检测：缺失的补记录、已有记录的空字段（介绍/外部链接）回填
+// 编程语言基础数据检测：缺失的补记录、已有记录的空字段（图标/介绍/外部链接）回填
 // 已填写过的内容不覆盖，保留后续维护成果；返回本次补写的记录数
 export async function ensureLanguages(): Promise<number> {
-  const [rows] = await pool.query<RowDataPacket[]>('SELECT `slug`, `intro`, `link_url` FROM `languages`')
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT `slug`, `logo_url`, `intro`, `link_url` FROM `languages`')
   const existing = new Map(rows.map(row => [row.slug as string, row]))
   let changed = 0
 
@@ -334,13 +377,16 @@ export async function ensureLanguages(): Promise<number> {
     }
   }
 
-  // 已存在的记录：只回填空字段
+  // 已存在的记录：只回填空字段（图标/介绍/外链），种子里本身为空的不算
   for (const lang of LANGUAGE_SEED) {
     const row = existing.get(lang.slug)
-    if (!row || (row.intro && row.link_url)) continue
+    const needsLogo = !!lang.logo_url && !row?.logo_url
+    const needsIntro = !!row && !row.intro
+    const needsLink = !!row && !row.link_url
+    if (!row || (!needsLogo && !needsIntro && !needsLink)) continue
     await pool.query(
-      'UPDATE `languages` SET `intro` = IF(`intro` = \'\', ?, `intro`), `link_url` = IFNULL(`link_url`, ?) WHERE `slug` = ?',
-      [lang.intro, lang.link_url, lang.slug]
+      'UPDATE `languages` SET `logo_url` = IFNULL(`logo_url`, ?), `intro` = IF(`intro` = \'\', ?, `intro`), `link_url` = IFNULL(`link_url`, ?) WHERE `slug` = ?',
+      [lang.logo_url, lang.intro, lang.link_url, lang.slug]
     )
     changed++
   }
@@ -348,8 +394,91 @@ export async function ensureLanguages(): Promise<number> {
   return changed
 }
 
-// 幂等：首次启动检测到表不存在时自动创建；已存在则检查迁移；最后补齐编程语言基础数据
-// 返回本次补齐的编程语言数量
+// 依赖/框架目录检测：与 ensureLanguages 同规则（缺失补记录、关联缺失补关联、空字段回填、已填写不覆盖）
+// 适用语言是多对多，关系落在 dependency_languages；语言不存在时跳过该语言（语言先于依赖补齐）
+// 返回本次补写的记录数
+export async function ensureDependencies(): Promise<number> {
+  const [languageRows] = await pool.query<RowDataPacket[]>('SELECT `sid`, `slug` FROM `languages`')
+  const languageSidBySlug = new Map(languageRows.map(row => [row.slug as string, row.sid as string]))
+
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT `slug`, `logo_url`, `intro`, `link_url` FROM `dependencies`')
+  const existing = new Map(rows.map(row => [row.slug as string, row]))
+  let changed = 0
+
+  const missing = DEPENDENCY_SEED
+    .map((dep, index) => ({ ...dep, sortOrder: index * 10 }))
+    .filter(dep => !existing.has(dep.slug))
+  if (missing.length) {
+    const placeholders = missing.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ')
+    const values = missing.flatMap(dep => [
+      shortId(), dep.slug, dep.name, dep.kind, dep.intro, dep.logo_url, dep.link_url, dep.sortOrder
+    ])
+    try {
+      await pool.query(
+        `INSERT INTO \`dependencies\`
+           (\`sid\`,\`slug\`,\`name\`,\`kind\`,\`intro\`,\`logo_url\`,\`link_url\`,\`sort_order\`)
+         VALUES ${placeholders}`,
+        values
+      )
+      changed += missing.length
+    } catch (err) {
+      // 多实例并发启动时另一实例已补齐
+      if ((err as { code?: string }).code !== 'ER_DUP_ENTRY') throw err
+    }
+  }
+
+  // 条目 ↔ 语言关联：补齐种子声明但库里还没有的关系（已存在的不动）
+  const [dependencyRows] = await pool.query<RowDataPacket[]>('SELECT `sid`, `slug` FROM `dependencies`')
+  const dependencySidBySlug = new Map(dependencyRows.map(row => [row.slug as string, row.sid as string]))
+  const [linkRows] = await pool.query<RowDataPacket[]>('SELECT `dependency_sid`, `language_sid` FROM `dependency_languages`')
+  const linked = new Set(linkRows.map(row => `${row.dependency_sid}:${row.language_sid}`))
+
+  const newLinks: (string | number)[] = []
+  let newLinkCount = 0
+  for (const dep of DEPENDENCY_SEED) {
+    const dependencySid = dependencySidBySlug.get(dep.slug)
+    if (!dependencySid) continue
+    dep.languages.forEach((language, index) => {
+      const languageSid = languageSidBySlug.get(language)
+      if (!languageSid || linked.has(`${dependencySid}:${languageSid}`)) return
+      newLinks.push(shortId(), dependencySid, languageSid, index === 0 ? 1 : 0, index)
+      newLinkCount++
+    })
+  }
+  if (newLinkCount) {
+    const placeholders = Array.from({ length: newLinkCount }, () => '(?, ?, ?, ?, ?)').join(', ')
+    try {
+      await pool.query(
+        `INSERT INTO \`dependency_languages\`
+           (\`sid\`,\`dependency_sid\`,\`language_sid\`,\`is_primary\`,\`sort_order\`)
+         VALUES ${placeholders}`,
+        newLinks
+      )
+      changed += newLinkCount
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'ER_DUP_ENTRY') throw err
+    }
+  }
+
+  // 已存在的记录：只回填空字段（图标/介绍/外链），种子里本身为空的不算
+  for (const dep of DEPENDENCY_SEED) {
+    const row = existing.get(dep.slug)
+    const needsLogo = !!dep.logo_url && !row?.logo_url
+    const needsIntro = !!row && !row.intro
+    const needsLink = !!row && !row.link_url
+    if (!row || (!needsLogo && !needsIntro && !needsLink)) continue
+    await pool.query(
+      'UPDATE `dependencies` SET `logo_url` = IFNULL(`logo_url`, ?), `intro` = IF(`intro` = \'\', ?, `intro`), `link_url` = IFNULL(`link_url`, ?) WHERE `slug` = ?',
+      [dep.logo_url, dep.intro, dep.link_url, dep.slug]
+    )
+    changed++
+  }
+
+  return changed
+}
+
+// 幂等：首次启动检测到表不存在时自动创建；已存在则检查迁移；最后补齐语言与依赖（框架）基础数据
+// 返回本次补齐的基础数据条数
 export async function ensureSchema(): Promise<number> {
   await pool.query(USERS_TABLE_SQL)
 
@@ -412,5 +541,60 @@ export async function ensureSchema(): Promise<number> {
   // 内容管理系统数据表（幂等建表）
   for (const sql of CONTENT_TABLES_SQL) await pool.query(sql)
 
-  return await ensureLanguages()
+  // dependencies 表增量列与索引（旧表升级）
+  for (const [col, sql] of DEPENDENCIES_COLUMNS_SQL) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dependencies' AND COLUMN_NAME = ?`,
+      [col]
+    )
+    if (!rows[0]?.count) await pool.query(sql)
+  }
+  for (const [index, sql] of DEPENDENCIES_INDEXES_SQL) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS count FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dependencies' AND INDEX_NAME = ?`,
+      [index]
+    )
+    if (!rows[0]?.count) await pool.query(sql)
+  }
+
+  // 旧库升级：dependencies.language_sid（单语言）→ dependency_languages（多语言关联）
+  // 先把旧列的值回填成关联，再删旧列，避免同一事实存两处
+  const [languageCol] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dependencies' AND COLUMN_NAME = 'language_sid'`
+  )
+  if (languageCol[0]?.count) {
+    const [legacyRows] = await pool.query<RowDataPacket[]>(
+      'SELECT `sid`, `language_sid` FROM `dependencies` WHERE `language_sid` IS NOT NULL'
+    )
+    const [linkedRows] = await pool.query<RowDataPacket[]>(
+      'SELECT `dependency_sid`, `language_sid` FROM `dependency_languages`'
+    )
+    const linked = new Set(linkedRows.map(row => `${row.dependency_sid}:${row.language_sid}`))
+    const pending = legacyRows.filter(row => !linked.has(`${row.sid}:${row.language_sid}`))
+    if (pending.length) {
+      const placeholders = pending.map(() => '(?, ?, ?, ?, ?)').join(', ')
+      await pool.query(
+        `INSERT INTO \`dependency_languages\`
+           (\`sid\`,\`dependency_sid\`,\`language_sid\`,\`is_primary\`,\`sort_order\`)
+         VALUES ${placeholders}`,
+        pending.flatMap(row => [shortId(), row.sid, row.language_sid, 1, 0])
+      )
+    }
+    const [legacyIndex] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS count FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dependencies' AND INDEX_NAME = 'uk_dependencies_lang_name'`
+    )
+    if (legacyIndex[0]?.count) {
+      await pool.query('ALTER TABLE `dependencies` DROP INDEX `uk_dependencies_lang_name`')
+    }
+    await pool.query('ALTER TABLE `dependencies` DROP COLUMN `language_sid`')
+  }
+
+  // 基础数据补齐：先语言（依赖需要解析语言 sid）
+  const addedLanguages = await ensureLanguages()
+  const addedDependencies = await ensureDependencies()
+  return addedLanguages + addedDependencies
 }

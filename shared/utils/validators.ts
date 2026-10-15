@@ -10,7 +10,8 @@ export const PASSWORD_RE = /^(?=.*[0-9])(?=.*[A-Za-z])[A-Za-z0-9_-]{6,20}$/
 // 保留用户名：用户名是 URL 第一段，与顶级路由冲突的名称禁止使用
 const RESERVED_USERNAMES = new Set([
   'api', 'sign', 'login', 'logout', 'account', 'settings', 'explore',
-  'search', 'admin', 'static', 'assets', '_nuxt', 'oauth', 'dashboard', 'language'
+  'search', 'admin', 'static', 'assets', '_nuxt', 'oauth', 'dashboard',
+  'language', 'languages', 'framework', 'library', 'tool', 'runtime', 'dependencies', 'legal'
 ])
 
 export function isValidNickname(value: string): boolean {

@@ -361,5 +361,374 @@ export const LANGUAGE_SEED: LanguageSeed[] = [
     intro: 'The standard language for querying and managing relational databases.',
     link_url: 'https://www.w3schools.com/sql/',
     logo_url: null
+  },
+
+  // ---------- 追加批次：函数式 / 学术 ----------
+  {
+    slug: 'elm',
+    name: 'Elm',
+    intro: 'A functional language for web front-ends that promises no runtime exceptions.',
+    link_url: 'https://elm-lang.org/',
+    logo_url: 'https://cdn.simpleicons.org/elm'
+  },
+  {
+    slug: 'purescript',
+    name: 'PureScript',
+    intro: 'A strongly typed, purely functional language that compiles to JavaScript.',
+    link_url: 'https://www.purescript.org/',
+    logo_url: 'https://cdn.simpleicons.org/purescript'
+  },
+  {
+    slug: 'rescript',
+    name: 'ReScript',
+    intro: 'A typed language for the JavaScript platform with a very fast compiler.',
+    link_url: 'https://rescript-lang.org/',
+    logo_url: 'https://cdn.simpleicons.org/rescript'
+  },
+  {
+    slug: 'racket',
+    name: 'Racket',
+    intro: 'A Lisp dialect and environment built for language-oriented programming.',
+    link_url: 'https://racket-lang.org/',
+    logo_url: 'https://cdn.simpleicons.org/racket'
+  },
+  {
+    slug: 'scheme',
+    name: 'Scheme',
+    intro: 'A minimalist Lisp dialect with tail calls and first-class continuations.',
+    link_url: 'https://schemers.org/',
+    logo_url: null
+  },
+  {
+    slug: 'common-lisp',
+    name: 'Common Lisp',
+    intro: 'A mature, multi-paradigm Lisp with a powerful macro system.',
+    link_url: 'https://common-lisp.net/',
+    logo_url: null
+  },
+  {
+    slug: 'gleam',
+    name: 'Gleam',
+    intro: 'A typed functional language that targets the Erlang VM and JavaScript.',
+    link_url: 'https://gleam.run/',
+    logo_url: 'https://cdn.simpleicons.org/gleam'
+  },
+  {
+    slug: 'idris',
+    name: 'Idris',
+    intro: 'A dependently typed functional language where types are first-class values.',
+    link_url: 'https://www.idris-lang.org/',
+    logo_url: null
+  },
+
+  // ---------- 追加批次：系统 / 底层 ----------
+  {
+    slug: 'd',
+    name: 'D',
+    intro: 'A systems language with modern conveniences and C-level performance.',
+    link_url: 'https://dlang.org/',
+    logo_url: 'https://cdn.simpleicons.org/d'
+  },
+  {
+    slug: 'v',
+    name: 'V',
+    intro: 'A simple, fast language positioned as a small alternative to Go and C.',
+    link_url: 'https://vlang.io/',
+    logo_url: 'https://cdn.simpleicons.org/v'
+  },
+  {
+    slug: 'odin',
+    name: 'Odin',
+    intro: 'A data-oriented systems language built for performance and clarity.',
+    link_url: 'https://odin-lang.org/',
+    logo_url: 'https://cdn.simpleicons.org/odin'
+  },
+  {
+    slug: 'hare',
+    name: 'Hare',
+    intro: 'A small systems language with a C-like feel and no hidden runtime.',
+    link_url: 'https://harelang.org/',
+    logo_url: null
+  },
+  {
+    slug: 'ada',
+    name: 'Ada',
+    intro: 'A strongly typed language designed for safety-critical and embedded software.',
+    link_url: 'https://ada-lang.io/',
+    logo_url: null
+  },
+  {
+    slug: 'pascal',
+    name: 'Pascal',
+    intro: 'A structured language long used for teaching and desktop applications.',
+    link_url: 'https://www.freepascal.org/',
+    logo_url: null
+  },
+  {
+    slug: 'assembly',
+    name: 'Assembly',
+    intro: 'The low-level instruction languages emitted by compilers or written by hand.',
+    link_url: 'https://en.wikipedia.org/wiki/Assembly_language',
+    logo_url: null
+  },
+  {
+    slug: 'webassembly',
+    name: 'WebAssembly',
+    intro: 'A portable binary format for running code in browsers and beyond.',
+    link_url: 'https://webassembly.org/',
+    logo_url: 'https://cdn.simpleicons.org/webassembly'
+  },
+  {
+    slug: 'glsl',
+    name: 'GLSL',
+    intro: 'The shading language used with OpenGL for GPU programs.',
+    link_url: 'https://developer.mozilla.org/en-US/docs/Games/Techniques/3D_on_the_web/GLSL_Shaders',
+    logo_url: 'https://cdn.simpleicons.org/opengl'
+  },
+
+  // ---------- 追加批次：Shell / 自动化 ----------
+  {
+    slug: 'fish',
+    name: 'Fish',
+    intro: 'A user-friendly interactive shell with sensible defaults and rich completion.',
+    link_url: 'https://fishshell.com/',
+    logo_url: 'https://cdn.simpleicons.org/fishshell'
+  },
+  {
+    slug: 'zsh',
+    name: 'Zsh',
+    intro: 'An extended Bourne shell with strong completion and scripting features.',
+    link_url: 'https://www.zsh.org/',
+    logo_url: 'https://cdn.simpleicons.org/zsh'
+  },
+  {
+    slug: 'nushell',
+    name: 'Nushell',
+    intro: 'A modern shell that treats data as structured tables.',
+    link_url: 'https://www.nushell.sh/',
+    logo_url: 'https://cdn.simpleicons.org/nushell'
+  },
+  {
+    slug: 'batch',
+    name: 'Batch',
+    intro: 'The Windows command scripting language used for automation tasks.',
+    link_url: 'https://learn.microsoft.com/windows-server/administration/windows-commands/windows-commands',
+    logo_url: null
+  },
+  {
+    slug: 'awk',
+    name: 'AWK',
+    intro: 'A text-processing language for extracting and reporting from structured text.',
+    link_url: 'https://www.gnu.org/software/gawk/manual/gawk.html',
+    logo_url: null
+  },
+  {
+    slug: 'tcl',
+    name: 'Tcl',
+    intro: 'A small scripting language built around strings and extensible commands.',
+    link_url: 'https://www.tcl-lang.org/',
+    logo_url: null
+  },
+  {
+    slug: 'puppet',
+    name: 'Puppet',
+    intro: 'A declarative language for describing and enforcing server configuration.',
+    link_url: 'https://www.puppet.com/',
+    logo_url: 'https://cdn.simpleicons.org/puppet'
+  },
+  {
+    slug: 'autohotkey',
+    name: 'AutoHotkey',
+    intro: 'A scripting language for automating Windows input and desktop tasks.',
+    link_url: 'https://www.autohotkey.com/',
+    logo_url: 'https://cdn.simpleicons.org/autohotkey'
+  },
+
+  // ---------- 追加批次：配置 / 数据 / 接口描述 ----------
+  {
+    slug: 'hcl',
+    name: 'HCL',
+    intro: 'The HashiCorp configuration language used to describe infrastructure.',
+    link_url: 'https://developer.hashicorp.com/terraform/language',
+    logo_url: 'https://cdn.simpleicons.org/terraform'
+  },
+  {
+    slug: 'nix',
+    name: 'Nix',
+    intro: 'A purely functional language for reproducible builds and system configuration.',
+    link_url: 'https://nixos.org/',
+    logo_url: 'https://cdn.simpleicons.org/nixos'
+  },
+  {
+    slug: 'jsonnet',
+    name: 'Jsonnet',
+    intro: 'A data templating language that generates JSON configuration.',
+    link_url: 'https://jsonnet.org/',
+    logo_url: null
+  },
+  {
+    slug: 'dhall',
+    name: 'Dhall',
+    intro: 'A programmable configuration language that is total and type-safe.',
+    link_url: 'https://dhall-lang.org/',
+    logo_url: null
+  },
+  {
+    slug: 'starlark',
+    name: 'Starlark',
+    intro: 'A Python-like configuration language used by Bazel and other build tools.',
+    link_url: 'https://github.com/bazelbuild/starlark',
+    logo_url: 'https://cdn.simpleicons.org/bazel'
+  },
+  {
+    slug: 'graphql',
+    name: 'GraphQL',
+    intro: 'A query language and runtime for APIs described by typed schemas.',
+    link_url: 'https://graphql.org/',
+    logo_url: 'https://cdn.simpleicons.org/graphql'
+  },
+  {
+    slug: 'protobuf',
+    name: 'Protocol Buffers',
+    intro: 'A language-neutral schema language for serialising structured data.',
+    link_url: 'https://protobuf.dev/',
+    logo_url: null
+  },
+  {
+    slug: 'toml',
+    name: 'TOML',
+    intro: 'A minimal configuration format that maps cleanly to hash tables.',
+    link_url: 'https://toml.io/',
+    logo_url: 'https://cdn.simpleicons.org/toml'
+  },
+  {
+    slug: 'xml',
+    name: 'XML',
+    intro: 'A markup language for structured documents and data interchange.',
+    link_url: 'https://www.w3.org/XML/',
+    logo_url: 'https://unpkg.com/devicon@2.17.0/icons/xml/xml-original.svg'
+  },
+  {
+    slug: 'cypher',
+    name: 'Cypher',
+    intro: 'The declarative graph query language used by Neo4j.',
+    link_url: 'https://neo4j.com/docs/cypher-manual/current/',
+    logo_url: 'https://cdn.simpleicons.org/neo4j'
+  },
+
+  // ---------- 追加批次：模板 / 排版 ----------
+  {
+    slug: 'pug',
+    name: 'Pug',
+    intro: 'A template engine that compiles indentation-based syntax to HTML.',
+    link_url: 'https://pugjs.org/',
+    logo_url: 'https://cdn.simpleicons.org/pug'
+  },
+  {
+    slug: 'handlebars',
+    name: 'Handlebars',
+    intro: 'A logic-less templating language for HTML and text.',
+    link_url: 'https://handlebarsjs.com/',
+    logo_url: 'https://cdn.simpleicons.org/handlebarsdotjs'
+  },
+  {
+    slug: 'jinja',
+    name: 'Jinja',
+    intro: 'A fast templating engine for Python applications.',
+    link_url: 'https://jinja.palletsprojects.com/',
+    logo_url: 'https://cdn.simpleicons.org/jinja'
+  },
+  {
+    slug: 'liquid',
+    name: 'Liquid',
+    intro: 'A safe templating language used by Shopify and static site generators.',
+    link_url: 'https://shopify.github.io/liquid/',
+    logo_url: 'https://cdn.simpleicons.org/shopify'
+  },
+  {
+    slug: 'stylus',
+    name: 'Stylus',
+    intro: 'A CSS preprocessor with an expressive, indentation-based syntax.',
+    link_url: 'https://stylus-lang.com/',
+    logo_url: 'https://cdn.simpleicons.org/stylus'
+  },
+  {
+    slug: 'latex',
+    name: 'LaTeX',
+    intro: 'A document preparation system for high-quality technical typesetting.',
+    link_url: 'https://www.latex-project.org/',
+    logo_url: 'https://cdn.simpleicons.org/latex'
+  },
+  {
+    slug: 'asciidoc',
+    name: 'AsciiDoc',
+    intro: 'A plain-text markup language for technical documentation and books.',
+    link_url: 'https://asciidoc.org/',
+    logo_url: 'https://cdn.simpleicons.org/asciidoctor'
+  },
+
+  // ---------- 追加批次：脚本 / 游戏 / 其它 ----------
+  {
+    slug: 'coffeescript',
+    name: 'CoffeeScript',
+    intro: 'A language that compiles to JavaScript with a cleaner, Ruby-like syntax.',
+    link_url: 'https://coffeescript.org/',
+    logo_url: 'https://cdn.simpleicons.org/coffeescript'
+  },
+  {
+    slug: 'haxe',
+    name: 'Haxe',
+    intro: 'A language that compiles to many targets, from JavaScript to native binaries.',
+    link_url: 'https://haxe.org/',
+    logo_url: 'https://cdn.simpleicons.org/haxe'
+  },
+  {
+    slug: 'cython',
+    name: 'Cython',
+    intro: 'A superset of Python that compiles to C for native speed.',
+    link_url: 'https://cython.org/',
+    logo_url: null
+  },
+  {
+    slug: 'raku',
+    name: 'Raku',
+    intro: 'A gradually typed language from the Perl family with powerful grammars.',
+    link_url: 'https://raku.org/',
+    logo_url: null
+  },
+  {
+    slug: 'gdscript',
+    name: 'GDScript',
+    intro: 'The Python-like scripting language used inside the Godot engine.',
+    link_url: 'https://docs.godotengine.org/en/stable/tutorials/scripting/gdscript/',
+    logo_url: 'https://cdn.simpleicons.org/godotengine'
+  },
+  {
+    slug: 'qml',
+    name: 'QML',
+    intro: 'A declarative language for building fluid user interfaces with Qt.',
+    link_url: 'https://doc.qt.io/qt-6/qmlapplications.html',
+    logo_url: 'https://cdn.simpleicons.org/qt'
+  },
+  {
+    slug: 'gherkin',
+    name: 'Gherkin',
+    intro: 'A business-readable language for describing behaviour in Cucumber tests.',
+    link_url: 'https://cucumber.io/docs/gherkin/',
+    logo_url: 'https://cdn.simpleicons.org/cucumber'
+  },
+  {
+    slug: 'cairo',
+    name: 'Cairo',
+    intro: 'A language for writing provable programs and StarkNet smart contracts.',
+    link_url: 'https://www.cairo-lang.org/',
+    logo_url: null
+  },
+  {
+    slug: 'move',
+    name: 'Move',
+    intro: 'A language designed for safe smart contracts on the Aptos and Diem lineage.',
+    link_url: 'https://move-language.github.io/move/',
+    logo_url: null
   }
 ]

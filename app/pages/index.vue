@@ -66,6 +66,9 @@
       </div>
     </Transition>
   </div>
+
+  <!-- 页脚只在首页：内容层抬到它之上，滚动到底部时逐渐露出 -->
+  <SiteFooter />
 </template>
 
 <script setup lang="ts">
@@ -150,7 +153,12 @@ function onSearchFocusOut(event: FocusEvent) {
 
 <style scoped>
 .home {
+  /* 抬到固定在底部的页脚之上，背景要实心才能盖住它 */
   position: relative;
+  z-index: 1;
+  background: var(--p-content-background);
+  /* 至少铺满 header 以下的视口，否则页脚会从底部漏出来 */
+  min-height: calc(100vh - 70px);
   padding: 18vh 1.5rem 0;
 }
 
@@ -297,6 +305,9 @@ function onSearchFocusOut(event: FocusEvent) {
   line-height: 1.4;
   cursor: pointer;
   user-select: none;
+  &:hover{
+    border: none;
+  }
 }
 
 .search-input {
