@@ -105,6 +105,8 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
+      // 站点对外地址（sitemap 用绝对地址，必须是公开域名）；可用 NUXT_PUBLIC_SITE_URL 覆盖
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'https://bits.micropue.com.cn',
       // hCaptcha 前端 sitekey（公开值）。用 NUXT_PUBLIC_ 前缀，使其可在运行时由 .env 覆盖（无需重新构建）
       hcaptchaSitekey: process.env.NUXT_PUBLIC_HCAPTCHA_SITEKEY || '',
       // 开发模式（MODE=dev）：前端仍调起人机校验，但取不到 token 时不拦截（后端跳过校验）

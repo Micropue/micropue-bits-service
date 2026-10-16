@@ -44,6 +44,22 @@ body {
   }
 }
 
+// 控制台（/dashboard）：大背景 + 卡片块。浅色为浅灰底 + 白卡，深色为近黑底 + 抬升面板
+:root {
+  --dash-bg: #f4f4f5;
+  --dash-card: #ffffff;
+  --dash-border: color-mix(in srgb, var(--p-text-color) 12%, transparent);
+  --dash-hover: color-mix(in srgb, var(--p-text-color) 6%, transparent);
+  --dash-active: color-mix(in srgb, var(--p-text-color) 11%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dash-bg: #09090b;
+    --dash-card: #1f1f23;
+  }
+}
+
 // RotatingText 依赖的少量工具类（项目未引入 Tailwind，只补必需项）
 .sr-only {
   position: absolute;

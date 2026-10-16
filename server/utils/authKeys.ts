@@ -35,5 +35,30 @@ export const AUTH_KEYS = {
   // 两步验证第二因子错码计数（按票据）
   twoFaFail: (ticket: string) => `auth:2fa:fail:${ticket}`,
   // 敏感操作二次验证授权标记（存在即表示最近已通过密码 / 两步验证）
-  verifyGrant: (uuid: string) => `auth:verify:grant:${uuid}`
+  verifyGrant: (uuid: string) => `auth:verify:grant:${uuid}`,
+
+  // ---------- 后台系统（Bits System Console）：与前台登录完全隔离的键空间 ----------
+  // 动态认证码会话（按管理员邮箱，值含码哈希与错码次数）
+  consoleCode: (email: string) => `console:code:${email}`,
+  // 重发冷却
+  consoleCooldown: (email: string) => `console:code:cooldown:${email}`,
+  // 每邮箱小时限额
+  consoleQuota: (email: string) => `console:code:quota:${email}`,
+  // 每 IP 小时限额
+  consoleIpQuota: (ip: string) => `console:code:ip:${ip}`,
+  // 发码限额：IP × 邮箱 组合
+  consolePair: (ip: string, email: string) => `console:code:pair:${ip}:${email}`,
+  // 账户级错码计数与临时锁定
+  consoleFail: (email: string) => `console:code:fail:${email}`,
+  consoleLock: (email: string) => `console:code:lock:${email}`,
+  // 敏感操作身份确认授权（绑定/解绑 AuthApp、Passkey 前须先验证一次）
+  consoleGrant: (uuid: string) => `console:grant:${uuid}`,
+  // AuthApp 待激活密钥（绑定流程中，激活前临时存放）
+  consoleTotpSetup: (uuid: string) => `console:totp:setup:${uuid}`,
+  // AuthApp 动态码已用时间步（防重放）
+  consoleTotpStep: (uuid: string) => `console:totp:step:${uuid}`,
+  // WebAuthn 注册 challenge（绑定 Passkey）
+  consoleWebauthnReg: (uuid: string) => `console:webauthn:reg:${uuid}`,
+  // WebAuthn 登录 challenge（不指定用户，随机 challengeId）
+  consoleWebauthnAuth: (challengeId: string) => `console:webauthn:auth:${challengeId}`
 }

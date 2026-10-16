@@ -1,4 +1,5 @@
 import mysql, { type RowDataPacket } from 'mysql2/promise'
+import { randomUUID } from 'node:crypto'
 import { shortId } from './id'
 import { LANGUAGE_SEED } from './languages'
 import { DEPENDENCY_SEED } from './dependencies'
@@ -308,6 +309,57 @@ const CONTENT_TABLES_SQL: string[] = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表'`
 ]
 
+// 后台系统（Bits System Console）数据表（幂等建表）
+// 与前台 users 表完全独立：管理员不属于前台用户体系，登录邮箱也不要求是注册用户
+// 规范详见 docs-internal/Bits System Console 开发设计规范.md
+const ADMIN_TABLES_SQL: string[] = [
+  `CREATE TABLE IF NOT EXISTS \`admins\` (
+    \`uuid\` CHAR(36) NOT NULL COMMENT '管理员UUID',
+    \`email\` VARCHAR(254) NOT NULL COMMENT '登录邮箱（唯一，存小写）',
+    \`name\` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '显示名称（留空则展示邮箱）',
+    \`permissions\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '权限点列表（逐人配置，无用户组）',
+    \`totp_secret\` VARCHAR(255) NULL COMMENT 'AuthApp(TOTP)密钥密文（AES-256-GCM）；存在=已绑定',
+    \`passkeys\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT 'Passkey 列表 [{id,publicKey,counter,...}]；非空=已绑定',
+    \`status\` ENUM('normal','disabled') NOT NULL DEFAULT 'normal' COMMENT '状态（禁用后无法登录）',
+    \`last_login_at\` DATETIME NULL COMMENT '最近登录时间',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
+    PRIMARY KEY (\`uuid\`),
+    UNIQUE KEY \`uk_admins_email\` (\`email\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='后台管理员表'`,
+
+  // 会话落库（JWT 内只带 sid）：退出登录、禁用管理员、删除会话都能立即失效
+  `CREATE TABLE IF NOT EXISTS \`admin_sessions\` (
+    \`sid\` CHAR(36) NOT NULL COMMENT '会话ID（写入控制台 JWT Cookie）',
+    \`admin_uuid\` CHAR(36) NOT NULL COMMENT '管理员UUID',
+    \`user_agent\` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '登录设备 User-Agent',
+    \`ip\` VARCHAR(45) NOT NULL DEFAULT '' COMMENT '登录 IP',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',
+    \`expires_at\` DATETIME NOT NULL COMMENT '失效时间（登录后 7 天，不续期）',
+    PRIMARY KEY (\`sid\`),
+    KEY \`idx_admin_sessions_admin\` (\`admin_uuid\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='后台管理员登录会话表'`,
+
+  // 系统配置（键值对）：当前存认证方式开关 auth.methods
+  `CREATE TABLE IF NOT EXISTS \`admin_settings\` (
+    \`key\` VARCHAR(64) NOT NULL COMMENT '配置键',
+    \`value\` JSON NOT NULL COMMENT '配置值',
+    \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (\`key\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='后台系统配置表'`
+]
+
+// admins 表增量列（旧表升级：AuthApp 密钥与 Passkey 列表）
+const ADMIN_COLUMNS_SQL: [string, string][] = [
+  ['totp_secret', `
+    ALTER TABLE \`admins\`
+      ADD COLUMN \`totp_secret\` VARCHAR(255) NULL
+      COMMENT 'AuthApp(TOTP)密钥密文（AES-256-GCM）；存在=已绑定' AFTER \`permissions\``],
+  ['passkeys', `
+    ALTER TABLE \`admins\`
+      ADD COLUMN \`passkeys\` JSON NOT NULL DEFAULT (JSON_ARRAY())
+      COMMENT 'Passkey 列表 [{id,publicKey,counter,...}]；非空=已绑定' AFTER \`totp_secret\``]
+]
+
 // dependencies 表增量列（旧表升级为「依赖/框架目录」：标识、类型、LOGO、排序）
 const DEPENDENCIES_COLUMNS_SQL: [string, string][] = [
   ['slug', `
@@ -477,6 +529,28 @@ export async function ensureDependencies(): Promise<number> {
   return changed
 }
 
+// 首个管理员来自环境变量 ADMIN_EMAILS（逗号分隔）：仅在管理员表为空时写入，
+// 避免控制台里删掉的管理员被下次重启复活；后续增删一律在控制台完成
+export async function ensureAdmins(): Promise<number> {
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) AS `count` FROM `admins`')
+  if (Number(rows[0]?.count ?? 0) > 0) return 0
+
+  const emails = [...new Set(
+    (process.env.ADMIN_EMAILS ?? '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean)
+  )]
+  if (!emails.length) {
+    console.warn('[console] 管理员表为空且未配置 ADMIN_EMAILS，后台无法登录')
+    return 0
+  }
+
+  const placeholders = emails.map(() => '(?, ?, ?, ?)').join(', ')
+  await pool.query(
+    `INSERT INTO \`admins\` (\`uuid\`,\`email\`,\`name\`,\`permissions\`) VALUES ${placeholders}`,
+    emails.flatMap(email => [randomUUID(), email, '', JSON.stringify(ADMIN_PERMISSION_KEYS)])
+  )
+  return emails.length
+}
+
 // 幂等：首次启动检测到表不存在时自动创建；已存在则检查迁移；最后补齐语言与依赖（框架）基础数据
 // 返回本次补齐的基础数据条数
 export async function ensureSchema(): Promise<number> {
@@ -596,5 +670,30 @@ export async function ensureSchema(): Promise<number> {
   // 基础数据补齐：先语言（依赖需要解析语言 sid）
   const addedLanguages = await ensureLanguages()
   const addedDependencies = await ensureDependencies()
-  return addedLanguages + addedDependencies
+
+  // 后台系统：管理员表 + 会话表 + 配置表，随后按 ADMIN_EMAILS 引导首个管理员
+  for (const sql of ADMIN_TABLES_SQL) await pool.query(sql)
+
+  // admins 表增量列（旧表升级）
+  for (const [col, sql] of ADMIN_COLUMNS_SQL) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admins' AND COLUMN_NAME = ?`,
+      [col]
+    )
+    if (!rows[0]?.count) await pool.query(sql)
+  }
+
+  await pool.query('DELETE FROM `admin_sessions` WHERE `expires_at` < NOW()')
+  const addedAdmins = await ensureAdmins()
+
+  // 兜底告警：表里有管理员但没有正常状态的，控制台实际上没人能登录（需要手工改状态）
+  const [available] = await pool.query<RowDataPacket[]>(
+    "SELECT COUNT(*) AS `count` FROM `admins` WHERE `status` = 'normal'"
+  )
+  if (Number(available[0]?.count ?? 0) === 0) {
+    console.warn('[console] 没有任何正常状态的管理员，后台无法登录（请检查 admins 表）')
+  }
+
+  return addedLanguages + addedDependencies + addedAdmins
 }
