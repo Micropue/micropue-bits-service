@@ -3,7 +3,6 @@
     <section class="dash-card dash-card--wide">
       <div class="dash-card-head">
         <h2 class="dash-card-title">{{ t('settings.authentication') }}</h2>
-        <Tag v-if="!canConfigure" :value="t('settings.readOnly')" severity="secondary" rounded />
       </div>
 
       <div class="settings-rows">
@@ -12,14 +11,14 @@
             <span class="dash-row-label">{{ t(method.labelKey) }}</span>
             <span class="dash-row-desc">{{ t(method.hintKey) }}</span>
           </div>
-          <ToggleSwitch v-model="draft[method.key]" :input-id="`auth-${method.key}`" :disabled="!canConfigure"
+          <ToggleSwitch v-model="draft[method.key]" :input-id="`auth-${method.key}`"
             :aria-label="t(method.labelKey)" />
         </div>
       </div>
 
       <p class="dash-card-note">{{ t('settings.note') }}</p>
 
-      <div v-if="canConfigure" class="settings-actions">
+      <div class="settings-actions">
         <Button :label="t('settings.save')" size="small" :loading="saving" :disabled="!dirty" @click="save" />
         <Button :label="t('settings.reset')" severity="secondary" text size="small" :disabled="!dirty || saving"
           @click="reset" />
@@ -50,13 +49,6 @@
           <span class="dash-row-desc">{{ t('settings.signedInAdmin') }}</span>
         </div>
       </div>
-      <div class="permission-block">
-        <p class="dash-card-note">{{ t('settings.permissionsNote') }}</p>
-        <div class="permission-list">
-          <Tag v-for="permission in user?.permissions ?? []" :key="permission" :value="permission"
-            severity="secondary" rounded />
-        </div>
-      </div>
     </section>
   </div>
 </template>
@@ -76,7 +68,6 @@ const displayName = computed(() => adminDisplayName(user.value))
 
 const { data } = await useFetch<{ authMethods: AdminAuthMethods, sessionDays: number }>('/api/dashboard/settings')
 const sessionDays = computed(() => data.value?.sessionDays ?? ADMIN_SESSION_DAYS)
-const canConfigure = computed(() => user.value?.permissions.includes('system.config') ?? false)
 
 const draft = ref<AdminAuthMethods>({ ...(data.value?.authMethods ?? methods.value) })
 const saved = ref<AdminAuthMethods>({ ...draft.value })
@@ -106,7 +97,7 @@ async function save() {
     toast.add({
       severity: 'error',
       summary: t('toast.configFailed'),
-      detail: e.statusCode === 403 ? t('toast.noConfigPermission') : (e.statusMessage ?? t('common.tryAgain')),
+      detail: e.statusMessage ?? t('common.tryAgain'),
       life: 6000
     })
   } finally {
@@ -136,17 +127,5 @@ useHead({
 .dash-value {
   font-size: 0.9rem;
   color: var(--p-text-muted-color);
-}
-
-.permission-block {
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--dash-border);
-}
-
-.permission-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.5rem;
 }
 </style>

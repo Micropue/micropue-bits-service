@@ -5,7 +5,7 @@
         <h2 class="page-title">{{ t('dependencies.title') }}</h2>
         <p class="page-sub">{{ t('dependencies.subtitle', { count: dependencies.length }) }}</p>
       </div>
-      <Button v-if="canWrite" :label="t('dependencies.new')" size="small" @click="openCreate">
+      <Button :label="t('dependencies.new')" size="small" @click="openCreate">
         <template #icon>
           <Plus aria-hidden="true" />
         </template>
@@ -118,7 +118,7 @@
 import Plus from '@primeicons/vue/plus'
 import type { ConsoleColumn } from '~/components/ConsoleDataTable.vue'
 
-// 已发布依赖：全量列表 + 搜索/筛选/排除/按类型分类 + 基础 CRUD（catalog.write 才可改）
+// 已发布依赖：全量列表 + 搜索/筛选/排除/按类型分类 + 基础 CRUD
 definePageMeta({ layout: 'dashboard', middleware: 'admin' })
 
 interface DependencyLanguage {
@@ -143,14 +143,11 @@ interface DependencyRow {
   language_text: string
 }
 
-const { user } = useAdminAuth()
 const { t, restoreLocale } = useConsoleI18n()
 const toast = useToast()
 const confirm = useConfirm()
 
 onMounted(restoreLocale)
-
-const canWrite = computed(() => user.value?.permissions.includes('catalog.write') ?? false)
 
 const { data, pending, refresh } = await useFetch<{ dependencies: DependencyRow[] }>('/api/dashboard/dependencies')
 const { data: languageData } = await useFetch<{ languages: { sid: string, name: string }[] }>('/api/dashboard/languages')

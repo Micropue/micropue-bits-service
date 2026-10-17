@@ -1,7 +1,8 @@
 <template>
   <NuxtLink :to="to" class="tile">
     <span class="tile-logo">
-      <img v-if="logo_url" :src="logo_url" alt="" width="36" height="36" loading="lazy" decoding="async" />
+      <img v-if="logo_url" :src="logo_url" alt="" width="36" height="36" loading="lazy" decoding="async"
+        @error="($event.target as HTMLImageElement).style.display = 'none'" />
       <!-- 无图标条目用首字母兜底 -->
       <span v-else class="tile-initial">{{ name.charAt(0) }}</span>
     </span>

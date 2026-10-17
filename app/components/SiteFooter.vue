@@ -40,11 +40,12 @@ const revealed = ref(false)
 // JS 量测前先用样式表里的兜底高度（SSR 首屏不跳动）
 const spacerHeight = ref('')
 
-// 网站地图：只放入口，不在页脚罗列具体条目；入口页（/languages、/dependencies）待实现
+// 网站地图：只放入口，不在页脚罗列具体条目
 const entries = [
   { to: '/account', name: 'Account' },
   { to: '/languages', name: 'Languages' },
-  { to: '/dependencies', name: 'Dependencies' }
+  { to: '/dependencies', name: 'Dependencies' },
+  { to: '/request', name: 'Submit an entry' }
 ]
 
 // 法务入口（页面待实现，统一挂在 /legal/ 下，便于只保留一个用户名保留词）

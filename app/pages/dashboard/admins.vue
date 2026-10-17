@@ -9,7 +9,7 @@
             : t('admins.subtitlePlural', { count: admins.length }) }}
         </p>
       </div>
-      <Button v-if="canManage" :label="t('admins.new')" size="small" @click="openCreate">
+      <Button :label="t('admins.new')" size="small" @click="openCreate">
         <template #icon>
           <Plus aria-hidden="true" />
         </template>
@@ -42,7 +42,7 @@
         </template>
       </Column>
 
-      <Column v-if="canManage" header="" style="width: 8rem">
+      <Column header="" style="width: 8rem">
         <template #body="{ data: admin }">
           <div class="cell-actions">
             <Button :label="t('admins.edit')" severity="secondary" text size="small" :disabled="busy"
@@ -72,17 +72,6 @@
           :placeholder="t('admins.field.namePlaceholder')" fluid />
       </label>
 
-      <div class="field">
-        <span>{{ t('admins.field.permissions') }}</span>
-        <div class="permission-picker">
-          <label v-for="permission in ADMIN_PERMISSIONS" :key="permission.key" class="permission-option">
-            <Checkbox v-model="draft.permissions" :input-id="`perm-${permission.key}`" :value="permission.key"
-              :name="`perm-${permission.key}`" />
-            <span>{{ t(`perm.${permission.key}`) }}</span>
-          </label>
-        </div>
-      </div>
-
       <div v-if="editing" class="field field--row">
         <div>
           <span class="field-label">{{ t('admins.field.disabled') }}</span>
@@ -107,12 +96,11 @@
 import Plus from '@primeicons/vue/plus'
 import type { AdminUser } from '~/composables/useAdminAuth'
 
-// 管理员列表与权限配置：增删改需要 admins.manage 权限，查看对所有管理员开放
+// 管理员列表与增删改：所有登录管理员权限相同，都可操作
 definePageMeta({ layout: 'dashboard', middleware: 'admin' })
 
 interface AdminsResponse {
   admins: AdminUser[]
-  canManage: boolean
   selfUuid: string
 }
 
@@ -123,7 +111,6 @@ const { t, locale, restoreLocale } = useConsoleI18n()
 
 onMounted(restoreLocale)
 
-const canManage = computed(() => data.value?.canManage ?? false)
 const selfUuid = computed(() => data.value?.selfUuid ?? '')
 const admins = computed(() => data.value?.admins ?? [])
 
@@ -134,7 +121,7 @@ const dialogVisible = ref(false)
 const dialogError = ref('')
 const editing = ref(false)
 const draftDisabled = ref(false)
-const draft = ref({ uuid: '', email: '', name: '', permissions: [] as string[] })
+const draft = ref({ uuid: '', email: '', name: '' })
 const draftEmailValid = computed(() => EMAIL_RE.test(draft.value.email.trim()))
 
 function notify(severity: 'success' | 'error', summary: string, detail?: string) {
@@ -160,12 +147,11 @@ function methodSummary(admin: AdminUser) {
 
 function apiError(err: unknown, fallbackKey: string) {
   const e = err as { statusCode?: number, statusMessage?: string }
-  if (e.statusCode === 403) return t('common.noPermission')
   return e.statusMessage ?? t(fallbackKey)
 }
 
 function openCreate() {
-  draft.value = { uuid: '', email: '', name: '', permissions: [] }
+  draft.value = { uuid: '', email: '', name: '' }
   draftDisabled.value = false
   dialogError.value = ''
   editing.value = false
@@ -173,7 +159,7 @@ function openCreate() {
 }
 
 function openEdit(admin: AdminUser) {
-  draft.value = { uuid: admin.uuid, email: admin.email, name: admin.name, permissions: [...admin.permissions] }
+  draft.value = { uuid: admin.uuid, email: admin.email, name: admin.name }
   draftDisabled.value = admin.status !== 'normal'
   dialogError.value = ''
   editing.value = true
@@ -190,7 +176,6 @@ async function submitDialog() {
         method: 'PATCH',
         body: {
           name: draft.value.name,
-          permissions: draft.value.permissions,
           status: draftDisabled.value ? 'disabled' : 'normal'
         }
       })
@@ -201,7 +186,7 @@ async function submitDialog() {
       }
       await $fetch('/api/dashboard/admins', {
         method: 'POST',
-        body: { email: draft.value.email.trim(), name: draft.value.name, permissions: draft.value.permissions }
+        body: { email: draft.value.email.trim(), name: draft.value.name }
       })
     }
     dialogVisible.value = false
@@ -330,22 +315,6 @@ useHead({
   margin-top: 0.15rem;
   font-size: 0.78rem;
   color: var(--p-text-muted-color);
-}
-
-.permission-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.permission-option {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.85rem;
-  font-weight: 400;
-  color: var(--p-text-color);
-  cursor: pointer;
 }
 </style>
 

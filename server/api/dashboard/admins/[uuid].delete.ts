@@ -1,6 +1,6 @@
 // 移除管理员：不能删自己，也不能删到最后一个正常管理员
 export default defineEventHandler(async event => {
-  const self = await requireAdmin(event, 'admins.manage')
+  const self = await requireAdmin(event)
   const uuid = String(getRouterParam(event, 'uuid') ?? '')
   const target = await fetchAdminByUuid(uuid)
   if (!target) throw createError({ statusCode: 404, statusMessage: 'Administrator not found' })

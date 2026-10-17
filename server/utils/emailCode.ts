@@ -132,6 +132,9 @@ export async function issueEmailCode(
     })
   }
 
+  // 本地开发提示：收不到信时从服务端日志取码（仅 MODE=dev，与后台登录码一致）
+  if (process.env.MODE === 'dev') console.log(`[auth] 邮箱验证码（dev）：${email} → ${code}`)
+
   return {
     sessionId,
     resendAfterSeconds: RESEND_COOLDOWN_SECONDS,

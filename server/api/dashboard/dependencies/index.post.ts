@@ -1,6 +1,6 @@
-// 新建依赖（catalog.write）：可选带上归属语言，首项为主语言
+// 新建依赖：可选带上归属语言，首项为主语言
 export default defineEventHandler(async event => {
-  await requireAdmin(event, 'catalog.write')
+  await requireAdmin(event)
   const body = await readBody<Record<string, unknown>>(event)
   const fields = readCatalogBody(body ?? {})
   const languageSids = readLanguageSids(body?.language_sids)

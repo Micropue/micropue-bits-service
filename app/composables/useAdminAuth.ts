@@ -15,8 +15,6 @@ export interface AdminUser {
   uuid: string
   email: string
   name: string
-  // 权限点：逐人配置，不做用户组
-  permissions: string[]
   status: string
   last_login_at: string | null
   created_at: string | null

@@ -1,8 +1,9 @@
 <template>
   <div class="search">
     <div class="search-field">
-      <InputText v-model="query" fluid class="search-input" :placeholder="placeholder" aria-label="Search the catalog"
-        autocomplete="off" spellcheck="false" enterkeyhint="search" />
+      <InputText id="catalog-search" v-model="query" name="catalog-search" fluid class="search-input"
+        :placeholder="placeholder" aria-label="Search the catalog" autocomplete="off" spellcheck="false"
+        enterkeyhint="search" />
 
       <!-- 清空用独立的 Button（图标按钮点击区域 2.5rem），原生 search 的取消按钮太小 -->
       <Button v-if="term" severity="secondary" text rounded class="search-clear" aria-label="Clear search"

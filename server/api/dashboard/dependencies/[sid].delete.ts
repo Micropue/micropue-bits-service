@@ -1,8 +1,8 @@
 import type { RowDataPacket } from 'mysql2/promise'
 
-// 删除依赖（catalog.write）：被代码段引用时拒绝；否则连带清理语言关联
+// 删除依赖：被代码段引用时拒绝；否则连带清理语言关联
 export default defineEventHandler(async event => {
-  await requireAdmin(event, 'catalog.write')
+  await requireAdmin(event)
   const sid = String(getRouterParam(event, 'sid') ?? '')
   const current = await fetchDependencyRow(sid)
   if (!current) throw createError({ statusCode: 404, statusMessage: 'Dependency not found' })

@@ -5,7 +5,7 @@
         <h2 class="page-title">{{ t('languages.title') }}</h2>
         <p class="page-sub">{{ t('languages.subtitle', { count: languages.length }) }}</p>
       </div>
-      <Button v-if="canWrite" :label="t('languages.new')" size="small" @click="openCreate">
+      <Button :label="t('languages.new')" size="small" @click="openCreate">
         <template #icon>
           <Plus aria-hidden="true" />
         </template>
@@ -98,7 +98,7 @@
 import Plus from '@primeicons/vue/plus'
 import type { ConsoleColumn } from '~/components/ConsoleDataTable.vue'
 
-// 已发布语言：全量列表 + 搜索/筛选/排除/分类 + 基础 CRUD（catalog.write 才可改）
+// 已发布语言：全量列表 + 搜索/筛选/排除/分类 + 基础 CRUD
 definePageMeta({ layout: 'dashboard', middleware: 'admin' })
 
 interface LanguageRow {
@@ -114,14 +114,11 @@ interface LanguageRow {
   content_count: number
 }
 
-const { user } = useAdminAuth()
 const { t, locale, restoreLocale } = useConsoleI18n()
 const toast = useToast()
 const confirm = useConfirm()
 
 onMounted(restoreLocale)
-
-const canWrite = computed(() => user.value?.permissions.includes('catalog.write') ?? false)
 
 const { data, pending, refresh } = await useFetch<{ languages: LanguageRow[] }>('/api/dashboard/languages')
 const languages = computed(() => data.value?.languages ?? [])

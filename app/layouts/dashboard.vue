@@ -21,11 +21,14 @@
                 <span>{{ t(item.labelKey) }}</span>
                 <ChevronDown class="console-caret" aria-hidden="true" />
               </button>
-              <div v-if="isExpanded(item)" class="console-sublist">
-                <NuxtLink v-for="child in item.children" :key="child.to" :to="child.to"
-                  class="console-link console-link--child" @click="drawerOpen = false">
-                  <span>{{ t(child.labelKey) }}</span>
-                </NuxtLink>
+              <!-- 用 grid-rows 0fr → 1fr 做展开/收起动画（收起时 visibility 隐藏，保持键盘不可达） -->
+              <div class="console-sublist-wrap" :class="{ 'is-open': isExpanded(item) }">
+                <div class="console-sublist">
+                  <NuxtLink v-for="child in item.children" :key="child.to" :to="child.to"
+                    class="console-link console-link--child" @click="drawerOpen = false">
+                    <span>{{ t(child.labelKey) }}</span>
+                  </NuxtLink>
+                </div>
               </div>
             </div>
             <NuxtLink v-else-if="item.to" :to="item.to" class="console-link" @click="drawerOpen = false">
@@ -153,17 +156,27 @@ const navGroups: { labelKey: string, items: NavItem[] }[] = [
   }
 ]
 
-// 二级菜单展开状态：默认收起，进入子路由时自动展开
+// 二级菜单展开状态：默认收起，进入子路由时自动展开；手动点击可覆盖（collapsed 优先）
 const expanded = ref<string[]>([])
+const collapsed = ref<string[]>([])
+
+function routeExpands(item: NavItem) {
+  return !!item.children?.some(child => route.path === child.to || route.path.startsWith(`${child.to}/`))
+}
+
 function isExpanded(item: NavItem) {
-  return expanded.value.includes(item.labelKey) ||
-    !!item.children?.some(child => route.path === child.to || route.path.startsWith(`${child.to}/`))
+  if (collapsed.value.includes(item.labelKey)) return false
+  return expanded.value.includes(item.labelKey) || routeExpands(item)
 }
 
 function toggleGroup(item: NavItem) {
-  expanded.value = isExpanded(item) && expanded.value.includes(item.labelKey)
-    ? expanded.value.filter(key => key !== item.labelKey)
-    : [...new Set([...expanded.value, item.labelKey])]
+  if (isExpanded(item)) {
+    collapsed.value = [...new Set([...collapsed.value, item.labelKey])]
+    expanded.value = expanded.value.filter(key => key !== item.labelKey)
+  } else {
+    collapsed.value = collapsed.value.filter(key => key !== item.labelKey)
+    expanded.value = [...new Set([...expanded.value, item.labelKey])]
+  }
 }
 
 const titleKeys: Record<string, string> = {
@@ -292,10 +305,11 @@ async function onSignOut() {
   &:not(.console--nav-open) {
     grid-template-columns: 0 minmax(0, 1fr);
 
-    /* 收起时连内边距一起收掉，否则会留下一条 26px 的空隙 */
+    /* 收起时连内边距一起收掉，否则会留下一条 26px 的空隙；也不显示滚动条 */
     .console-nav {
       padding-left: 0;
       padding-right: 0;
+      overflow: hidden;
     }
   }
 
@@ -305,7 +319,14 @@ async function onSignOut() {
     flex-direction: column;
     gap: 1.75rem;
     padding: 1.4rem 1rem 1.5rem;
-    overflow: hidden;
+    /* 页面滚动时侧栏固定不动（sticky + 自身可滚动），内容列独立滚动 */
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .console-brand {
@@ -404,6 +425,10 @@ async function onSignOut() {
     width: 100%;
     border: 0;
     background: transparent;
+    /* <button> 不会继承字体族，不写这行会用系统默认字体，与旁边的链接不一致
+       （只取字体族，字号字重仍由 .console-link / 本规则控制） */
+    font-family: inherit;
+    font-weight: inherit;
     text-align: left;
     cursor: pointer;
 
@@ -419,12 +444,31 @@ async function onSignOut() {
     transition: transform 0.18s ease;
   }
 
+  .console-sublist-wrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.24s ease;
+    overflow: hidden;
+
+    &.is-open {
+      grid-template-rows: 1fr;
+    }
+  }
+
   .console-sublist {
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
-    margin: 0.1rem 0 0.25rem;
-    padding-left: 1.05rem;
+    min-height: 0;
+    padding: 0 0 0 1.05rem;
+    overflow: hidden;
+    visibility: hidden;
+    transition: visibility 0s linear 0.24s;
+  }
+
+  .console-sublist-wrap.is-open .console-sublist {
+    visibility: visible;
+    transition-delay: 0s;
   }
 
   .console-link--child {
@@ -485,6 +529,7 @@ async function onSignOut() {
   .console-icon-button {
     display: grid;
     place-items: center;
+    font-family: inherit;
     width: 2.25rem;
     height: 2.25rem;
     padding: 0;
@@ -508,6 +553,7 @@ async function onSignOut() {
   .console-avatar {
     display: grid;
     place-items: center;
+    font-family: inherit;
     width: 2.25rem;
     height: 2.25rem;
     padding: 0;
@@ -647,6 +693,9 @@ async function onSignOut() {
       bottom: 0;
       left: 0;
       width: var(--nav-width);
+      padding-left: 1rem;
+      padding-right: 1rem;
+      overflow-y: auto;
       background: var(--dash-bg);
       transform: translateX(-100%);
       transition: transform 0.22s ease;

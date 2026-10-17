@@ -1,6 +1,6 @@
-// 新建编程语言（catalog.write）
+// 新建编程语言
 export default defineEventHandler(async event => {
-  await requireAdmin(event, 'catalog.write')
+  await requireAdmin(event)
   const body = await readBody<Record<string, unknown>>(event)
   const fields = readCatalogBody(body ?? {})
   const sid = shortId()

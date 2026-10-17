@@ -1,6 +1,6 @@
-// 修改依赖（catalog.write）：字段可局部更新；带 language_sids 时整体替换归属语言
+// 修改依赖：字段可局部更新；带 language_sids 时整体替换归属语言
 export default defineEventHandler(async event => {
-  await requireAdmin(event, 'catalog.write')
+  await requireAdmin(event)
   const sid = String(getRouterParam(event, 'sid') ?? '')
   const current = await fetchDependencyRow(sid)
   if (!current) throw createError({ statusCode: 404, statusMessage: 'Dependency not found' })

@@ -51,6 +51,10 @@ body {
   --dash-border: color-mix(in srgb, var(--p-text-color) 12%, transparent);
   --dash-hover: color-mix(in srgb, var(--p-text-color) 6%, transparent);
   --dash-active: color-mix(in srgb, var(--p-text-color) 11%, transparent);
+  /* 不透明版本：用于冻结列等"下面有内容会透出来"的地方（color-mix 叠在卡片底色上） */
+  --dash-head: color-mix(in srgb, var(--p-text-color) 6%, var(--dash-card));
+  --dash-hover-solid: color-mix(in srgb, var(--p-text-color) 8%, var(--dash-card));
+  --dash-active-solid: color-mix(in srgb, var(--p-text-color) 13%, var(--dash-card));
 }
 
 @media (prefers-color-scheme: dark) {

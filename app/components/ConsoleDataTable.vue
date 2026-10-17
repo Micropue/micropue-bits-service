@@ -382,7 +382,8 @@ void emit
 
   .p-datatable-header-cell {
     padding: 0.8rem 0.9rem;
-    background: var(--dash-hover);
+    /* 不透明表头底色：横向滚动时冻结列下方的内容不会透出来 */
+    background: var(--dash-head);
     border-bottom: 1px solid var(--dash-border);
     font-size: 0.9rem;
     font-weight: 600;
@@ -395,7 +396,31 @@ void emit
 
   .p-datatable-row-group-header > td {
     padding: 0.5rem 0.9rem;
-    background: var(--dash-active);
+    background: var(--dash-active-solid);
+  }
+
+  /* 冻结列（右侧操作列）：本身必须是不透明底色，否则滚动时被下面的列透出来 */
+  .p-datatable-tbody > tr > td.p-datatable-frozen-column,
+  .p-datatable-row-group-header > td.p-datatable-frozen-column {
+    background: var(--dash-card);
+  }
+
+  .p-datatable-row-group-header > td.p-datatable-frozen-column {
+    background: var(--dash-active-solid);
+  }
+
+  .p-datatable-header-cell.p-datatable-frozen-column {
+    background: var(--dash-head);
+  }
+
+  /* 悬停 / 选中时的冻结列也用不透明底色，跟整行状态一致 */
+  .p-datatable-tbody > tr:hover > td.p-datatable-frozen-column {
+    background: var(--dash-hover-solid);
+  }
+
+  .p-datatable-tbody > tr.p-datatable-row-selected > td,
+  .p-datatable-tbody > tr.p-datatable-row-selected > td.p-datatable-frozen-column {
+    background: var(--dash-active-solid);
   }
 
   .cdt-align-right {

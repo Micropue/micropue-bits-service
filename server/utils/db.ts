@@ -306,7 +306,29 @@ const CONTENT_TABLES_SQL: string[] = [
     \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (\`sid\`),
     KEY \`idx_notifications_user\` (\`user_uuid\`,\`read_at\`,\`created_at\`)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表'`
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表'`,
+
+  // 目录条目申请（用户提交「新语言 / 新依赖」，后台审核通过时补全信息并发布）
+  // 用户只填最核心的信息，其余字段由审核管理员在通过前补齐
+  `CREATE TABLE IF NOT EXISTS \`catalog_requests\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`kind\` ENUM('language','dependency') NOT NULL COMMENT '申请类型（语言/依赖）',
+    \`status\` ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending' COMMENT '审核状态',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '申请人账户UUID',
+    \`contact_email\` VARCHAR(254) NOT NULL COMMENT '联系邮箱（提交时的账户邮箱）',
+    \`name\` VARCHAR(64) NOT NULL COMMENT '名称（用户填写）',
+    \`link_url\` VARCHAR(512) NOT NULL COMMENT 'Official Website（用户填写）',
+    \`dependency_kind\` ENUM('framework','library','tool','runtime') NULL COMMENT '依赖类型（仅依赖申请）',
+    \`language_sids\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '适用语言短UUID列表（仅依赖申请，首项为主语言）',
+    \`reject_reason\` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '驳回原因',
+    \`reviewed_by\` CHAR(36) NULL COMMENT '审核管理员UUID',
+    \`reviewed_at\` DATETIME NULL COMMENT '审核时间',
+    \`published_sid\` ${SID} NULL COMMENT '通过后生成的目录条目短UUID',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
+    PRIMARY KEY (\`sid\`),
+    KEY \`idx_catalog_requests_queue\` (\`kind\`,\`status\`,\`created_at\`),
+    KEY \`idx_catalog_requests_user\` (\`user_uuid\`,\`created_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='目录条目申请表'`
 ]
 
 // 后台系统（Bits System Console）数据表（幂等建表）
@@ -543,10 +565,10 @@ export async function ensureAdmins(): Promise<number> {
     return 0
   }
 
-  const placeholders = emails.map(() => '(?, ?, ?, ?)').join(', ')
+  const placeholders = emails.map(() => '(?, ?, ?)').join(', ')
   await pool.query(
-    `INSERT INTO \`admins\` (\`uuid\`,\`email\`,\`name\`,\`permissions\`) VALUES ${placeholders}`,
-    emails.flatMap(email => [randomUUID(), email, '', JSON.stringify(ADMIN_PERMISSION_KEYS)])
+    `INSERT INTO \`admins\` (\`uuid\`,\`email\`,\`name\`) VALUES ${placeholders}`,
+    emails.flatMap(email => [randomUUID(), email, ''])
   )
   return emails.length
 }

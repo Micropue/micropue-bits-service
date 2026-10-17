@@ -1,14 +1,13 @@
-// 修改管理员：名称、权限点、状态（禁用自己会把当前登录踢出，禁止）
+// 修改管理员：名称、状态（禁用自己会把当前登录踢出，禁止）
 export default defineEventHandler(async event => {
-  const self = await requireAdmin(event, 'admins.manage')
+  const self = await requireAdmin(event)
   const uuid = String(getRouterParam(event, 'uuid') ?? '')
   const target = await fetchAdminByUuid(uuid)
   if (!target) throw createError({ statusCode: 404, statusMessage: 'Administrator not found' })
 
-  const body = await readBody<{ name?: string; permissions?: unknown; status?: string }>(event)
+  const body = await readBody<{ name?: string; status?: string }>(event)
   const next = {
     name: body?.name === undefined ? target.name : String(body.name).trim().slice(0, 64),
-    permissions: Array.isArray(body?.permissions) ? body.permissions.filter(isValidAdminPermission) : target.permissions,
     status: body?.status === undefined ? target.status : String(body.status)
   }
 
@@ -21,8 +20,8 @@ export default defineEventHandler(async event => {
   if (next.status === 'disabled') await assertNotLastAdmin(target)
 
   await useDb().execute(
-    'UPDATE `admins` SET `name` = ?, `permissions` = ?, `status` = ? WHERE `uuid` = ?',
-    [next.name, JSON.stringify(next.permissions), next.status, uuid]
+    'UPDATE `admins` SET `name` = ?, `status` = ? WHERE `uuid` = ?',
+    [next.name, next.status, uuid]
   )
 
   // 禁用后立即失效该管理员的全部会话

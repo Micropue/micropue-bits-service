@@ -1,6 +1,6 @@
-// 删除编程语言（catalog.write）：被代码段引用时拒绝；仅被依赖关联时级联清理关联
+// 删除编程语言：被代码段引用时拒绝；仅被依赖关联时级联清理关联
 export default defineEventHandler(async event => {
-  await requireAdmin(event, 'catalog.write')
+  await requireAdmin(event)
   const sid = String(getRouterParam(event, 'sid') ?? '')
   const current = await fetchLanguageRow(sid)
   if (!current) throw createError({ statusCode: 404, statusMessage: 'Language not found' })

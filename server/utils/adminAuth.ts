@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import type { H3Event } from 'h3'
 import type { RowDataPacket } from 'mysql2/promise'
-import type { AdminPermission } from '#shared/utils/admin'
 import { useDb } from './db'
 import { getClientIp } from './clientIp'
 import { normalizePasskeys, type StoredPasskey } from './webauthn'
@@ -18,7 +17,6 @@ export interface AdminUser {
   uuid: string
   email: string
   name: string
-  permissions: AdminPermission[]
   // AuthApp（TOTP）密钥密文：存在 = 已绑定
   totp_secret: string | null
   // 已绑定的 Passkey 列表
@@ -28,9 +26,9 @@ export interface AdminUser {
   created_at: string | null
 }
 
-const ADMIN_COLUMNS = '`uuid`, `email`, `name`, `permissions`, `totp_secret`, `passkeys`, `status`, `last_login_at`, `created_at`'
+const ADMIN_COLUMNS = '`uuid`, `email`, `name`, `totp_secret`, `passkeys`, `status`, `last_login_at`, `created_at`'
 
-type AdminRow = RowDataPacket & Omit<AdminUser, 'permissions' | 'passkeys'> & { permissions: unknown, passkeys: unknown }
+type AdminRow = RowDataPacket & Omit<AdminUser, 'passkeys'> & { passkeys: unknown }
 
 function jwtKey() {
   const secret = process.env.JWT_SECRET
@@ -38,25 +36,9 @@ function jwtKey() {
   return new TextEncoder().encode(secret)
 }
 
-function normalizePermissions(value: unknown): AdminPermission[] {
-  const list = typeof value === 'string'
-    ? (() => {
-        try {
-          return JSON.parse(value)
-        } catch {
-          return []
-        }
-      })()
-    : value
-  if (!Array.isArray(list)) return []
-  // 只保留仍然有效的权限点，避免废弃权限残留提权
-  return list.filter(isValidAdminPermission)
-}
-
 function toAdmin(row: AdminRow): AdminUser {
   return {
     ...row,
-    permissions: normalizePermissions(row.permissions),
     passkeys: normalizePasskeys(row.passkeys)
   }
 }
@@ -99,7 +81,6 @@ export interface PublicAdmin {
   uuid: string
   email: string
   name: string
-  permissions: AdminPermission[]
   status: string
   last_login_at: string | null
   created_at: string | null
@@ -112,7 +93,6 @@ export function publicAdmin(admin: AdminUser): PublicAdmin {
     uuid: admin.uuid,
     email: admin.email,
     name: admin.name,
-    permissions: admin.permissions,
     status: admin.status,
     last_login_at: admin.last_login_at,
     created_at: admin.created_at,
@@ -192,13 +172,10 @@ export async function getAdmin(event: H3Event): Promise<AdminUser | null> {
   return admin
 }
 
-// 控制台接口守卫：未登录 401；带 permission 时校验权限点，缺失返回 403
-export async function requireAdmin(event: H3Event, permission?: AdminPermission): Promise<AdminUser> {
+// 控制台接口守卫：未登录 401（登录的管理员权限相同，不再逐点校验）
+export async function requireAdmin(event: H3Event): Promise<AdminUser> {
   const admin = await getAdmin(event)
   if (!admin) throw createError({ statusCode: 401, statusMessage: 'Not signed in' })
-  if (permission && !admin.permissions.includes(permission)) {
-    throw createError({ statusCode: 403, statusMessage: 'Missing permission' })
-  }
   return admin
 }
 

@@ -1,6 +1,9 @@
 <template>
   <div class="catalog">
-    <h1 class="page-title">Dependencies</h1>
+    <header class="page-head">
+      <h1 class="page-title">Dependencies</h1>
+      <NuxtLink to="/request?kind=dependency" class="page-action">Request a new dependency</NuxtLink>
+    </header>
 
     <CatalogSearch placeholder="Search frameworks, libraries, tools and runtimes" scope="dependencies">
       <!-- 语言（按名称排序，可跳转到该语言介绍页） -->
@@ -87,6 +90,30 @@ useSeoMeta({ description: 'Frameworks, libraries, tools and runtimes on BITS, gr
   display: flex;
   flex-direction: column;
   gap: 3rem;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.page-action {
+  flex-shrink: 0;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 999px;
+  color: var(--p-text-color);
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.18s ease, border-color 0.18s ease;
+
+  &:hover {
+    background: var(--p-content-hover-background);
+    border-color: var(--p-text-muted-color);
+  }
 }
 
 .page-title {
