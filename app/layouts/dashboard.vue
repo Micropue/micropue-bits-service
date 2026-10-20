@@ -149,7 +149,7 @@ const navGroups: { labelKey: string, items: NavItem[] }[] = [
   {
     labelKey: 'nav.system',
     items: [
-      { labelKey: 'nav.accounts', icon: Users },
+      { labelKey: 'nav.accounts', to: '/dashboard/users', icon: Users },
       { labelKey: 'nav.administrators', to: '/dashboard/admins', icon: Shield },
       { labelKey: 'nav.settings', to: '/dashboard/settings', icon: Cog }
     ]

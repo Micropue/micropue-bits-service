@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS \`users\` (
   \`login_devices\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '登录设备列表 [{type,name,token,loginAt}]',
   \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
   \`status\` ENUM('normal','disabled') NOT NULL DEFAULT 'normal' COMMENT '账户状态（正常/禁用，客户端不可修改）',
+  \`disabled_at\` DATETIME NULL COMMENT '禁用时间（NULL=未禁用）',
+  \`disabled_by\` CHAR(36) NULL COMMENT '执行禁用的管理员UUID',
+  \`disabled_reason\` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '禁用原因（供客服追溯）',
   PRIMARY KEY (\`uuid\`),
   UNIQUE KEY \`uk_users_email\` (\`email\`),
   UNIQUE KEY \`uk_users_username\` (\`username\`),
@@ -83,6 +86,24 @@ ALTER TABLE \`users\`
   ADD COLUMN \`bio\` VARCHAR(500) NOT NULL DEFAULT ''
   COMMENT '个人介绍' AFTER \`nickname\`
 `
+
+// 幂等迁移：后台用户管理（禁用时间 / 操作人 / 原因）
+const USERS_DISABLED_AT_SQL = `
+ALTER TABLE \`users\`
+  ADD COLUMN \`disabled_at\` DATETIME NULL
+  COMMENT '禁用时间（NULL=未禁用）' AFTER \`status\`
+`
+const USERS_DISABLED_BY_SQL = `
+ALTER TABLE \`users\`
+  ADD COLUMN \`disabled_by\` CHAR(36) NULL
+  COMMENT '执行禁用的管理员UUID' AFTER \`disabled_at\`
+`
+const USERS_DISABLED_REASON_SQL = `
+ALTER TABLE \`users\`
+  ADD COLUMN \`disabled_reason\` VARCHAR(255) NOT NULL DEFAULT ''
+  COMMENT '禁用原因（供客服追溯）' AFTER \`disabled_by\`
+`
+const USERS_STATUS_INDEX_SQL = `ALTER TABLE \`users\` ADD KEY \`idx_users_status\` (\`status\`, \`created_at\`)`
 
 // 短 UUID 列定义：所有内容表的主键与外键统一使用（生成见 server/utils/id.ts）
 const SID = 'CHAR(16) CHARACTER SET ascii COLLATE ascii_bin'
@@ -618,12 +639,15 @@ export async function ensureSchema(): Promise<number> {
   // 用户名统一存小写（大小写不敏感，避免展示/存储不一致）
   await pool.query('UPDATE `users` SET `username` = LOWER(`username`) WHERE `username` <> LOWER(`username`)')
 
-  // 逐个幂等补充的可选列（两步验证 + 个人介绍）
+  // 逐个幂等补充的可选列（两步验证 + 个人介绍 + 后台处置字段）
   const extraCols: [string, string][] = [
     ['totp_secret', USERS_TOTP_SECRET_SQL],
     ['two_factor_enabled', USERS_TWO_FACTOR_ENABLED_SQL],
     ['recovery_codes', USERS_RECOVERY_CODES_SQL],
-    ['bio', USERS_BIO_SQL]
+    ['bio', USERS_BIO_SQL],
+    ['disabled_at', USERS_DISABLED_AT_SQL],
+    ['disabled_by', USERS_DISABLED_BY_SQL],
+    ['disabled_reason', USERS_DISABLED_REASON_SQL]
   ]
   for (const [col, sql] of extraCols) {
     const [rows] = await pool.query<RowDataPacket[]>(
@@ -633,6 +657,13 @@ export async function ensureSchema(): Promise<number> {
     )
     if (!rows[0]?.count) await pool.query(sql)
   }
+
+  // 用户状态索引（后台按状态筛选）
+  const [statusIdx] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS count FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND INDEX_NAME = 'idx_users_status'`
+  )
+  if (!statusIdx[0]?.count) await pool.query(USERS_STATUS_INDEX_SQL)
 
   // 内容管理系统数据表（幂等建表）
   for (const sql of CONTENT_TABLES_SQL) await pool.query(sql)
