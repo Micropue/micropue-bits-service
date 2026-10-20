@@ -14,8 +14,11 @@
       :selectable="false" :search-fields="['account', 'email', 'security']" @refresh="refresh">
       <template #cell-account="{ row }">
         <div class="cell-main">
-          <span class="cell-title">{{ row.nickname }}</span>
-          <span class="cell-sub">{{ usernameLabel(row) }}</span>
+          <UserAvatar :src="row.avatarUrl" :size="28" />
+          <span class="cell-text">
+            <span class="cell-title">{{ row.nickname }}</span>
+            <span class="cell-sub">{{ usernameLabel(row) }}</span>
+          </span>
         </div>
       </template>
 
@@ -42,9 +45,12 @@
 
     <div v-else-if="detail" class="detail">
       <div class="detail-head">
-        <div>
-          <span class="detail-name">{{ detail.nickname }}</span>
-          <span class="detail-sub">{{ usernameLabel(detail) }}</span>
+        <div class="detail-person">
+          <UserAvatar :src="detail.avatarUrl" :size="40" />
+          <div>
+            <span class="detail-name">{{ detail.nickname }}</span>
+            <span class="detail-sub">{{ usernameLabel(detail) }}</span>
+          </div>
         </div>
         <Tag :value="t(`users.status.${detail.status}`)" :severity="detail.status === 'normal' ? 'secondary' : 'danger'"
           rounded />
@@ -168,6 +174,7 @@ interface UserRow {
   appBound: boolean
   twoFactorEnabled: boolean
   passkeyCount: number
+  avatarUrl: string | null
   githubLogin: string | null
 }
 
@@ -488,6 +495,13 @@ useHead({
 
 .cell-main {
   display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.cell-text {
+  display: flex;
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;
@@ -527,6 +541,13 @@ useHead({
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.detail-person {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 .detail-name {

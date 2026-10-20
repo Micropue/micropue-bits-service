@@ -26,11 +26,11 @@
         <div class="row-main">
           <span class="row-label">GitHub</span>
           <span class="row-desc">Link a GitHub account for one-click sign-in.</span>
+          <span class="row-hint">Your profile picture is your GitHub avatar. Without a linked account, a question mark is shown.</span>
         </div>
         <div class="row-control value-action">
           <span v-if="githubLinked" class="github-account">
-            <img v-if="githubAvatarUrl" class="github-avatar" :src="githubAvatarUrl" :alt="githubLogin || 'GitHub'"
-              width="24" height="24" loading="lazy" />
+            <UserAvatar :src="githubAvatarUrl" :size="24" />
             <span class="row-value">{{ githubLogin ? '@' + githubLogin : 'Linked' }}</span>
           </span>
           <Button v-if="!githubLinked" label="Link" severity="success" outlined size="small" @click="openGithubLink" />
@@ -415,14 +415,6 @@ async function pkSubmit() {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.github-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid var(--p-content-border-color);
-  object-fit: cover;
 }
 
 .github-msg {

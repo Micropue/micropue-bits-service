@@ -3,14 +3,32 @@
         <nav class="navbar" aria-label="主导航">
             <BrandLogo class="header-brand" :active="loaderDone" />
             <div class="nav-actions">
+                <!-- 指令框入口：点击打开；按钮内的 / 提示快捷键（首页由 hero 输入框承担，不重复显示） -->
+                <button v-if="route.path !== '/'" type="button" class="command-trigger"
+                    aria-label="Open command box (press slash)" aria-keyshortcuts="/"
+                    title="Press / to open the command box" @click="openCommands">
+                    <Search aria-hidden="true" />
+                    <span class="command-trigger-label">Commands</span>
+                    <kbd class="command-trigger-key" aria-hidden="true">/</kbd>
+                </button>
                 <Button as="a" class="github-link" severity="secondary" rounded :href="githubUrl" target="_blank"
                     rel="noopener noreferrer">
                     <Github aria-hidden="true" />
                     <span>{{ starLabel }} Stars</span>
                 </Button>
-                <Button as-child v-slot="slotProps">
-                    <NuxtLink :to="authUser ? '/account' : '/sign'" :class="[slotProps.class, 'auth-button']"
-                        v-bind="slotProps.a11yAttrs">{{ authUser ? 'My Account' : 'Log In / Sign Up' }}</NuxtLink>
+                <!-- 已登录用扁平文本按钮（无背景）；未登录仍是填充式登录按钮 -->
+                <Button as-child v-slot="slotProps" :text="!!authUser" :severity="authUser ? 'secondary' : undefined">
+                    <NuxtLink :to="authUser ? '/account' : '/sign'"
+                        :class="[slotProps.class, 'auth-button', { 'auth-button--account': !!authUser }]"
+                        v-bind="slotProps.a11yAttrs">
+                        <!-- 已登录：GitHub 头像 + 昵称 + 右上箭头（提示可进入账户页） -->
+                        <template v-if="authUser">
+                            <UserAvatar :src="authUser.githubAvatarUrl" :size="22" />
+                            <span class="auth-name">{{ authUser.nickname }}</span>
+                            <ArrowUpRight class="auth-arrow" aria-hidden="true" />
+                        </template>
+                        <template v-else>Log In / Sign Up</template>
+                    </NuxtLink>
                 </Button>
             </div>
         </nav>
@@ -18,13 +36,25 @@
     <main>
         <slot></slot>
     </main>
+    <!-- 全站目录指令框：任意站点页面按 / 或点顶栏入口唤起（首页 hero 搜索框也支持 /） -->
+    <SiteCommandPalette ref="palette" />
 </template>
 <script setup lang="ts">
 import type { AuthUser } from '~/composables/useAuthUser'
+
+const route = useRoute()
 import Github from '@primeicons/vue/github'
+import Search from '@primeicons/vue/search'
+import ArrowUpRight from '@primeicons/vue/arrow-up-right'
 const githubUrl = 'https://github.com/Micropue/micropue-bits-service'
 import Button from 'primevue/button'
 const { data } = useFetch<{ stars: number | null }>('/api/github/star')
+
+// 顶栏指令入口
+const palette = ref<{ open: () => void } | null>(null)
+function openCommands() {
+    palette.value?.open()
+}
 
 const starLabel = computed(() =>
     data.value?.stars == null
@@ -80,6 +110,64 @@ header {
         .nav-actions {
             display: flex;
             align-items: center;
+            gap: 0.75rem;
+
+            .command-trigger {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.45rem;
+                height: 36px;
+                padding: 0 0.7rem;
+                border: 1px solid var(--p-content-border-color);
+                border-radius: 999px;
+                background: transparent;
+                color: var(--p-text-muted-color);
+                font: inherit;
+                font-size: 0.85rem;
+                cursor: pointer;
+                transition: border-color 0.15s, color 0.15s;
+
+                &:hover,
+                &:focus-visible {
+                    border-color: var(--p-primary-color);
+                    color: var(--p-text-color);
+                }
+
+                svg {
+                    width: 1rem;
+                    height: 1rem;
+                }
+
+                kbd {
+                    padding: 0 0.3rem;
+                    border: 1px solid var(--p-content-border-color);
+                    border-radius: 0.3rem;
+                    font: inherit;
+                    font-size: 0.72rem;
+                    line-height: 1.5;
+                }
+            }
+
+            .auth-button--account {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding-block: 0.35rem;
+            }
+
+            .auth-name {
+                max-width: 9rem;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-weight: 500;
+            }
+
+            .auth-arrow {
+                width: 0.8rem;
+                height: 0.8rem;
+                opacity: 0.7;
+            }
 
             .github-link {
                 width: fit-content;
@@ -92,7 +180,6 @@ header {
                 display: flex;
                 align-items: center;
                 font-size: 1em;
-                margin-right: 2em;
             }
         }
     }
@@ -104,6 +191,27 @@ header {
             :deep(.brand-name) {
                 display: none;
             }
+        }
+    }
+
+    /* 窄屏：指令入口只留图标，账户入口只留头像与箭头 */
+    @media screen and (max-width: 700px) {
+        .nav-actions .command-trigger-label {
+            display: none;
+        }
+    }
+
+    @media screen and (max-width: 560px) {
+        .nav-actions .auth-name {
+            display: none;
+        }
+
+        .nav-actions .command-trigger {
+            padding: 0 0.55rem;
+        }
+
+        .nav-actions .command-trigger-key {
+            display: none;
         }
     }
 }

@@ -93,3 +93,172 @@ body {
 ::-webkit-scrollbar{
   display: none;
 }
+
+/* ===== 目录指令框（主页 hero 与全站浮层共用） ===== */
+.command-palette {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-height: min(22rem, 60vh);
+  overflow-y: auto;
+  padding: 0.35rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 0.75rem;
+  background: var(--p-content-background);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.35);
+}
+
+/* 浮层里列表是对话框的一部分，不再绝对定位 */
+.command-palette--static {
+  position: static;
+  max-height: min(26rem, 60vh);
+  border: 0;
+  border-top: 1px solid var(--p-content-border-color);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.command-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &.is-active {
+    background: color-mix(in srgb, var(--p-primary-color) 14%, transparent);
+  }
+}
+
+.command-logo {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+/* 选定指令后的彩色标记（未选指令时不存在，斜杠在输入框里） */
+.command-prefix {
+  flex-shrink: 0;
+  padding: 0.05rem 0.45rem;
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--p-primary-color) 14%, transparent);
+  color: var(--p-primary-color);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+.command-name {
+  font-size: 0.95rem;
+
+  &--cmd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 600;
+  }
+}
+
+.command-alias {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.76rem;
+  color: var(--p-text-muted-color);
+}
+
+.command-desc,
+.command-kind {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--p-text-muted-color);
+}
+
+.command-empty {
+  margin: 0;
+  padding: 0.55rem 0.6rem;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+}
+
+.command-foot {
+  display: flex;
+  gap: 0.9rem;
+  margin-top: 0.1rem;
+  padding: 0.4rem 0.6rem 0.15rem;
+  border-top: 1px solid var(--p-content-border-color);
+  font-size: 0.72rem;
+  color: var(--p-text-muted-color);
+
+  kbd {
+    margin-right: 0.15rem;
+    padding: 0 0.25rem;
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 0.25rem;
+    font: inherit;
+    font-size: 0.7rem;
+  }
+}
+
+/* 全站浮层 */
+.command-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 1rem 1rem;
+  background: color-mix(in srgb, #000 32%, transparent);
+}
+
+.command-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 100%);
+  max-height: min(32rem, 80vh);
+  overflow: hidden;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 0.9rem;
+  background: var(--p-content-background);
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.5);
+}
+
+.command-field {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.9rem 1rem;
+}
+
+.command-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.05rem;
+}
+
+.command-fade-enter-active,
+.command-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.command-fade-enter-from,
+.command-fade-leave-to {
+  opacity: 0;
+}

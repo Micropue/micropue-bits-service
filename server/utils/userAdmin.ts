@@ -11,7 +11,7 @@ export const USER_SUMMARY_SQL = [
   '(`totp_secret` IS NOT NULL) AS `app_bound`',
   '`two_factor_enabled`',
   'COALESCE(JSON_LENGTH(`passkeys`), 0) AS `passkey_count`',
-  '`github_login`'
+  '`github_id`', '`github_login`'
 ].join(', ')
 
 export interface UserRow extends RowDataPacket {
@@ -28,6 +28,7 @@ export interface UserRow extends RowDataPacket {
   app_bound: number
   two_factor_enabled: number
   passkey_count: number
+  github_id: string | number | null
   github_login: string | null
   bio?: string
   email_verified_at?: string | null
@@ -64,6 +65,8 @@ export function publicUserSummary(row: UserRow) {
     appBound: !!Number(row.app_bound),
     twoFactorEnabled: !!Number(row.two_factor_enabled),
     passkeyCount: Number(row.passkey_count ?? 0),
+    // 头像统一取 GitHub：未绑定则返回 null，前端显示问号占位
+    avatarUrl: row.github_id ? `https://avatars.githubusercontent.com/u/${row.github_id}?v=4` : null,
     githubLogin: row.github_login || null
   }
 }

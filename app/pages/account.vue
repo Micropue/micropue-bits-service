@@ -312,6 +312,15 @@ function toggleGroup(label: string, item: NavItem) {
     color: var(--p-text-muted-color);
   }
 
+  .row-hint {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.74rem;
+    line-height: 1.5;
+    color: var(--p-text-muted-color);
+    opacity: 0.85;
+  }
+
   .row-control {
     flex-shrink: 0;
   }

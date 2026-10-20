@@ -19,9 +19,23 @@
       </nav>
 
       <div class="baseline">
-        <nav class="legal" aria-label="法务信息">
-          <NuxtLink v-for="item in legal" :key="item.to" :to="item.to" class="footer-link">{{ item.name }}</NuxtLink>
-        </nav>
+        <div class="baseline-left">
+          <div class="license">
+            <span class="license-title">
+              <Shield aria-hidden="true" />
+              Apache License 2.0
+            </span>
+            <p class="license-text">
+              Bits is open source — the project is published under the
+              <a class="license-link" href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank"
+                rel="noopener noreferrer">Apache License 2.0</a>.
+            </p>
+          </div>
+
+          <nav class="legal" aria-label="法务信息">
+            <NuxtLink v-for="item in legal" :key="item.to" :to="item.to" class="footer-link">{{ item.name }}</NuxtLink>
+          </nav>
+        </div>
         <div class="connect">
           <span class="connect-label">Connect:</span>
           <a class="footer-link" href="mailto:micropue@micropue.com.cn">micropue@micropue.com.cn</a>
@@ -32,6 +46,8 @@
 </template>
 
 <script setup lang="ts">
+import Shield from '@primeicons/vue/shield'
+
 // 站点页脚：固定在视口底部（z-index 0），页面内容在其上层，滚动到底部时逐渐露出
 // 入场动画由视差触发：占位元素进入视口 = 页脚开始露出，此时播放 LOGO 动画并让各区块错开淡入
 const footerEl = ref<HTMLElement | null>(null)
@@ -193,11 +209,56 @@ onBeforeUnmount(() => {
 
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 1rem 2rem;
   padding-top: 1.75rem;
   border-top: 1px dashed color-mix(in srgb, currentColor 35%, transparent);
   font-size: 0.85rem;
+}
+
+.baseline-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.license {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.license-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.license-title svg {
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.85;
+}
+
+.license-text {
+  margin: 0;
+  max-width: 36rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  opacity: 0.72;
+}
+
+.license-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.license-link:hover {
+  opacity: 0.8;
 }
 
 .legal {

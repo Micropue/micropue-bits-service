@@ -37,27 +37,36 @@
         </motion.h1>
       </LayoutGroup>
 
-      <motion.div
-        class="search-box"
-        :class="{ 'search-box--floating': searchFocused }"
-        layout="position"
-        :transition="{ type: 'spring', damping: 30, stiffness: 400 }"
-        @click="focusInput"
-        @mousedown="onSearchMouseDown"
-        @focusin="onSearchFocusIn"
-        @focusout="onSearchFocusOut"
-      >
-        <Button v-for="(keyword, index) in keywords" :key="keyword" severity="secondary" type="button"
-          class="search-keyword" :aria-label="`Remove keyword ${keyword}`" @click.stop="removeKeyword(index)">
-          {{ keyword }}
-          <Times :size="14" aria-hidden="true" />
-        </Button>
-        <input ref="inputEl" v-model="draft" class="search-input" type="text"
-          placeholder="Search code snippets, space to add keyword" aria-label="Search code snippets"
-          @keydown.space="onSpace"
-          @keydown.delete="onDelete"
-          @paste="onPaste" />
-      </motion.div>
+      <!-- 浮起时用同高度的占位撑住文档流，避免下方内容上移 -->
+      <div class="search-slot" :style="searchFocused ? { height: `${searchSlotHeight}px` } : undefined">
+        <motion.div
+          class="search-box"
+          :class="{ 'search-box--floating': searchFocused }"
+          layout="position"
+          :transition="{ type: 'spring', damping: 30, stiffness: 400 }"
+          @click="focusInput"
+          @mousedown="onSearchMouseDown"
+          @focusin="onSearchFocusIn"
+          @focusout="onSearchFocusOut"
+        >
+        <!-- 选定指令后的彩色标记（退格一次删除整条）；未选指令时斜杠在输入框里 -->
+        <span v-if="command" class="command-prefix" aria-hidden="true">{{ prefix }}</span>
+        <input id="home-search" ref="inputEl" v-model="text" class="search-input" type="text" name="q"
+          :placeholder="placeholder" role="combobox" aria-autocomplete="list" aria-label="Catalog command"
+          :aria-expanded="showPalette" :aria-controls="listId" :aria-activedescendant="activeOptionId"
+          @keydown.space="handleSpace"
+          @keydown.delete="handleBackspace"
+          @keydown.down="onArrow($event, 1)"
+          @keydown.up="onArrow($event, -1)"
+          @keydown.enter="onEnter"
+          @keydown.esc.prevent="onEscape"
+          @paste="handlePaste" />
+
+          <CatalogCommandList v-if="showPalette" v-model:active-index="activeIndex" :mode="mode"
+            :commands="commandMatches" :results="results" :list-id="listId" :loading="resultsLoading"
+            :empty-text="emptyText" @pick-command="setCommand" @pick-item="go" />
+        </motion.div>
+      </div>
     </div>
 
     <Transition name="page-loader" @leave="loaderDone = true">
@@ -65,6 +74,11 @@
         <ProgressSpinner />
       </div>
     </Transition>
+
+    <!-- 代码片段墙：左右循环滚动 -->
+    <SnippetMarquee />
+    <!-- 数量统计 + 按用途浏览 -->
+    <HomeHighlights />
   </div>
 
   <!-- 页脚只在首页：内容层抬到它之上，滚动到底部时逐渐露出 -->
@@ -73,7 +87,7 @@
 
 <script setup lang="ts">
 import { LayoutGroup, motion } from 'motion-v'
-import Times from '@primeicons/vue/times'
+import type { CatalogCommandDef } from '~/composables/useCatalogCommand'
 
 const backgroundReady = ref(false)
 const searchFocused = ref(false)
@@ -84,50 +98,59 @@ loaderDone.value = false
 
 useHead({ title: 'Make Your Code Shareable' })
 
-const keywords = ref<string[]>([])
-const draft = ref('')
+const command = ref<CatalogCommandDef | null>(null)
+const text = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
+const searchSlotHeight = ref(0)
 
-function addKeyword(word: string) {
-  const keyword = word.trim()
-  if (keyword && !keywords.value.includes(keyword)) keywords.value.push(keyword)
+// 指令框（逻辑见 useCatalogCommand）：选中指令后是「彩色标记 + 参数输入」
+const {
+  listId, mode, prefix, placeholder, commandMatches, results, resultsLoading, activeIndex, activeList,
+  emptyText, setCommand, handleSpace, handleBackspace, handlePaste, move, choose, go, dispose
+} = useCatalogCommand(command, text, {
+  idPrefix: 'home-command',
+  focusInput: () => inputEl.value?.focus()
+})
+
+const showPalette = computed(() => searchFocused.value)
+const activeOptionId = computed(() =>
+  showPalette.value && activeList.value.length ? `${listId}-${activeIndex.value}` : undefined)
+
+function onArrow(event: KeyboardEvent, delta: number) {
+  if (!showPalette.value || !activeList.value.length) return
+  event.preventDefault()
+  move(delta)
 }
 
-// 空格把当前输入升级为关键词；IME 拼音组合中不处理
-function onSpace(event: KeyboardEvent) {
-  if (event.isComposing) return
+function onEnter(event: KeyboardEvent) {
+  if (!showPalette.value) return
   event.preventDefault()
-  addKeyword(draft.value)
-  draft.value = ''
+  choose()
 }
 
-// 粘贴含空白的内容时自动拆分为多个关键词；单个词照常留在输入框
-function onPaste(event: ClipboardEvent) {
-  const text = event.clipboardData?.getData('text')
-  if (!text) return
-  event.preventDefault()
-  const input = event.target as HTMLInputElement
-  const start = input.selectionStart ?? input.value.length
-  const end = input.selectionEnd ?? input.value.length
-  const combined = input.value.slice(0, start) + text + input.value.slice(end)
-  if (!/\s/.test(combined)) {
-    draft.value = combined
+function onEscape() {
+  if (command.value || text.value) {
+    command.value = null
+    text.value = ''
     return
   }
-  combined.split(/\s+/).forEach(addKeyword)
-  draft.value = ''
+  inputEl.value?.blur()
 }
 
-// 输入框为空时退格删除最后一个关键词
-function onDelete(event: KeyboardEvent) {
-  if (event.isComposing || draft.value || !keywords.value.length) return
-  keywords.value.pop()
+// 全局 /：不在输入框内时聚焦搜索框，直接开始输入指令名
+function onGlobalSlash(event: KeyboardEvent) {
+  if (!isSlashShortcut(event) || isEditableTarget(event.target)) return
+  event.preventDefault()
+  command.value = null
+  text.value = '/'
+  inputEl.value?.focus()
 }
 
-function removeKeyword(index: number) {
-  keywords.value.splice(index, 1)
-  focusInput()
-}
+onMounted(() => window.addEventListener('keydown', onGlobalSlash))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalSlash)
+  dispose()
+})
 
 function focusInput() {
   inputEl.value?.focus()
@@ -140,6 +163,12 @@ function onSearchMouseDown(event: MouseEvent) {
 }
 
 function onSearchFocusIn() {
+  // 浮起前先量高度，交给占位容器撑住文档流
+  // （motion.div 的模板 ref 是组件实例，这里从输入框反查真实的盒子高度）
+  if (!searchFocused.value) {
+    const box = inputEl.value?.closest('.search-box') as HTMLElement | null
+    searchSlotHeight.value = box?.offsetHeight ?? 0
+  }
   searchFocused.value = true
 }
 
@@ -263,7 +292,12 @@ function onSearchFocusOut(event: FocusEvent) {
   }
 }
 
+.search-slot {
+  width: 100%;
+}
+
 .search-box {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -293,23 +327,6 @@ function onSearchFocusOut(event: FocusEvent) {
   box-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.35);
 }
 
-.search-keyword {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.6rem;
-  border: 0;
-  border-radius: 0.5rem;
-  font: inherit;
-  font-size: 0.95rem;
-  line-height: 1.4;
-  cursor: pointer;
-  user-select: none;
-  &:hover{
-    border: none;
-  }
-}
-
 .search-input {
   flex: 1 1 8rem;
   min-width: 8rem;
@@ -321,4 +338,10 @@ function onSearchFocusOut(event: FocusEvent) {
   font: inherit;
   font-size: 1.15rem;
 }
+
+/* 指令标记与 hero 输入框同字号 */
+.command-prefix {
+  font-size: 1.15rem;
+}
+
 </style>
