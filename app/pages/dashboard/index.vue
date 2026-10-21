@@ -6,7 +6,6 @@
       </span>
       <span class="ov-value">{{ block.value }}</span>
       <span class="ov-label">{{ block.label }}</span>
-      <Tag v-if="block.pending" :value="t('home.notConnected')" severity="secondary" rounded />
     </section>
   </div>
 </template>
@@ -27,6 +26,8 @@ interface Stats {
   users: number
   languages: number
   dependencies: number
+  snippets: number
+  groups: number
 }
 
 const { data } = await useFetch<Stats>('/api/dashboard/stats')
@@ -34,12 +35,12 @@ const { data } = await useFetch<Stats>('/api/dashboard/stats')
 const formatter = new Intl.NumberFormat('en')
 const format = (value?: number) => (value == null ? '—' : formatter.format(value))
 
-// 代码段与代码段分组的数据表还没建设，先占位（不接数据）
+// 有效内容：未软删除的代码段 / 分组（已删除的可在内容管理里恢复）
 const blocks = computed(() => [
   { label: t('home.users'), value: format(data.value?.users), icon: Users },
   { label: t('home.languages'), value: format(data.value?.languages), icon: Code },
-  { label: t('home.snippets'), value: '—', icon: Copy, pending: true },
-  { label: t('home.snippetGroups'), value: '—', icon: Folder, pending: true },
+  { label: t('home.snippets'), value: format(data.value?.snippets), icon: Copy },
+  { label: t('home.snippetGroups'), value: format(data.value?.groups), icon: Folder },
   { label: t('home.dependencies'), value: format(data.value?.dependencies), icon: Database }
 ])
 

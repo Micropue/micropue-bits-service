@@ -1,5 +1,5 @@
 <template>
-  <article class="catalog-entry">
+  <article class="catalog-entry" :class="{ 'is-embedded': embedded }">
     <div class="logo-stage">
       <img v-if="entry.logo_url" class="logo" :src="entry.logo_url" :alt="`${entry.name} logo`" width="150"
         height="150" loading="lazy" decoding="async" />
@@ -50,7 +50,7 @@ import ExternalLink from '@primeicons/vue/external-link'
 import type { CatalogEntryData, CatalogRelatedGroup } from '~/composables/useCatalogEntry'
 
 // 目录项展示页（编程语言 / 框架 / 库 / 工具 / 运行时共用）
-defineProps<{ entry: CatalogEntryData; label: string; related?: CatalogRelatedGroup[] }>()
+defineProps<{ entry: CatalogEntryData; label: string; related?: CatalogRelatedGroup[]; embedded?: boolean }>()
 </script>
 
 <style scoped>
@@ -63,6 +63,13 @@ defineProps<{ entry: CatalogEntryData; label: string; related?: CatalogRelatedGr
   align-items: center;
   text-align: center;
   gap: 2.25rem;
+}
+
+/* 目录详情页两栏布局：目录项嵌在左栏，页面容器由 CatalogDetailLayout 提供 */
+.catalog-entry.is-embedded {
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 /* LOGO 底座与着色见 main.scss 的 --logo-plate / --logo-tint（深色主题无白底、反白） */

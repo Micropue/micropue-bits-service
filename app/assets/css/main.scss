@@ -177,6 +177,11 @@ body {
   color: var(--p-text-muted-color);
 }
 
+.command-sub {
+  font-size: 0.76rem;
+  color: var(--p-text-muted-color);
+}
+
 .command-desc,
 .command-kind {
   margin-left: auto;
@@ -261,4 +266,36 @@ body {
 .command-fade-enter-from,
 .command-fade-leave-to {
   opacity: 0;
+}
+
+
+/* ===== 代码高亮（首页代码墙 / 代码段详情共用） ===== */
+.code-highlight {
+  --tok-kw: #a626a4;
+  --tok-str: #50a14f;
+  --tok-num: #986801;
+  --tok-com: #a0a1a7;
+  --tok-fn: #4078f2;
+  --tok-type: #c18401;
+  --tok-punc: #7a7f87;
+
+  .tok-kw { color: var(--tok-kw); }
+  .tok-str { color: var(--tok-str); }
+  .tok-num { color: var(--tok-num); }
+  .tok-com { color: var(--tok-com); font-style: italic; }
+  .tok-fn { color: var(--tok-fn); }
+  .tok-type { color: var(--tok-type); }
+  .tok-punc { color: var(--tok-punc); }
+}
+
+@media (prefers-color-scheme: dark) {
+  .code-highlight {
+    --tok-kw: #c678dd;
+    --tok-str: #98c379;
+    --tok-num: #d19a66;
+    --tok-com: #7f848e;
+    --tok-fn: #61afef;
+    --tok-type: #e5c07b;
+    --tok-punc: #8b909a;
+  }
 }

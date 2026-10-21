@@ -7,9 +7,6 @@
           <span class="brand-product">Bits</span>
         </NuxtLink>
         <div class="auth-head-actions">
-          <SelectButton :model-value="locale" :options="CONSOLE_LOCALE_OPTIONS" option-label="label"
-            option-value="value" size="small" :allow-empty="false" :aria-label="t('locale.label')"
-            @update:model-value="setLocale" />
           <Tag value="System Console" severity="secondary" rounded />
         </div>
       </header>
@@ -101,7 +98,7 @@ definePageMeta({ layout: false })
 
 const { user, methods, fetchMethods, fetchSession } = useAdminAuth()
 const toast = useToast()
-const { t, locale, setLocale, restoreLocale } = useConsoleI18n()
+const { t, restoreLocale } = useConsoleI18n()
 const route = useRoute()
 
 // 其它登录方式的图标

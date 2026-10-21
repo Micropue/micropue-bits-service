@@ -1,0 +1,217 @@
+// 控制台内容管理页共用样式（代码段 / 分组）：页面骨架、单元格、详情弹窗、代码块
+// 由 dashboard/snippets.vue 与 dashboard/groups.vue 分别 @use（scoped，互不影响）
+
+.c-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.c-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.c-page-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.c-page-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: var(--p-text-muted-color);
+}
+
+.c-page-note {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  color: var(--p-text-muted-color);
+}
+
+/* ---------- 单元格 ---------- */
+.c-cell-main,
+.c-owner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.c-cell-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.c-cell-title {
+  display: block;
+  font-weight: 500;
+}
+
+.c-cell-sub {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--p-text-muted-color);
+}
+
+.c-cell-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.c-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.c-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  filter: var(--logo-tint);
+}
+
+/* ---------- 详情弹窗 ---------- */
+.c-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.c-detail-loading {
+  padding: 1rem 0;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+}
+
+.c-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.c-detail-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.c-detail-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+}
+
+.c-detail-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--dash-border);
+}
+
+.c-detail-title {
+  margin: 0 0 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+}
+
+.c-kv {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.c-k {
+  color: var(--p-text-muted-color);
+}
+
+.c-v {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.c-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.c-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.c-tag {
+  padding: 0.08rem 0.45rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--p-text-muted-color);
+}
+
+.c-code {
+  max-height: 24rem;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  overflow: auto;
+  border: 1px solid var(--dash-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--p-text-color) 3%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.c-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* 分组详情里的代码段清单 */
+.c-snippet-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.c-snippet-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--dash-border);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.c-snippet-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.c-muted {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+}

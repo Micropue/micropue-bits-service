@@ -4,28 +4,17 @@
       <h1 class="settings-heading">Settings</h1>
       <nav class="settings-nav" aria-label="Account settings">
         <template v-for="item in sections" :key="item.label">
-          <!-- 二级菜单：父项点击展开/收起，进入子页面时自动展开 -->
-          <div v-if="item.children" class="nav-group">
-            <button type="button" class="nav-item nav-parent" :class="{ 'is-open': isExpanded(item) }"
-              :aria-expanded="isExpanded(item)" @click="toggleGroup(item.label, item)">
-              <component :is="item.icon" aria-hidden="true" />
-              <span>{{ item.label }}</span>
-              <ExclamationTriangle v-if="item.warn" class="nav-warn" aria-label="Action required" />
-              <ChevronDown class="nav-caret" aria-hidden="true" />
-            </button>
-            <!-- grid-rows 0fr → 1fr：展开/收起带过渡；收起时 visibility 隐藏（不可聚焦） -->
-            <div class="nav-sublist-wrap" :class="{ 'is-open': isExpanded(item) }">
-              <div class="nav-sublist">
-                <NuxtLink v-for="child in item.children" :key="child.to" :to="child.to" class="nav-subitem">
-                  {{ child.label }}
-                </NuxtLink>
-              </div>
-            </div>
-          </div>
+          <button v-if="item.needsUsername && !usernameSet" type="button" class="nav-item"
+            @click="showUsernameHint">
+            <component :is="item.icon" aria-hidden="true" />
+            <span>{{ item.label }}</span>
+            <ArrowUpRight v-if="item.outgoing" class="nav-out" aria-hidden="true" />
+          </button>
           <NuxtLink v-else :to="item.to" class="nav-item">
             <component :is="item.icon" aria-hidden="true" />
             <span>{{ item.label }}</span>
             <ExclamationTriangle v-if="item.warn" class="nav-warn" aria-label="Action required" />
+            <ArrowUpRight v-if="item.outgoing" class="nav-out" aria-hidden="true" />
           </NuxtLink>
         </template>
       </nav>
@@ -34,6 +23,8 @@
     <div class="settings-content">
       <NuxtPage />
     </div>
+
+    <Toast position="bottom-right" />
   </div>
 </template>
 
@@ -43,9 +34,20 @@ import User from '@primeicons/vue/user'
 import Folder from '@primeicons/vue/folder'
 import Shield from '@primeicons/vue/shield'
 import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
-import ChevronDown from '@primeicons/vue/chevron-down'
+import ArrowUpRight from '@primeicons/vue/arrow-up-right'
 
 const { user: authUser } = useAuthUser()
+const usernameSet = computed(() => authUser.value?.usernameSet ?? false)
+const toast = useToast()
+
+function showUsernameHint() {
+  toast.add({
+    severity: 'warn',
+    summary: 'Set a username first',
+    detail: 'Your public profile needs a username. Set one in Account → Profile.',
+    life: 4500
+  })
+}
 
 // 登录守卫（所有子路由共用）：未登录跳转 /sign
 const { data } = await useFetch<{ user: AuthUser }>('/api/auth/me')
@@ -60,48 +62,31 @@ interface NavItem {
   to?: string
   icon: unknown
   warn?: boolean
-  children?: { label: string, to: string }[]
+  /** 公开主页入口：未设置用户名时点击只弹提示 */
+  needsUsername?: boolean
+  /** 跳出账户设置（公开站点页面），右侧显示右上角箭头 */
+  outgoing?: boolean
 }
 
-const route = useRoute()
-const expanded = ref<string[]>([])
-
 // warn：待办提醒（用户名未设置 / 密码未设置 / 未开启两步验证）
+// 内容入口与 Account 同级，不再折叠隐藏
 const sections = computed<NavItem[]>(() => [
-  { label: 'Account', to: '/account/profile', icon: User, warn: !authUser.value?.usernameSet },
+  { label: 'Account', to: '/account/profile', icon: User, warn: !usernameSet.value },
   {
     label: 'Login Security',
     to: '/account/security',
     icon: Shield,
     warn: !authUser.value?.hasPassword || !authUser.value?.twoFactorEnabled
   },
+  { label: 'Language & dependency requests', to: '/account/requests', icon: Folder },
   {
-    label: 'Content Management',
-    icon: Folder,
-    // 原有的「代码段 / 分组 / 收藏」管理入口先撤下，这里先接入条目申请
-    children: [{ label: 'Language & dependency requests', to: '/account/requests' }]
+    label: 'My profile',
+    to: usernameSet.value ? `/${authUser.value?.username}` : '/account/profile',
+    icon: User,
+    needsUsername: true,
+    outgoing: true
   }
 ])
-
-// 进入子页面自动展开；手动点击可覆盖（collapsed 优先）
-const collapsed = ref<string[]>([])
-
-function routeExpands(item: NavItem) {
-  return !!item.children?.some(child => route.path.startsWith(child.to))
-}
-
-const isExpanded = (item: NavItem) =>
-  !collapsed.value.includes(item.label) && (expanded.value.includes(item.label) || routeExpands(item))
-
-function toggleGroup(label: string, item: NavItem) {
-  if (isExpanded(item)) {
-    collapsed.value = [...new Set([...collapsed.value, label])]
-    expanded.value = expanded.value.filter(entry => entry !== label)
-  } else {
-    collapsed.value = collapsed.value.filter(entry => entry !== label)
-    expanded.value = [...new Set([...expanded.value, label])]
-  }
-}
 </script>
 
 <!-- 非 scoped：子路由页面复用本页的卡片/行样式（均在 .settings 作用域内） -->
@@ -149,10 +134,15 @@ function toggleGroup(label: string, item: NavItem) {
     gap: 0.65rem;
     width: 100%;
     padding: 0.55rem 0.7rem;
+    border: 0;
     border-radius: 8px;
+    background: transparent;
     color: var(--p-text-color);
+    font-family: inherit;
     font-size: 0.95rem;
+    text-align: left;
     text-decoration: none;
+    cursor: pointer;
 
     svg {
       width: 1.05em;
@@ -168,6 +158,13 @@ function toggleGroup(label: string, item: NavItem) {
     &.router-link-active {
       background: var(--active);
       font-weight: 500;
+    }
+
+    .nav-out {
+      width: 0.78em;
+      height: 0.78em;
+      margin-left: auto;
+      opacity: 0.55;
     }
   }
 
@@ -227,11 +224,17 @@ function toggleGroup(label: string, item: NavItem) {
 
   .nav-subitem {
     display: block;
+    width: 100%;
     padding: 0.45rem 0.7rem;
+    border: 0;
     border-radius: 8px;
+    background: none;
     color: var(--p-text-muted-color);
+    font-family: inherit;
     font-size: 0.9rem;
+    text-align: left;
     text-decoration: none;
+    cursor: pointer;
 
     &:hover {
       background: var(--hover);

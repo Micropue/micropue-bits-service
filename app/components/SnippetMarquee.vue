@@ -15,7 +15,7 @@
               </span>
             </header>
 
-            <pre class="card-code"><code><template v-for="(token, tokenIndex) in card.tokens"
+            <pre class="card-code code-highlight"><code><template v-for="(token, tokenIndex) in card.tokens"
               :key="tokenIndex"><span :class="`tok-${token.type}`">{{ token.text }}</span></template></code></pre>
 
             <footer class="card-foot">
@@ -33,13 +33,6 @@
 // 首页代码片段墙：两行反向无限循环（CSS 动画），悬停暂停
 // 每行渲染 4 份：前两份构成一个宽度超过常见视口的「单元」，首屏就是满的，循环无接缝
 // 片段是展示用静态样例；高亮是极简分词（关键字/字符串/数字/注释/函数），颜色随深浅色模式切换
-
-type TokenType = 'plain' | 'kw' | 'str' | 'num' | 'com' | 'fn' | 'type' | 'punc'
-
-interface CodeToken {
-  text: string
-  type: TokenType
-}
 
 interface SnippetCard {
   title: string
@@ -153,49 +146,7 @@ git branch -vv | grep ': gone]' \\
   }
 ]
 
-const KEYWORDS = new Set([
-  'const', 'let', 'var', 'function', 'return', 'import', 'from', 'export', 'default', 'async', 'await',
-  'if', 'else', 'for', 'of', 'in', 'new', 'class', 'extends', 'interface', 'type', 'as', 'def', 'fn',
-  'pub', 'use', 'struct', 'impl', 'match', 'mut', 'self', 'true', 'false', 'null', 'undefined', 'void',
-  'go', 'defer', 'chan', 'package', 'func', 'range', 'select', 'case', 'break', 'continue', 'while',
-  'onBeforeUnmount', 'setInterval', 'clearInterval', 'clearTimeout', 'watch', 'ref', 'limit', 'group',
-  'order', 'by', 'desc'
-])
-
-const TOKEN_RE = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|#[^\n]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$-]*)|\s+|([^\sA-Za-z0-9_$])/g
-
-function tokenize(code: string): CodeToken[] {
-  const tokens: CodeToken[] = []
-  let lastIndex = 0
-  const re = new RegExp(TOKEN_RE.source, 'g')
-  let match: RegExpExecArray | null
-
-  while ((match = re.exec(code))) {
-    if (match.index > lastIndex) tokens.push({ text: code.slice(lastIndex, match.index), type: 'plain' })
-    const raw = match[0]
-    const comment = match[1]
-    const string = match[2]
-    const number = match[3]
-    const word = match[4]
-    const punct = match[6]
-    if (comment) tokens.push({ text: raw, type: 'com' })
-    else if (string) tokens.push({ text: raw, type: 'str' })
-    else if (number) tokens.push({ text: raw, type: 'num' })
-    else if (word) {
-      const next = code.slice(re.lastIndex).match(/^\s*\(/)
-      if (KEYWORDS.has(word)) tokens.push({ text: raw, type: 'kw' })
-      else if (/^[A-Z]/.test(word)) tokens.push({ text: raw, type: 'type' })
-      else if (next) tokens.push({ text: raw, type: 'fn' })
-      else tokens.push({ text: raw, type: 'plain' })
-    } else if (punct) tokens.push({ text: raw, type: 'punc' })
-    else tokens.push({ text: raw, type: 'plain' })
-    lastIndex = re.lastIndex
-  }
-  if (lastIndex < code.length) tokens.push({ text: code.slice(lastIndex), type: 'plain' })
-  return tokens
-}
-
-const cards = SAMPLES.map(sample => ({ ...sample, tokens: tokenize(sample.code) }))
+const cards = SAMPLES.map(sample => ({ ...sample, tokens: tokenizeCode(sample.code) }))
 const rows = [cards.slice(0, 4), cards.slice(4)]
 </script>
 
@@ -316,36 +267,6 @@ const rows = [cards.slice(0, 4), cards.slice(4)]
 
   code {
     font: inherit;
-  }
-
-  /* One Light */
-  --tok-kw: #a626a4;
-  --tok-str: #50a14f;
-  --tok-num: #986801;
-  --tok-com: #a0a1a7;
-  --tok-fn: #4078f2;
-  --tok-type: #c18401;
-  --tok-punc: #7a7f87;
-}
-
-.tok-kw { color: var(--tok-kw); }
-.tok-str { color: var(--tok-str); }
-.tok-num { color: var(--tok-num); }
-.tok-com { color: var(--tok-com); font-style: italic; }
-.tok-fn { color: var(--tok-fn); }
-.tok-type { color: var(--tok-type); }
-.tok-punc { color: var(--tok-punc); }
-
-@media (prefers-color-scheme: dark) {
-  .card-code {
-    /* One Dark */
-    --tok-kw: #c678dd;
-    --tok-str: #98c379;
-    --tok-num: #d19a66;
-    --tok-com: #7f848e;
-    --tok-fn: #61afef;
-    --tok-type: #e5c07b;
-    --tok-punc: #8b909a;
   }
 }
 

@@ -96,7 +96,9 @@ import ChevronDown from '@primeicons/vue/chevron-down'
 import ChevronLeft from '@primeicons/vue/chevron-left'
 import Code from '@primeicons/vue/code'
 import Cog from '@primeicons/vue/cog'
+import Copy from '@primeicons/vue/copy'
 import Database from '@primeicons/vue/database'
+import Folder from '@primeicons/vue/folder'
 import Home from '@primeicons/vue/home'
 import Lock from '@primeicons/vue/lock'
 import Shield from '@primeicons/vue/shield'
@@ -123,6 +125,13 @@ const navGroups: { labelKey: string, items: NavItem[] }[] = [
     items: [
       { labelKey: 'nav.dashboard', to: '/dashboard', icon: Home },
       { labelKey: 'nav.security', to: '/dashboard/security', icon: Lock }
+    ]
+  },
+  {
+    labelKey: 'nav.content',
+    items: [
+      { labelKey: 'nav.snippets', to: '/dashboard/snippets', icon: Copy },
+      { labelKey: 'nav.groups', to: '/dashboard/groups', icon: Folder }
     ]
   },
   {

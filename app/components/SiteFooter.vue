@@ -12,7 +12,7 @@
       <BrandLogo class="footer-brand" :active="revealed" />
 
       <nav class="sitemap" aria-label="网站地图">
-        <NuxtLink v-for="(entry, index) in entries" :key="entry.to" :to="entry.to" class="sitemap-entry"
+        <NuxtLink v-for="(entry, index) in entries" :key="entry.name" :to="entry.to" class="sitemap-entry"
           :style="{ '--i': index }">
           {{ entry.name }}
         </NuxtLink>
@@ -57,12 +57,23 @@ const revealed = ref(false)
 const spacerHeight = ref('')
 
 // 网站地图：只放入口，不在页脚罗列具体条目
-const entries = [
+// 新增的公开主页 / 分组入口按当前账户解析；未登录或未设置用户名时引导去设置
+const { user } = useAuthUser()
+const profileLink = computed(() => {
+  if (!user.value) return '/sign'
+  return user.value.usernameSet ? `/${user.value.username}` : '/account/profile'
+})
+const groupsLink = computed(() => (user.value?.usernameSet ? `/${user.value.username}#groups` : profileLink.value))
+const entries = computed(() => [
+  { to: '/new', name: 'New snippet' },
+  { to: profileLink.value, name: 'My profile' },
+  { to: groupsLink.value, name: 'Groups' },
+  { to: '/docs', name: 'Docs' },
   { to: '/account', name: 'Account' },
   { to: '/languages', name: 'Languages' },
   { to: '/dependencies', name: 'Dependencies' },
   { to: '/request', name: 'Submit an entry' }
-]
+])
 
 // 法务入口（页面待实现，统一挂在 /legal/ 下，便于只保留一个用户名保留词）
 const legal = [

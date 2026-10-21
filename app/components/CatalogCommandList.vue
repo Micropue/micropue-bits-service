@@ -20,6 +20,7 @@
         <img v-if="item.logo_url" class="command-logo" :src="item.logo_url" alt="" width="18" height="18"
           loading="lazy" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'">
         <span class="command-name">{{ item.name }}</span>
+        <span v-if="item.subtitle" class="command-sub">{{ item.subtitle }}</span>
         <span class="command-kind">{{ catalogKindLabel(item.kind) }}</span>
       </button>
       <p v-if="!results.length" class="command-empty">{{ loading ? 'Searching…' : emptyText }}</p>

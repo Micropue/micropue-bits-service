@@ -3,6 +3,10 @@
         <nav class="navbar" aria-label="主导航">
             <BrandLogo class="header-brand" :active="loaderDone" />
             <div class="nav-actions">
+                <NuxtLink to="/docs" class="docs-trigger" aria-label="Documentation">
+                    <Book aria-hidden="true" />
+                    <span class="docs-trigger-label">Docs</span>
+                </NuxtLink>
                 <!-- 指令框入口：点击打开；按钮内的 / 提示快捷键（首页由 hero 输入框承担，不重复显示） -->
                 <button v-if="route.path !== '/'" type="button" class="command-trigger"
                     aria-label="Open command box (press slash)" aria-keyshortcuts="/"
@@ -43,6 +47,7 @@
 import type { AuthUser } from '~/composables/useAuthUser'
 
 const route = useRoute()
+import Book from '@primeicons/vue/book'
 import Github from '@primeicons/vue/github'
 import Search from '@primeicons/vue/search'
 import ArrowUpRight from '@primeicons/vue/arrow-up-right'
@@ -111,6 +116,36 @@ header {
             display: flex;
             align-items: center;
             gap: 0.75rem;
+
+            .docs-trigger {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.45rem;
+                height: 36px;
+                padding: 0 0.7rem;
+                border: 1px solid var(--p-content-border-color);
+                border-radius: 999px;
+                color: var(--p-text-muted-color);
+                font-size: 0.85rem;
+                text-decoration: none;
+                transition: border-color 0.15s, color 0.15s;
+
+                &:hover,
+                &:focus-visible {
+                    border-color: var(--p-primary-color);
+                    color: var(--p-text-color);
+                }
+
+                &.router-link-active {
+                    border-color: color-mix(in srgb, var(--p-primary-color) 45%, var(--p-content-border-color));
+                    color: var(--p-text-color);
+                }
+
+                svg {
+                    width: 1rem;
+                    height: 1rem;
+                }
+            }
 
             .command-trigger {
                 display: inline-flex;
@@ -194,23 +229,28 @@ header {
         }
     }
 
-    /* 窄屏：指令入口只留图标，账户入口只留头像与箭头 */
+    /* 窄屏：指令 / 文档入口只留图标，并做成正圆；账户入口只留头像与箭头 */
     @media screen and (max-width: 700px) {
-        .nav-actions .command-trigger-label {
+        .nav-actions .command-trigger-label,
+        .nav-actions .docs-trigger-label {
+            display: none;
+        }
+
+        .nav-actions .command-trigger,
+        .nav-actions .docs-trigger {
+            justify-content: center;
+            width: 36px;
+            padding: 0;
+            border-radius: 50%;
+        }
+
+        .nav-actions .command-trigger-key {
             display: none;
         }
     }
 
     @media screen and (max-width: 560px) {
         .nav-actions .auth-name {
-            display: none;
-        }
-
-        .nav-actions .command-trigger {
-            padding: 0 0.55rem;
-        }
-
-        .nav-actions .command-trigger-key {
             display: none;
         }
     }

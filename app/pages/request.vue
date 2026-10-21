@@ -61,9 +61,16 @@
           </label>
           <label class="field" for="request-languages">
             <span>Languages it belongs to</span>
-            <MultiSelect input-id="request-languages" v-model="form.language_sids" :options="languageOptions"
-              option-label="label" option-value="value" filter :max-selected-labels="4" fluid
-              placeholder="Pick one or more" />
+            <MultiSelect input-id="request-languages" v-model="form.languages" :options="languageOptions"
+              option-label="name" filter :max-selected-labels="4" fluid placeholder="Pick one or more"
+              @filter="onLanguageFilter">
+              <template #option="{ option }">
+                <span class="lang-option">
+                  <img v-if="option.logo_url" :src="option.logo_url" alt="" width="16" height="16" loading="lazy">
+                  {{ option.name }}
+                </span>
+              </template>
+            </MultiSelect>
             <small class="hint">The first one you pick becomes the primary language.</small>
           </label>
         </template>
@@ -103,7 +110,13 @@ const KIND_TYPE_OPTIONS = [
 ]
 
 const kind = ref<RequestKind>(route.query.kind === 'dependency' ? 'dependency' : 'language')
-const form = ref({ name: '', link_url: '', dependency_kind: 'library', language_sids: [] as string[] })
+interface LanguageOption {
+  slug: string
+  name: string
+  logo_url: string | null
+}
+
+const form = ref({ name: '', link_url: '', dependency_kind: 'library', languages: [] as LanguageOption[] })
 const saving = ref(false)
 const error = ref('')
 const submitted = ref(false)
@@ -113,30 +126,54 @@ const submittedName = ref('')
 if (import.meta.client) await refresh()
 const signedIn = computed(() => !!authUser.value)
 
-// 依赖申请需要语言多选（取语言目录）
-const { data: languageData } = await useFetch<{ languages: { slug: string, name: string }[] }>('/api/languages')
-const languageOptions = computed(() =>
-  (languageData.value?.languages ?? [])
-    .map(language => ({ label: language.name, value: language.slug }))
-    .sort((a, b) => a.label.localeCompare(b.label, 'en', { sensitivity: 'base' })))
+// 依赖申请的语言多选：初始随机样本 + 防抖远程搜索（不拉全量）
+const languageOptions = ref<LanguageOption[]>([])
+let languageSeq = 0
+
+async function loadLanguages(query: string) {
+  const seq = ++languageSeq
+  try {
+    const data = await $fetch<{ languages: LanguageOption[] }>('/api/languages/search', {
+      query: { q: query }
+    })
+    if (seq !== languageSeq) return
+    const merged = [...data.languages]
+    // 已选中的语言即使不在本次结果里也保留，标签不会退化成 slug
+    for (const selected of form.value.languages) {
+      if (!merged.some(item => item.slug === selected.slug)) merged.push(selected)
+    }
+    languageOptions.value = merged
+  } catch {
+    if (seq === languageSeq) languageOptions.value = [...form.value.languages]
+  }
+}
+
+const languageSearch = debounce((query: string) => { void loadLanguages(query) }, 250)
+
+function onLanguageFilter(event: { value: string }) {
+  languageSearch.run(event.value)
+}
+
+onMounted(() => { void loadLanguages('') })
+onBeforeUnmount(() => languageSearch.cancel())
 
 const URL_RE = /^https?:\/\/[^\s]+$/i
 const canSubmit = computed(() =>
   form.value.name.trim().length >= 2 &&
   URL_RE.test(form.value.link_url.trim()) &&
-  (kind.value === 'language' || (form.value.language_sids.length > 0 && !!form.value.dependency_kind)))
+  (kind.value === 'language' || (form.value.languages.length > 0 && !!form.value.dependency_kind)))
 
 function switchKind(next: RequestKind) {
   kind.value = next
   error.value = ''
   // 语言与依赖的字段不同，切换时清掉可能不适用的一半
-  if (next === 'language') form.value.language_sids = []
+  if (next === 'language') form.value.languages = []
 }
 
 function reset() {
   submitted.value = false
   submittedName.value = ''
-  form.value = { name: '', link_url: '', dependency_kind: 'library', language_sids: [] }
+  form.value = { name: '', link_url: '', dependency_kind: 'library', languages: [] }
   error.value = ''
 }
 
@@ -152,7 +189,7 @@ async function submit() {
         name: form.value.name.trim(),
         link_url: form.value.link_url.trim(),
         dependency_kind: kind.value === 'dependency' ? form.value.dependency_kind : undefined,
-        language_slugs: kind.value === 'dependency' ? form.value.language_sids : undefined
+        language_slugs: kind.value === 'dependency' ? form.value.languages.map(language => language.slug) : undefined
       }
     })
     submittedName.value = form.value.name.trim()
@@ -177,6 +214,19 @@ async function submit() {
 </script>
 
 <style scoped lang="scss">
+.lang-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lang-option img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  filter: var(--logo-tint);
+}
+
 .request {
   width: min(720px, 90vw);
   margin: 0 auto;

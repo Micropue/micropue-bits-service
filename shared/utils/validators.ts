@@ -15,7 +15,7 @@ const RESERVED_USERNAMES = new Set([
   'api', 'sign', 'login', 'logout', 'account', 'settings', 'explore',
   'search', 'admin', 'static', 'assets', '_nuxt', 'oauth', 'dashboard',
   'language', 'languages', 'framework', 'library', 'tool', 'runtime', 'dependencies', 'legal',
-  'request', 'requests'
+  'request', 'requests', 'new', 'docs'
 ])
 
 export function isValidNickname(value: string): boolean {
