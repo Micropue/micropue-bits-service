@@ -32,7 +32,8 @@ export function tokenizeCode(code: string): CodeToken[] {
     const string = match[2]
     const number = match[3]
     const word = match[4]
-    const punct = match[6]
+    // 正则里空白分支不是捕获组：注释/字符串/数字/单词之后的第 5 组才是标点
+    const punct = match[5]
 
     if (comment) tokens.push({ text: raw, type: 'com' })
     else if (string) tokens.push({ text: raw, type: 'str' })

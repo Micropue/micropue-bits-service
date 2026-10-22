@@ -48,10 +48,12 @@ onMounted(async () => {
   if (!host.value) return
 
   const { EditorView, keymap, placeholder } = await import('@codemirror/view')
-  const { EditorState, Compartment } = await import('@codemirror/state')
+  const { EditorState, Compartment, Prec } = await import('@codemirror/state')
   const { basicSetup } = await import('codemirror')
   const { indentWithTab } = await import('@codemirror/commands')
   const { oneDark } = await import('@codemirror/theme-one-dark')
+  const { HighlightStyle, syntaxHighlighting } = await import('@codemirror/language')
+  const { tags: t } = await import('@lezer/highlight')
   const languageModule = await import('@codemirror/language-data')
   languageData = languageModule.languages
 
@@ -62,7 +64,7 @@ onMounted(async () => {
   const baseTheme = EditorView.theme({
     '&': { backgroundColor: 'transparent', color: 'var(--p-text-color)', fontSize: '0.82rem' },
     '.cm-content': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', padding: '0.65rem 0' },
-    '.cm-scroller': { fontFamily: 'inherit', lineHeight: '1.65' },
+    '.cm-scroller': { fontFamily: 'inherit', lineHeight: '1.7' },
     '.cm-gutters': {
       backgroundColor: 'transparent',
       borderRight: '1px solid var(--p-content-border-color)',
@@ -79,13 +81,43 @@ onMounted(async () => {
 
   // One Dark 自带背景，这里覆盖成透明以贴合页面卡片
   const darkOverrides = EditorView.theme({
-    '&': { backgroundColor: 'transparent' },
-    '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid var(--p-content-border-color)' },
+    '&': { backgroundColor: 'transparent', color: 'var(--p-text-color)' },
+    '.cm-gutters': {
+      backgroundColor: 'transparent',
+      borderRight: '1px solid var(--p-content-border-color)',
+      color: 'var(--p-text-muted-color)'
+    },
     '.cm-activeLine': { backgroundColor: 'rgba(255, 255, 255, 0.045)' },
     '.cm-activeLineGutter': { backgroundColor: 'transparent' }
   })
 
-  const themeExtensions = () => (isDark() ? [oneDark, darkOverrides] : [baseTheme])
+  // 与公开详情页的 .code-highlight 配色保持一致（Light / Dark 两套）
+  const oneLightHighlight = HighlightStyle.define([
+    { tag: [t.keyword, t.controlKeyword, t.modifier, t.bool, t.null], color: '#a626a4' },
+    { tag: [t.string, t.special(t.string), t.regexp], color: '#50a14f' },
+    { tag: [t.number, t.integer, t.float], color: '#986801' },
+    { tag: [t.comment, t.meta], color: '#a0a1a7', fontStyle: 'italic' },
+    { tag: [t.function(t.variableName), t.function(t.propertyName), t.labelName], color: '#4078f2' },
+    { tag: [t.typeName, t.className], color: '#c18401' },
+    { tag: [t.operator, t.operatorKeyword, t.punctuation], color: '#7a7f87' },
+    { tag: t.invalid, color: '#e45649' }
+  ])
+
+  const oneDarkHighlight = HighlightStyle.define([
+    { tag: [t.keyword, t.controlKeyword, t.modifier, t.bool, t.null], color: '#c678dd' },
+    { tag: [t.string, t.special(t.string), t.regexp], color: '#98c379' },
+    { tag: [t.number, t.integer, t.float], color: '#d19a66' },
+    { tag: [t.comment, t.meta], color: '#7f848e', fontStyle: 'italic' },
+    { tag: [t.function(t.variableName), t.function(t.propertyName), t.labelName], color: '#61afef' },
+    { tag: [t.typeName, t.className], color: '#e5c07b' },
+    { tag: [t.operator, t.operatorKeyword, t.punctuation], color: '#8b909a' },
+    { tag: t.invalid, color: '#e06c75' }
+  ])
+
+  // 主题色板：浅色用 One Light 对齐详情页；深色保留 One Dark 背景并覆盖高亮色
+  const themeExtensions = () => isDark()
+    ? [baseTheme, oneDark, darkOverrides, Prec.highest(syntaxHighlighting(oneDarkHighlight))]
+    : [baseTheme, Prec.highest(syntaxHighlighting(oneLightHighlight))]
 
   view = new EditorView({
     parent: host.value,
@@ -93,7 +125,6 @@ onMounted(async () => {
       doc: props.modelValue,
       extensions: [
         basicSetup,
-        baseTheme,
         themeCompartment.of(themeExtensions()),
         languageCompartment.of([]),
         keymap.of([indentWithTab]),
