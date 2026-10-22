@@ -129,7 +129,11 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: 'profile' })
+definePageMeta({
+  layout: 'profile',
+  // 切换用户名时强制重新挂载，避免右侧列表沿用一个用户的数据
+  key: route => route.path
+})
 
 import LinkIcon from '@primeicons/vue/link'
 import FolderIcon from '@primeicons/vue/folder'
