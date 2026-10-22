@@ -312,7 +312,8 @@ const CONTENT_TABLES_SQL: string[] = [
     \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '举报时间',
     PRIMARY KEY (\`sid\`),
     KEY \`idx_reports_status\` (\`status\`,\`created_at\`),
-    KEY \`idx_reports_target\` (\`target_kind\`,\`target_ref\`)
+    KEY \`idx_reports_target\` (\`target_kind\`,\`target_ref\`),
+    KEY \`idx_reports_reporter\` (\`reporter_uuid\`,\`created_at\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='举报表'`,
 
   // 通知（只记必要信息，不做消息流）
@@ -381,6 +382,19 @@ const ADMIN_TABLES_SQL: string[] = [
     PRIMARY KEY (\`sid\`),
     KEY \`idx_admin_sessions_admin\` (\`admin_uuid\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='后台管理员登录会话表'`,
+
+  // 更新日志：控制台发布，前台 /changelog 时间线展示；published_at 为空 = 草稿
+  `CREATE TABLE IF NOT EXISTS \`changelogs\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`title\` VARCHAR(120) NOT NULL COMMENT '标题',
+    \`body\` MEDIUMTEXT NOT NULL COMMENT '正文（纯文本，保留换行）',
+    \`published_at\` DATETIME NULL COMMENT '发布时间（NULL=草稿）',
+    \`created_by\` CHAR(36) NULL COMMENT '创建管理员UUID',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (\`sid\`),
+    KEY \`idx_changelogs_published\` (\`published_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='更新日志表'`,
 
   // 系统配置（键值对）：当前存认证方式开关 auth.methods
   `CREATE TABLE IF NOT EXISTS \`admin_settings\` (
@@ -667,6 +681,15 @@ export async function ensureSchema(): Promise<number> {
 
   // 内容管理系统数据表（幂等建表）
   for (const sql of CONTENT_TABLES_SQL) await pool.query(sql)
+
+  // 旧表补举报人索引（个人中心「我提交的举报」）
+  const [reportReporterIdx] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS count FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'reports' AND INDEX_NAME = 'idx_reports_reporter'`
+  )
+  if (!reportReporterIdx[0]?.count) {
+    await pool.query('ALTER TABLE `reports` ADD KEY `idx_reports_reporter` (`reporter_uuid`,`created_at`)')
+  }
 
   // dependencies 表增量列与索引（旧表升级）
   for (const [col, sql] of DEPENDENCIES_COLUMNS_SQL) {

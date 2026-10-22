@@ -31,6 +31,8 @@
 <script setup lang="ts">
 import type { AuthUser } from '~/composables/useAuthUser'
 import User from '@primeicons/vue/user'
+import Bookmark from '@primeicons/vue/bookmark'
+import Flag from '@primeicons/vue/flag'
 import Folder from '@primeicons/vue/folder'
 import Shield from '@primeicons/vue/shield'
 import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
@@ -78,6 +80,8 @@ const sections = computed<NavItem[]>(() => [
     icon: Shield,
     warn: !authUser.value?.hasPassword || !authUser.value?.twoFactorEnabled
   },
+  { label: 'Favorites', to: '/account/favorites', icon: Bookmark },
+  { label: 'Reports & feedback', to: '/account/activity', icon: Flag },
   { label: 'Language & dependency requests', to: '/account/requests', icon: Folder },
   {
     label: 'My profile',

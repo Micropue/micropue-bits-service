@@ -35,11 +35,14 @@ interface SitePage {
 const SITE_PAGES: SitePage[] = [
   { name: 'Home', to: '/', keywords: 'index start' },
   { name: 'Docs', to: '/docs', keywords: 'documentation help guide usage' },
+  { name: 'Changelog', to: '/changelog', keywords: 'updates release notes what is new' },
   { name: 'Languages', to: '/languages', keywords: 'language catalog' },
   { name: 'Dependencies', to: '/dependencies', keywords: 'framework library tool runtime catalog' },
   { name: 'Submit an entry', to: '/request', keywords: 'request submit language dependency' },
   { name: 'Account', to: '/account', keywords: 'profile me settings' },
   { name: 'My requests', to: '/account/requests', keywords: 'requests submissions status review' },
+  { name: 'Favorites', to: '/account/favorites', keywords: 'saved bookmarks snippets groups' },
+  { name: 'Reports & feedback', to: '/account/activity', keywords: 'reports feedback inbox' },
   { name: 'Login security', to: '/account/security', keywords: 'security password passkey github devices two-factor' },
   { name: 'Sign in', to: '/sign', keywords: 'login signup' }
 ]

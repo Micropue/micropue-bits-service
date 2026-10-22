@@ -90,20 +90,31 @@
               <template v-if="kind === 'snippet'">
                 <div><span>Copies</span><strong>{{ copyCount }}</strong></div>
                 <div><span>Forks</span><strong>{{ snippet?.forkCount ?? 0 }}</strong></div>
+                <div><span>Favorites</span><strong>{{ favoriteCount }}</strong></div>
               </template>
               <template v-else>
                 <div><span>Snippets</span><strong>{{ groupSnippets.length }}</strong></div>
                 <div><span>Forks</span><strong>{{ group?.forkCount ?? 0 }}</strong></div>
+                <div><span>Favorites</span><strong>{{ favoriteCount }}</strong></div>
               </template>
             </section>
 
-            <div v-if="isOwner || (kind === 'group' && group?.visibility === 'public')" class="side-actions">
+            <div v-if="isOwner || visibility !== 'private'" class="side-actions">
               <template v-if="isOwner">
                 <Button v-if="kind === 'snippet'" label="Edit snippet" size="small" outlined fluid
                   @click="navigateTo(`/${author.username}/${snippet?.slug}/edit`)" />
                 <Button v-else label="Edit group" size="small" outlined fluid @click="editGroupDialog = true" />
               </template>
-              <Button v-else label="Fork group" size="small" outlined fluid :loading="forking" @click="forkGroup" />
+              <template v-else>
+                <Button :label="isFavorited ? 'Saved' : 'Save'" size="small" severity="secondary" outlined fluid
+                  :loading="favoriteBusy" @click="toggleFavorite" />
+                <Button v-if="visibility === 'public'" label="Report" size="small" text severity="secondary"
+                  @click="openReport" />
+                <Button v-if="kind === 'snippet'" label="Feedback" size="small" text severity="secondary"
+                  @click="openFeedback" />
+                <Button v-if="kind === 'group' && group?.visibility === 'public'" label="Fork group" size="small"
+                  outlined fluid :loading="forking" @click="forkGroup" />
+              </template>
             </div>
           </div>
         </aside>
@@ -120,9 +131,55 @@
                   <Button :label="copied ? 'Copied' : 'Copy'" size="small" text @click="copyCode" />
                 </div>
               </div>
-              <pre class="code-pre code-highlight"><code><template v-for="(token, index) in tokens"
-                :key="index"><span :class="`tok-${token.type}`">{{ token.text }}</span></template></code></pre>
+              <ClientOnly>
+                <CodeEditor :model-value="snippet.code" :language="snippet.language?.name" readonly
+                  :show-line-numbers="false" />
+                <template #fallback>
+                  <pre class="code-pre code-highlight"><code><template v-for="(token, index) in tokens"
+                    :key="index"><span :class="`tok-${token.type}`">{{ token.text }}</span></template></code></pre>
+                </template>
+              </ClientOnly>
             </div>
+
+            <section class="feedback-section" aria-labelledby="feedback-title">
+              <header class="feedback-head">
+                <h2 id="feedback-title" class="feedback-title">
+                  Feedback
+                  <span class="feedback-count">{{ feedbackTotal }}</span>
+                </h2>
+                <InputText v-if="feedbackTotal || feedbackQuery" v-model="feedbackQuery" size="small"
+                  class="feedback-search" placeholder="Search feedback" aria-label="Search feedback"
+                  autocomplete="off" />
+              </header>
+
+              <p v-if="feedbackLoading && !feedbackItems.length" class="feedback-empty">Loading…</p>
+              <p v-else-if="!feedbackItems.length" class="feedback-empty">
+                {{ feedbackQuery.trim() ? 'No feedback matches this search.' : 'No feedback yet.' }}
+              </p>
+              <div v-else class="feedback-list">
+                <article v-for="item in feedbackItems" :key="item.sid" class="feedback-item">
+                  <UserAvatar :src="item.from.avatarUrl" :size="32" />
+                  <div class="feedback-main">
+                    <div class="feedback-meta">
+                      <NuxtLink v-if="item.from.username" :to="`/${item.from.username}`" class="feedback-author">
+                        @{{ item.from.username }}
+                      </NuxtLink>
+                      <span v-else class="feedback-author">{{ item.from.nickname }}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{{ feedbackTypeLabel(item.type) }}</span>
+                      <span aria-hidden="true">·</span>
+                      <time>{{ formatDate(item.createdAt) }}</time>
+                    </div>
+                    <p class="feedback-detail">{{ item.detail }}</p>
+                  </div>
+                </article>
+              </div>
+
+              <div v-if="feedbackItems.length < feedbackTotal" class="feedback-more">
+                <Button label="Load more feedback" size="small" severity="secondary" outlined
+                  :loading="feedbackLoading" @click="loadFeedback(false)" />
+              </div>
+            </section>
           </template>
 
           <template v-else>
@@ -157,11 +214,17 @@
   </div>
 
   <GroupDialog v-model:visible="editGroupDialog" :group="group" @saved="refreshGroup" />
+  <FeedbackDialog v-if="snippet" v-model:visible="feedbackDialog" :username="author.username" :slug="snippet.slug"
+    :snippet-name="snippet.name" @submitted="refreshFeedback" />
+  <ReportDialog v-if="kind" v-model:visible="reportDialog"
+    :target-kind="kind === 'group' ? 'group' : 'snippet'" :username="author.username"
+    :slug="kind === 'snippet' ? snippet?.slug : group?.slug" :target-name="title" />
   <Toast />
 </template>
 
 <script setup lang="ts">
 import ArrowUpRight from '@primeicons/vue/arrow-up-right'
+import { FEEDBACK_TYPES, moderationTypeLabel } from '#shared/utils/moderation'
 
 // 公开内容页 /{username}/{slug}：同一命名空间下渲染代码段或分组
 // public 所有人可见；unlisted 凭链接可见；private 仅作者本人；无权限统一 404
@@ -178,6 +241,8 @@ interface SnippetDetail {
   visibility: 'public' | 'unlisted' | 'private'
   copyCount: number
   forkCount: number
+  favoriteCount: number
+  isFavorited: boolean
   forkFrom: { slug: string, name: string, author: { username: string, nickname: string } } | null
   createdAt: string
   updatedAt: string
@@ -194,6 +259,8 @@ interface GroupDetail {
   intro: string
   visibility: 'public' | 'unlisted' | 'private'
   forkCount: number
+  favoriteCount: number
+  isFavorited: boolean
   forkFrom: { slug: string, name: string, author: { username: string, nickname: string } } | null
   createdAt: string
   updatedAt: string
@@ -250,6 +317,119 @@ const isOwner = computed(() => snippet.value?.isOwner ?? group.value?.isOwner ??
 const tokens = computed(() => tokenizeCode(snippet.value?.code ?? ''))
 const copyCount = ref(0)
 watch(snippet, value => { copyCount.value = Number(value?.copyCount ?? 0) }, { immediate: true })
+
+const favoriteCount = ref(0)
+const isFavorited = ref(false)
+watch([snippet, group], () => {
+  favoriteCount.value = Number(snippet.value?.favoriteCount ?? group.value?.favoriteCount ?? 0)
+  isFavorited.value = snippet.value?.isFavorited ?? group.value?.isFavorited ?? false
+}, { immediate: true })
+
+const favoriteBusy = ref(false)
+
+async function toggleFavorite() {
+  if (favoriteBusy.value) return
+  if (!authUser.value) {
+    await navigateTo('/sign')
+    return
+  }
+  favoriteBusy.value = true
+  try {
+    const response = await $fetch<{ favorited: boolean, count: number }>(
+      `/api/users/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/favorite`,
+      { method: isFavorited.value ? 'DELETE' : 'POST' }
+    )
+    isFavorited.value = response.favorited
+    favoriteCount.value = response.count
+    toast.add({
+      severity: 'success',
+      summary: response.favorited ? 'Saved to favorites' : 'Removed from favorites',
+      life: 2500
+    })
+  } catch (err) {
+    const e = err as { statusCode?: number, statusMessage?: string }
+    if (e.statusCode === 401) {
+      await navigateTo('/sign')
+      return
+    }
+    toast.add({ severity: 'error', summary: e.statusMessage ?? 'Action failed', life: 4000 })
+  } finally {
+    favoriteBusy.value = false
+  }
+}
+
+const feedbackDialog = ref(false)
+const reportDialog = ref(false)
+
+async function openFeedback() {
+  if (!authUser.value) {
+    await navigateTo('/sign')
+    return
+  }
+  feedbackDialog.value = true
+}
+
+async function openReport() {
+  if (!authUser.value) {
+    await navigateTo('/sign')
+    return
+  }
+  reportDialog.value = true
+}
+
+// ---------- 公开反馈 / 评论 ----------
+interface FeedbackItem {
+  sid: string
+  type: string
+  detail: string
+  createdAt: string
+  from: { username: string | null, nickname: string, avatarUrl: string | null }
+}
+
+const feedbackItems = ref<FeedbackItem[]>([])
+const feedbackTotal = ref(0)
+const feedbackQuery = ref('')
+const feedbackLoading = ref(false)
+let feedbackSeq = 0
+
+function feedbackTypeLabel(value: string) {
+  return moderationTypeLabel(FEEDBACK_TYPES, value)
+}
+
+async function loadFeedback(reset: boolean) {
+  if (!snippet.value) return
+  const seq = ++feedbackSeq
+  const offset = reset ? 0 : feedbackItems.value.length
+  feedbackLoading.value = true
+  try {
+    const response = await $fetch<{ items: FeedbackItem[], total: number }>(
+      `/api/users/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/feedback`,
+      { query: { q: feedbackQuery.value.trim(), limit: 20, offset } }
+    )
+    if (seq !== feedbackSeq) return
+    feedbackItems.value = reset ? response.items : [...feedbackItems.value, ...response.items]
+    feedbackTotal.value = response.total
+  } catch {
+    if (seq === feedbackSeq && reset) {
+      feedbackItems.value = []
+      feedbackTotal.value = 0
+    }
+  } finally {
+    if (seq === feedbackSeq) feedbackLoading.value = false
+  }
+}
+
+function refreshFeedback() {
+  void loadFeedback(true)
+}
+
+const feedbackSearch = debounce(() => { void loadFeedback(true) }, 250)
+watch(feedbackQuery, () => feedbackSearch.run())
+watch(snippet, value => {
+  if (!value) return
+  feedbackQuery.value = ''
+  void loadFeedback(true)
+}, { immediate: true })
 
 // 不存在 / 私密内容：返回真正的 404 页面
 if (error.value || !data.value) {
@@ -549,6 +729,10 @@ useHead({
 }
 
 .side-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.8rem 0;
   border-top: 1px solid var(--p-content-border-color);
 }
@@ -598,6 +782,107 @@ useHead({
   line-height: 1.7;
   white-space: pre;
   tab-size: 2;
+}
+
+/* ---------- 反馈 / 评论 ---------- */
+.feedback-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.feedback-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.feedback-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.feedback-count {
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--p-text-muted-color);
+}
+
+.feedback-search {
+  width: 15rem;
+  max-width: 45vw;
+}
+
+.feedback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.feedback-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 0.7rem;
+  background: var(--p-content-background);
+}
+
+.feedback-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.feedback-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--p-text-muted-color);
+}
+
+.feedback-author {
+  color: var(--p-text-color);
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.feedback-detail {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.feedback-empty {
+  margin: 0;
+  padding: 1rem 0;
+  font-size: 0.84rem;
+  color: var(--p-text-muted-color);
+}
+
+.feedback-more {
+  display: flex;
+  justify-content: center;
 }
 
 .empty-group {
@@ -713,6 +998,17 @@ useHead({
 
   .detail-main {
     order: 1;
+  }
+
+  .feedback-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .feedback-search {
+    width: 100%;
+    max-width: none;
   }
 }
 </style>

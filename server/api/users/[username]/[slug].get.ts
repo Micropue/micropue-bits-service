@@ -27,6 +27,9 @@ export default defineEventHandler(async event => {
       fetchSnippetTags(group.sid),
       fetchGroupSnippets(group.sid, isOwner)
     ])
+    const [favoriteRows] = viewer
+      ? await useDb().query<RowDataPacket[]>('SELECT 1 FROM `favorites` WHERE `user_uuid` = ? AND `content_sid` = ? LIMIT 1', [viewer.uuid, group.sid])
+      : [[]]
 
     // 分组 Fork 来源（仅当来源仍公开时展示）
     let groupForkFrom: { slug: string, name: string, author: { username: string, nickname: string } } | null = null
@@ -57,6 +60,8 @@ export default defineEventHandler(async event => {
         intro: group.intro,
         visibility: group.visibility,
         forkCount: Number(group.fork_count ?? 0),
+        favoriteCount: Number(group.favorite_count ?? 0),
+        isFavorited: favoriteRows.length > 0,
         forkFrom: groupForkFrom,
         createdAt: group.created_at,
         updatedAt: group.updated_at,
@@ -78,6 +83,9 @@ export default defineEventHandler(async event => {
     fetchSnippetTags(snippet.sid),
     fetchSnippetDependencies(snippet.sid)
   ])
+  const [favoriteRows] = viewer
+    ? await useDb().query<RowDataPacket[]>('SELECT 1 FROM `favorites` WHERE `user_uuid` = ? AND `content_sid` = ? LIMIT 1', [viewer.uuid, snippet.sid])
+    : [[]]
 
   // Fork 来源（仅当来源仍公开时展示，避免指向已隐藏内容）
   let forkFrom: { slug: string, name: string, author: { username: string, nickname: string } } | null = null
@@ -110,6 +118,8 @@ export default defineEventHandler(async event => {
       visibility: snippet.visibility,
       copyCount: Number(snippet.copy_count ?? 0),
       forkCount: Number(snippet.fork_count ?? 0),
+      favoriteCount: Number(snippet.favorite_count ?? 0),
+      isFavorited: favoriteRows.length > 0,
       forkFrom,
       createdAt: snippet.created_at,
       updatedAt: snippet.updated_at,

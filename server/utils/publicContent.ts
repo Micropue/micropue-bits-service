@@ -58,13 +58,17 @@ export async function fetchUserSnippets(ownerUuid: string, includeAll = false, o
     params
   )
 
+  const order = terms.length
+    ? 'c.`updated_at` DESC'
+    : "(c.`pinned_at` IS NOT NULL) DESC, c.`pinned_at` DESC, c.`sort_order` ASC, c.`updated_at` DESC"
   const [rows] = await useDb().query<RowDataPacket[]>(
     `SELECT c.\`sid\`, c.\`slug\`, c.\`name\`, c.\`intro\`, c.\`visibility\`, c.\`updated_at\`, c.\`group_sid\`,
+            c.\`pinned_at\`, c.\`favorite_count\`,
             l.\`slug\` AS \`language_slug\`, l.\`name\` AS \`language_name\`, l.\`logo_url\` AS \`language_logo\`
        FROM \`contents\` c
        LEFT JOIN \`languages\` l ON l.\`sid\` = c.\`language_sid\`
       WHERE ${where}
-      ORDER BY c.\`updated_at\` DESC
+      ORDER BY ${order}
       LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   )
@@ -77,6 +81,8 @@ export async function fetchUserSnippets(ownerUuid: string, includeAll = false, o
     visibility: row.visibility as string,
     updated_at: row.updated_at as string,
     group_sid: row.group_sid as string | null,
+    pinned: !!row.pinned_at,
+    favoriteCount: Number(row.favorite_count ?? 0),
     language: row.language_slug
       ? { slug: row.language_slug as string, name: row.language_name as string, logo_url: row.language_logo as string | null }
       : null
@@ -104,14 +110,18 @@ export async function fetchUserGroups(ownerUuid: string, includeAll = false, opt
     params
   )
 
+  const order = terms.length
+    ? 'g.`updated_at` DESC'
+    : "(g.`pinned_at` IS NOT NULL) DESC, g.`pinned_at` DESC, g.`sort_order` ASC, g.`updated_at` DESC"
   const [rows] = await useDb().query<RowDataPacket[]>(
     `SELECT g.\`sid\`, g.\`slug\`, g.\`name\`, g.\`intro\`, g.\`visibility\`, g.\`updated_at\`,
+            g.\`pinned_at\`, g.\`favorite_count\`,
             (SELECT COUNT(*) FROM \`contents\` s
               WHERE s.\`group_sid\` = g.\`sid\` AND s.\`kind\` = 'snippet' AND s.\`deleted_at\` IS NULL
                 ${includeAll ? '' : "AND s.`visibility` = 'public'"}) AS \`snippet_count\`
        FROM \`contents\` g
       WHERE ${where}
-      ORDER BY g.\`updated_at\` DESC
+      ORDER BY ${order}
       LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   )
@@ -123,6 +133,8 @@ export async function fetchUserGroups(ownerUuid: string, includeAll = false, opt
     intro: row.intro as string,
     visibility: row.visibility as string,
     updated_at: row.updated_at as string,
+    pinned: !!row.pinned_at,
+    favoriteCount: Number(row.favorite_count ?? 0),
     snippetCount: Number(row.snippet_count ?? 0)
   })))
   return { items, total: Number(countRow?.total ?? 0) }
@@ -156,6 +168,7 @@ export interface PublicSnippetRow extends RowDataPacket {
   visibility: string
   copy_count: number
   fork_count: number
+  favorite_count: number
   fork_from_sid: string | null
   created_at: string
   updated_at: string
@@ -168,7 +181,7 @@ export async function fetchSnippetBySlug(ownerUuid: string, slug: string): Promi
   if (!slug || slug.length > 40) return null
   const [rows] = await useDb().query<PublicSnippetRow[]>(
     `SELECT c.\`sid\`, c.\`slug\`, c.\`name\`, c.\`intro\`, c.\`code\`, c.\`visibility\`, c.\`copy_count\`,
-            c.\`fork_count\`, c.\`fork_from_sid\`, c.\`created_at\`, c.\`updated_at\`,
+            c.\`fork_count\`, c.\`favorite_count\`, c.\`fork_from_sid\`, c.\`created_at\`, c.\`updated_at\`,
             l.\`slug\` AS \`language_slug\`, l.\`name\` AS \`language_name\`, l.\`logo_url\` AS \`language_logo\`
        FROM \`contents\` c
        LEFT JOIN \`languages\` l ON l.\`sid\` = c.\`language_sid\`
@@ -201,6 +214,7 @@ export interface GroupRow extends RowDataPacket {
   intro: string
   visibility: string
   fork_count: number
+  favorite_count: number
   fork_from_sid: string | null
   created_at: string
   updated_at: string
@@ -209,7 +223,7 @@ export interface GroupRow extends RowDataPacket {
 export async function fetchGroupBySlug(ownerUuid: string, slug: string): Promise<GroupRow | null> {
   if (!slug || slug.length > 40) return null
   const [rows] = await useDb().query<GroupRow[]>(
-    `SELECT \`sid\`, \`slug\`, \`name\`, \`intro\`, \`visibility\`, \`fork_count\`, \`fork_from_sid\`, \`created_at\`, \`updated_at\`
+    `SELECT \`sid\`, \`slug\`, \`name\`, \`intro\`, \`visibility\`, \`fork_count\`, \`favorite_count\`, \`fork_from_sid\`, \`created_at\`, \`updated_at\`
        FROM \`contents\`
       WHERE \`owner_uuid\` = ? AND \`slug\` = ? AND \`kind\` = 'group' AND \`deleted_at\` IS NULL
       LIMIT 1`,

@@ -98,9 +98,11 @@ import Code from '@primeicons/vue/code'
 import Cog from '@primeicons/vue/cog'
 import Copy from '@primeicons/vue/copy'
 import Database from '@primeicons/vue/database'
+import Flag from '@primeicons/vue/flag'
 import Folder from '@primeicons/vue/folder'
 import Home from '@primeicons/vue/home'
 import Lock from '@primeicons/vue/lock'
+import Megaphone from '@primeicons/vue/megaphone'
 import Shield from '@primeicons/vue/shield'
 import SignOut from '@primeicons/vue/sign-out'
 import Users from '@primeicons/vue/users'
@@ -156,6 +158,13 @@ const navGroups: { labelKey: string, items: NavItem[] }[] = [
     ]
   },
   {
+    labelKey: 'nav.community',
+    items: [
+      { labelKey: 'nav.reports', to: '/dashboard/reports', icon: Flag },
+      { labelKey: 'nav.changelog', to: '/dashboard/changelogs', icon: Megaphone }
+    ]
+  },
+  {
     labelKey: 'nav.system',
     items: [
       { labelKey: 'nav.accounts', to: '/dashboard/users', icon: Users },
@@ -197,6 +206,8 @@ const titleKeys: Record<string, string> = {
   '/dashboard/dependencies/pending': 'title.dependenciesPending',
   '/dashboard/admins': 'title.administrators',
   '/dashboard/settings': 'title.settings',
+  '/dashboard/reports': 'title.reports',
+  '/dashboard/changelogs': 'title.changelog',
   '/dashboard/auth': 'title.signIn'
 }
 const title = computed(() => {

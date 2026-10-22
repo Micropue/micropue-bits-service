@@ -67,6 +67,7 @@
               :severity="profile.isFollowing ? 'secondary' : undefined" :outlined="profile.isFollowing" size="small"
               :loading="followBusy" @click="toggleFollow" />
             <Button v-else label="Follow" size="small" @click="navigateTo('/sign')" />
+            <Button label="Report" size="small" text severity="secondary" @click="openReportUser" />
           </template>
         </div>
       </aside>
@@ -79,9 +80,13 @@
               Snippets
               <span class="section-count">{{ snippetTotal }}</span>
             </h2>
-            <InputText v-if="snippetTotal || snippetQuery || profile.isOwner" v-model="snippetQuery" class="section-search"
-              name="profile-snippet-search" size="small" autocomplete="off" placeholder="Search snippets"
-              aria-label="Search snippets" />
+            <div class="section-tools">
+              <Button v-if="profile.isOwner && !snippetQuery.trim() && snippetItems.length" label="Reorder" size="small"
+                severity="secondary" text @click="openOrder('snippet')" />
+              <InputText v-if="snippetTotal || snippetQuery || profile.isOwner" v-model="snippetQuery" class="section-search"
+                name="profile-snippet-search" size="small" autocomplete="off" placeholder="Search snippets"
+                aria-label="Search snippets" />
+            </div>
           </header>
 
           <p v-if="!snippetItems.length" class="empty">
@@ -103,6 +108,7 @@
                 <h3 class="snippet-name">{{ snippet.name }}</h3>
                 <p v-if="snippet.intro" class="snippet-intro">{{ snippet.intro }}</p>
                 <div class="snippet-tags">
+                  <span v-if="snippet.pinned" class="tag tag--pinned">Pinned</span>
                   <span v-if="profile.isOwner" class="tag" :class="`tag--${snippet.visibility}`">
                     {{ visibilityLabel(snippet.visibility) }}
                   </span>
@@ -110,6 +116,8 @@
                 </div>
               </NuxtLink>
               <div v-if="profile.isOwner" class="card-actions">
+                <Button :label="snippet.pinned ? 'Unpin' : 'Pin'" size="small" text severity="secondary"
+                  :loading="pinBusy === snippet.slug" @click="togglePin('snippet', snippet)" />
                 <Button label="Edit" size="small" text severity="secondary"
                   @click="navigateTo(`/${profile.username}/${snippet.slug}/edit`)" />
                 <Button label="Delete" size="small" text severity="danger" @click="askDeleteSnippet(snippet)" />
@@ -129,9 +137,13 @@
               Groups
               <span class="section-count">{{ groupTotal }}</span>
             </h2>
-            <InputText v-if="groupTotal || groupQuery || profile.isOwner" v-model="groupQuery" class="section-search"
-              name="profile-group-search" size="small" autocomplete="off" placeholder="Search groups"
-              aria-label="Search groups" />
+            <div class="section-tools">
+              <Button v-if="profile.isOwner && !groupQuery.trim() && groupItems.length" label="Reorder" size="small"
+                severity="secondary" text @click="openOrder('group')" />
+              <InputText v-if="groupTotal || groupQuery || profile.isOwner" v-model="groupQuery" class="section-search"
+                name="profile-group-search" size="small" autocomplete="off" placeholder="Search groups"
+                aria-label="Search groups" />
+            </div>
           </header>
 
           <p v-if="!groupItems.length" class="empty">
@@ -151,6 +163,7 @@
                 </div>
                 <p v-if="group.intro" class="group-intro">{{ group.intro }}</p>
                 <div class="snippet-tags">
+                  <span v-if="group.pinned" class="tag tag--pinned">Pinned</span>
                   <span v-if="profile.isOwner" class="tag" :class="`tag--${group.visibility}`">
                     {{ visibilityLabel(group.visibility) }}
                   </span>
@@ -158,6 +171,8 @@
                 </div>
               </NuxtLink>
               <div v-if="profile.isOwner" class="card-actions">
+                <Button :label="group.pinned ? 'Unpin' : 'Pin'" size="small" text severity="secondary"
+                  :loading="pinBusy === group.slug" @click="togglePin('group', group)" />
                 <Button label="Edit" size="small" text severity="secondary" @click="openGroupEdit(group)" />
                 <Button label="Delete" size="small" text severity="danger" @click="askDeleteGroup(group)" />
               </div>
@@ -245,6 +260,10 @@
     </div>
   </Dialog>
 
+  <ProfileOrderDialog v-if="profile?.isOwner" v-model:visible="orderDialog" :kind="orderKind"
+    @saved="reloadProfile" />
+  <ReportDialog v-if="profile && !profile.isOwner" v-model:visible="reportUserDialog" target-kind="user"
+    :username="profile.username" :target-name="profile.nickname" />
   <ConfirmDialog />
   <Toast />
 </template>
@@ -277,6 +296,8 @@ interface SnippetItem {
   visibility: string
   updated_at: string
   group_sid: string | null
+  pinned: boolean
+  favoriteCount: number
   language: { slug: string, name: string, logo_url: string | null } | null
   tags: TagItem[]
 }
@@ -288,6 +309,8 @@ interface GroupItem {
   intro: string
   visibility: string
   updated_at: string
+  pinned: boolean
+  favoriteCount: number
   snippetCount: number
   tags: TagItem[]
 }
@@ -454,6 +477,48 @@ async function toggleFollow() {
   } finally {
     followBusy.value = false
   }
+}
+
+// ---------- 置顶 / 拖拽排序 ----------
+const pinBusy = ref('')
+const orderDialog = ref(false)
+const orderKind = ref<'snippet' | 'group'>('snippet')
+
+async function togglePin(kind: 'snippet' | 'group', item: { slug: string, pinned: boolean }) {
+  if (!profile.value?.isOwner || pinBusy.value) return
+  pinBusy.value = item.slug
+  try {
+    const response = await $fetch<{ pinned: boolean }>('/api/profile/pin', {
+      method: 'PATCH',
+      body: { kind, slug: item.slug, pinned: !item.pinned }
+    })
+    toast.add({
+      severity: 'success',
+      summary: response.pinned ? 'Pinned to profile' : 'Unpinned',
+      life: 2500
+    })
+    await reloadProfile()
+  } catch (err) {
+    toast.add({ severity: 'error', summary: (err as { statusMessage?: string }).statusMessage ?? 'Action failed', life: 4000 })
+  } finally {
+    pinBusy.value = ''
+  }
+}
+
+function openOrder(kind: 'snippet' | 'group') {
+  orderKind.value = kind
+  orderDialog.value = true
+}
+
+// ---------- 举报用户 ----------
+const reportUserDialog = ref(false)
+
+async function openReportUser() {
+  if (!authUser.value) {
+    await navigateTo('/sign')
+    return
+  }
+  reportUserDialog.value = true
 }
 
 // ---------- 删除代码段 / 分组 ----------
@@ -848,6 +913,12 @@ useHead({
   margin-bottom: 1rem;
 }
 
+.section-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .section-search {
   width: 17rem;
   max-width: 45vw;
@@ -1029,6 +1100,11 @@ useHead({
   &--private {
     border-color: color-mix(in srgb, #dc2626 40%, var(--p-content-border-color));
     color: color-mix(in srgb, #dc2626 70%, var(--p-text-color));
+  }
+
+  &--pinned {
+    border-color: color-mix(in srgb, #2563eb 45%, var(--p-content-border-color));
+    color: color-mix(in srgb, #2563eb 75%, var(--p-text-color));
   }
 }
 
@@ -1279,6 +1355,10 @@ useHead({
     flex-direction: column;
     align-items: stretch;
     gap: 0.6rem;
+  }
+
+  .section-tools {
+    justify-content: space-between;
   }
 
   .section-search {

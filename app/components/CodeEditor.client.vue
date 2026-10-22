@@ -1,5 +1,7 @@
 <template>
-  <div ref="host" class="code-editor" :style="{ '--editor-height': `${height}px` }" />
+  <div ref="host" class="code-editor"
+    :class="{ 'is-readonly': readonly, 'no-gutters': !showLineNumbers }"
+    :style="{ '--editor-height': `${height}px` }" />
 </template>
 
 <script setup lang="ts">
@@ -10,12 +12,18 @@ const props = withDefaults(defineProps<{
   /** 语言展示名（如 TypeScript），用于匹配 CodeMirror 语言包 */
   language?: string
   placeholder?: string
-  /** 编辑区高度（px），移动端会降到 280 */
+  /** 编辑区高度（px），移动端会降到 280；只读模式自动高度 */
   height?: number
+  /** 只读展示：用于代码段详情，与编辑器共用语言解析与配色 */
+  readonly?: boolean
+  /** 是否显示行号（详情页隐藏） */
+  showLineNumbers?: boolean
 }>(), {
   language: '',
   placeholder: 'Paste your code here…',
-  height: 360
+  height: 360,
+  readonly: false,
+  showLineNumbers: true
 })
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -45,6 +53,8 @@ async function loadLanguageSupport(viewRef: import('@codemirror/view').EditorVie
 }
 
 onMounted(async () => {
+  // ClientOnly / 表单挂载时模板 ref 可能晚一个 tick 才绑定
+  await nextTick()
   if (!host.value) return
 
   const { EditorView, keymap, placeholder } = await import('@codemirror/view')
@@ -127,6 +137,8 @@ onMounted(async () => {
         basicSetup,
         themeCompartment.of(themeExtensions()),
         languageCompartment.of([]),
+        EditorState.readOnly.of(!!props.readonly),
+        EditorView.editable.of(!props.readonly),
         keymap.of([indentWithTab]),
         EditorView.contentAttributes.of({ id: 'snippet-code-editor', name: 'code', 'aria-label': 'Code editor' }),
         placeholder(props.placeholder),
@@ -180,9 +192,39 @@ onBeforeUnmount(() => {
     overflow: auto;
   }
 
+  /* 只读展示：高度随内容完整展开；隐藏光标/当前行；与详情页 pre 的内边距一致 */
+  &.is-readonly {
+    :deep(.cm-editor) {
+      height: auto;
+    }
+
+    :deep(.cm-content) {
+      padding: 1rem 1.1rem;
+    }
+
+    :deep(.cm-activeLine),
+    :deep(.cm-activeLineGutter) {
+      background: transparent;
+    }
+
+    :deep(.cm-cursor) {
+      display: none;
+    }
+  }
+
+  &.no-gutters {
+    :deep(.cm-gutters) {
+      display: none;
+    }
+  }
+
   @media (max-width: 700px) {
     :deep(.cm-editor) {
       height: 280px;
+    }
+
+    &.is-readonly :deep(.cm-editor) {
+      height: auto;
     }
   }
 }
