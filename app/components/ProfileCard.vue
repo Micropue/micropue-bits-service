@@ -1,5 +1,6 @@
 <template>
-  <aside v-if="profile" class="profile-card">
+  <aside class="profile-card" :aria-busy="!profile">
+    <template v-if="profile">
     <UserAvatar :src="profile.avatarUrl" :size="72" />
     <h1 class="profile-name">{{ profile.nickname }}</h1>
     <p class="profile-handle">@{{ profile.username }}</p>
@@ -64,6 +65,10 @@
         <Button v-else label="Follow" size="small" @click="navigateTo('/sign')" />
         <Button label="Report" size="small" text severity="secondary" @click="openReportUser" />
       </template>
+    </div>
+    </template>
+    <div v-else class="profile-loading">
+      <ProgressSpinner aria-label="Loading profile" />
     </div>
   </aside>
 
@@ -186,7 +191,7 @@ const toast = useToast()
 const confirm = useConfirm()
 const contentRefresh = useState('profile-content-refresh', () => 0)
 
-const { data, refresh } = await useFetch<{
+const { data, refresh } = useFetch<{
   profile: Profile
   stats: Stats
   links: LinkItem[]
@@ -401,7 +406,8 @@ function removeFollow(person: FollowPerson) {
 </script>
 
 <style scoped lang="scss">
-.profile-card { position:sticky; top:1.5rem; display:flex; flex-direction:column; gap:.6rem; padding:1.5rem; border:1px solid var(--p-content-border-color); border-radius:1rem; background:var(--p-content-background); }
+.profile-card { position:sticky; top:1.5rem; display:flex; flex-direction:column; gap:.6rem; min-height:18rem; padding:1.5rem; border:1px solid var(--p-content-border-color); border-radius:1rem; background:var(--p-content-background); }
+.profile-loading { display:grid; flex:1; place-items:center; min-height:15rem; }
 .profile-name { margin:.4rem 0 0; font-size:1.5rem; font-weight:700; letter-spacing:-.02em; word-break:break-word; }
 .profile-handle { margin:0; font-size:.9rem; color:var(--p-text-muted-color); }
 .profile-bio { margin:.5rem 0 0; font-size:.9rem; line-height:1.7; color:var(--p-text-muted-color); white-space:pre-line; }

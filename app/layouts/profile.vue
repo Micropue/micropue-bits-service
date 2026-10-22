@@ -4,7 +4,7 @@
       <div class="profile-layout">
         <ProfileCard :key="username" :username="username" />
         <div class="profile-main" :class="{ 'profile-section-content': active !== 'profile' }">
-          <ProfileNav v-if="profile?.isOwner" :username="username" :active="active" />
+          <ProfileNav v-if="isOwner" :username="username" :active="active" />
           <div class="profile-route-content">
             <slot />
           </div>
@@ -20,11 +20,10 @@
 <script setup lang="ts">
 const route = useRoute()
 const username = computed(() => String(route.params.username ?? ''))
-const { data, refresh } = await useFetch<{ profile?: { isOwner: boolean } }>(
-  () => `/api/users/${encodeURIComponent(username.value)}`,
-  { key: () => `public-profile-${username.value}` }
+const { user: authUser } = useAuthUser()
+const isOwner = computed(() =>
+  !!authUser.value?.usernameSet && authUser.value.username === username.value
 )
-const profile = computed(() => data.value?.profile ?? null)
 
 const active = computed<'profile' | 'favorites' | 'feedback' | 'requests'>(() => {
   if (route.path.endsWith('/favorites')) return 'favorites'
@@ -34,10 +33,7 @@ const active = computed<'profile' | 'favorites' | 'feedback' | 'requests'>(() =>
 })
 
 // 私有子页面只对本人展示完整主页壳；非本人交给 404 页全屏渲染
-const showProfileLayout = computed(() => !!profile.value && (active.value === 'profile' || profile.value.isOwner))
-
-// 动态用户名变化时重新拉取导航所需的 isOwner 状态
-watch(username, () => { void refresh() })
+const showProfileLayout = computed(() => active.value === 'profile' || isOwner.value)
 </script>
 
 <style scoped lang="scss">
