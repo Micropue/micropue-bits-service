@@ -177,7 +177,7 @@ async function remove() {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--p-content-border-color);
   border-radius: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 0.9rem;
   letter-spacing: 0.05em;
   word-break: break-all;

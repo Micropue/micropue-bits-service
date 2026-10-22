@@ -56,7 +56,7 @@ function boxLabel(index: number) {
     flex: 0 0 auto;
     padding: 0;
     text-align: center;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-code);
   }
 
   /* 16 格一行（64 位登录码） */

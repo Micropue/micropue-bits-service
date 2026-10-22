@@ -521,7 +521,7 @@ useHead({
   text-align: left;
 
   code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-code);
     font-size: 0.9em;
   }
 }

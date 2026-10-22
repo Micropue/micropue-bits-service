@@ -801,7 +801,7 @@ useHead({
   margin: 0;
   padding: 1rem 1.1rem;
   overflow-x: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 0.82rem;
   line-height: 1.7;
   white-space: pre;

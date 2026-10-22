@@ -259,7 +259,7 @@ const rows = [cards.slice(0, 4), cards.slice(4)]
   overflow: hidden;
   border-radius: 0.6rem;
   background: color-mix(in srgb, var(--p-text-color) 4%, var(--p-content-background));
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 0.72rem;
   line-height: 1.65;
   white-space: pre;

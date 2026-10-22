@@ -73,7 +73,8 @@ onMounted(async () => {
   // 与站点一致：透明底 + 主题文字色；深色用 One Dark 的语法配色
   const baseTheme = EditorView.theme({
     '&': { backgroundColor: 'transparent', color: 'var(--p-text-color)', fontSize: '0.82rem' },
-    '.cm-content': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', padding: '0.65rem 0' },
+    // macOS 用 Menlo，Windows 用 Consolas；都是系统内置字体
+    '.cm-content': { fontFamily: 'Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace', padding: '0.65rem 0' },
     '.cm-scroller': { fontFamily: 'inherit', lineHeight: '1.7' },
     '.cm-gutters': {
       backgroundColor: 'transparent',

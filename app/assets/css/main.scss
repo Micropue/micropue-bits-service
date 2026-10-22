@@ -34,6 +34,8 @@ body {
   --logo-plate: #ffffff;
   --logo-tint: none;
   --logo-ink: #18181b;
+  /* macOS 用 Menlo，Windows 用 Consolas；均为系统内置，按字体是否存在自动切换 */
+  --font-code: Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -166,13 +168,13 @@ body {
   font-size: 0.95rem;
 
   &--cmd {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-code);
     font-weight: 600;
   }
 }
 
 .command-alias {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 0.76rem;
   color: var(--p-text-muted-color);
 }

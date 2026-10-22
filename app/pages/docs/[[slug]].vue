@@ -271,7 +271,7 @@ useHead({
 
 .docs-nav-num {
   padding-top: 0.14rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 0.7rem;
   opacity: 0.55;
 }
@@ -328,7 +328,7 @@ useHead({
   border: 1px solid var(--p-content-border-color);
   border-radius: 10px;
   background: color-mix(in srgb, var(--p-text-color) 3%, transparent);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 0.82rem;
   line-height: 1.65;
 }

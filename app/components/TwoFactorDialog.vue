@@ -254,7 +254,7 @@ async function copyCodes() {
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--p-content-border-color);
     border-radius: 8px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-code);
     font-size: 0.85rem;
     text-align: center;
   }
