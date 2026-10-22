@@ -472,16 +472,20 @@ useHead({
 }
 
 .recipient-add {
-  padding: 0.12rem 0.35rem;
-  border: 0;
-  background: none;
-  color: var(--p-primary-color);
+  min-height: 1.85rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px dashed var(--dash-border);
+  border-radius: 0.4rem;
+  background: var(--dash-active);
+  color: var(--p-text-color);
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 0.82rem;
+  font-weight: 500;
   cursor: pointer;
 
   &:hover {
-    text-decoration: underline;
+    border-color: var(--p-primary-color);
+    color: var(--p-primary-color);
   }
 }
 

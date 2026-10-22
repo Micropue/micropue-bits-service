@@ -101,7 +101,8 @@ type ActivityItem = FeedbackItem | ReportItem
 useHead({ title: 'Reports & feedback' })
 
 const toast = useToast()
-const tab = ref<'feedback' | 'reports'>('feedback')
+const route = useRoute()
+const tab = ref<'feedback' | 'reports'>(route.query.tab === 'reports' ? 'reports' : 'feedback')
 const query = ref('')
 const items = ref<ActivityItem[]>([])
 const total = ref(0)
@@ -158,6 +159,10 @@ watch(query, () => search.run())
 watch(tab, () => {
   query.value = ''
   reload()
+})
+watch(() => route.query.tab, value => {
+  const next = value === 'reports' ? 'reports' : 'feedback'
+  if (next !== tab.value) tab.value = next
 })
 
 async function setFeedbackStatus(item: ActivityItem, status: 'read' | 'closed') {

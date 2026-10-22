@@ -597,9 +597,10 @@ useHead({
   top: 1.5rem;
 }
 
-/* 左侧加入评论区后内容可能很高，避免 sticky 容器超出视口无法完整阅读 */
+/* 左侧加入评论区后内容可能很高：保持 sticky，同时让整列在视口内滚动 */
 .detail-side--with-feedback {
-  position: static;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
 }
 
 .side-panel {
@@ -1018,8 +1019,11 @@ useHead({
     grid-template-columns: 1fr;
   }
 
-  .detail-side {
+  .detail-side,
+  .detail-side--with-feedback {
     position: static;
+    max-height: none;
+    overflow: visible;
     order: 1;
   }
 

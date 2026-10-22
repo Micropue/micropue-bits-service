@@ -7,6 +7,8 @@ export default defineEventHandler(async event => {
   const user = await requireAuth(event)
   const query = getQuery(event)
   const kind = query.kind === 'group' ? 'group' : 'snippet'
+  const limit = Math.min(Math.max(Number(query.limit) || 50, 1), 100)
+  const offset = Math.max(Number(query.offset) || 0, 0)
 
   const [rows] = await useDb().query<RowDataPacket[]>(
     `SELECT \`slug\`, \`name\`, \`visibility\`, \`pinned_at\`, \`sort_order\`, \`updated_at\`
@@ -17,16 +19,28 @@ export default defineEventHandler(async event => {
     [user.uuid, kind]
   )
 
-  const items = rows.map(row => ({
-    slug: row.slug as string,
-    name: row.name as string,
-    visibility: row.visibility as string,
-    pinned: !!row.pinned_at
-  }))
+  const pinned = rows
+    .filter(row => row.pinned_at)
+    .map(row => ({
+      slug: row.slug as string,
+      name: row.name as string,
+      visibility: row.visibility as string
+    }))
+  const unpinned = rows
+    .filter(row => !row.pinned_at)
+    .map(row => ({
+      slug: row.slug as string,
+      name: row.name as string,
+      visibility: row.visibility as string
+    }))
+
   return {
-    pinned: items.filter(item => item.pinned),
-    items: items.filter(item => !item.pinned),
-    maxPinned: MAX_PINNED_PER_KIND,
-    truncated: rows.length >= 500
+    pinned,
+    items: unpinned.slice(offset, offset + limit),
+    // 轻量返回完整顺序，保存时把未加载的条目按原顺序接在后面
+    allSlugs: unpinned.map(item => item.slug),
+    total: unpinned.length,
+    hasMore: offset + limit < unpinned.length,
+    maxPinned: MAX_PINNED_PER_KIND
   }
 })

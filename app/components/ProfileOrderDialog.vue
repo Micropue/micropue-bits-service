@@ -6,6 +6,7 @@
     <div v-else class="order-body">
       <p class="order-note">
         Drag to reorder. Pinned items stay at the top; you can pin up to {{ maxPinned }}.
+        <template v-if="total > items.length"> Showing {{ items.length }} of {{ total }} unpinned items; unloaded items keep their current order.</template>
       </p>
 
       <div v-if="pinned.length" class="order-pinned">
@@ -39,6 +40,11 @@
           </span>
         </div>
       </div>
+
+      <div v-if="hasMore" class="order-more">
+        <Button label="Load more" size="small" severity="secondary" outlined :loading="loading"
+          @click="load(false)" />
+      </div>
     </div>
 
     <template #footer>
@@ -71,6 +77,9 @@ const loading = ref(false)
 const saving = ref(false)
 const pinned = ref<OrderItem[]>([])
 const items = ref<OrderItem[]>([])
+const allSlugs = ref<string[]>([])
+const total = ref(0)
+const hasMore = ref(false)
 const maxPinned = ref(3)
 const dragIndex = ref<number | null>(null)
 
@@ -78,26 +87,40 @@ function visibilityLabel(value: string) {
   return value === 'public' ? 'Public' : value === 'unlisted' ? 'Unlisted' : 'Private'
 }
 
-async function load() {
+async function load(reset: boolean) {
+  const offset = reset ? 0 : items.value.length
   loading.value = true
   try {
-    const response = await $fetch<{ pinned: OrderItem[], items: OrderItem[], maxPinned: number }>(
-      '/api/profile/order',
-      { query: { kind: props.kind } }
-    )
-    pinned.value = response.pinned
-    items.value = response.items
+    const response = await $fetch<{
+      pinned: OrderItem[]
+      items: OrderItem[]
+      allSlugs: string[]
+      total: number
+      hasMore: boolean
+      maxPinned: number
+    }>('/api/profile/order', {
+      query: { kind: props.kind, limit: 50, offset }
+    })
+    if (reset) {
+      pinned.value = response.pinned
+      items.value = response.items
+      allSlugs.value = response.allSlugs
+    } else {
+      items.value = [...items.value, ...response.items]
+    }
+    total.value = response.total
+    hasMore.value = response.hasMore
     maxPinned.value = response.maxPinned
   } catch (err) {
     toast.add({ severity: 'error', summary: (err as { statusMessage?: string }).statusMessage ?? 'Could not load order', life: 4000 })
-    visible.value = false
+    if (reset) visible.value = false
   } finally {
     loading.value = false
   }
 }
 
 watch(visible, open => {
-  if (open) void load()
+  if (open) void load(true)
 })
 
 function onDragStart(index: number) {
@@ -133,9 +156,14 @@ async function save() {
   if (saving.value) return
   saving.value = true
   try {
+    const loaded = new Set(items.value.map(item => item.slug))
+    const slugs = [
+      ...items.value.map(item => item.slug),
+      ...allSlugs.value.filter(slug => !loaded.has(slug))
+    ]
     await $fetch('/api/profile/order', {
       method: 'PUT',
-      body: { kind: props.kind, slugs: items.value.map(item => item.slug) }
+      body: { kind: props.kind, slugs }
     })
     toast.add({ severity: 'success', summary: 'Order saved', life: 2500 })
     visible.value = false
@@ -220,6 +248,12 @@ async function save() {
 .order-moves {
   display: flex;
   flex: none;
+}
+
+.order-more {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.25rem;
 }
 
 .order-loading {

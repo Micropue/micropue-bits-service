@@ -211,7 +211,8 @@
   </Dialog>
 
   <!-- 粉丝 / 关注列表 -->
-  <Dialog v-model:visible="followDialog" modal :draggable="false" :style="{ width: '32rem' }" :header="followDialogTitle">
+  <Dialog v-model:visible="followDialog" modal :draggable="false" :style="{ width: '32rem' }" :header="followDialogTitle"
+    @update:visible="onFollowDialogVisibility">
     <div class="follow-dialog">
       <div class="follow-tabs" role="tablist" aria-label="Followers and following">
         <button type="button" class="follow-tab" :class="{ 'is-active': followList === 'followers' }" role="tab"
@@ -670,6 +671,25 @@ function openFollowDialog(list: FollowList) {
   followDialog.value = true
   void loadFollows(true)
 }
+
+// 指令框 /followers、/following：主页加载完成后直接打开对应弹窗
+function openFollowDialogFromQuery() {
+  if (!profile.value?.isOwner) return
+  const dialog = String(route.query.dialog ?? '')
+  if (dialog !== 'followers' && dialog !== 'following') return
+  openFollowDialog(dialog)
+}
+
+// 用户关闭弹窗后再清掉 query，避免刷新时重复打开；打开时保留 query 供命令复用
+function onFollowDialogVisibility(open: boolean) {
+  if (open || !route.query.dialog) return
+  const query = { ...route.query }
+  delete query.dialog
+  void navigateTo({ path: route.path, query }, { replace: true })
+}
+
+watch(profile, openFollowDialogFromQuery, { immediate: true })
+watch(() => route.query.dialog, openFollowDialogFromQuery)
 
 function switchFollowList(list: FollowList) {
   if (followList.value === list) return

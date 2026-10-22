@@ -22,7 +22,7 @@
                 </Button>
                 <!-- 已登录用扁平文本按钮（无背景）；未登录仍是填充式登录按钮 -->
                 <Button as-child v-slot="slotProps" :text="!!authUser" :severity="authUser ? 'secondary' : undefined">
-                    <NuxtLink :to="authUser ? '/account' : '/sign'"
+                    <NuxtLink :to="authUser ? (authUser.usernameSet ? `/${authUser.username}` : '/account/profile') : '/sign'"
                         :class="[slotProps.class, 'auth-button', { 'auth-button--account': !!authUser }]"
                         v-bind="slotProps.a11yAttrs">
                         <!-- 已登录：GitHub 头像 + 昵称 + 右上箭头（提示可进入账户页） -->

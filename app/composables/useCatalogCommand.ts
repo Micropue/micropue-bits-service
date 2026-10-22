@@ -4,6 +4,7 @@ import type { Ref } from 'vue'
 // /language(/lang) · /framework(/fw) · /lib(/library) · /tool(/tools) · /runtime(/rt, /runtimes)
 // /dep(/dependency, /deps —— 跨全部依赖类型) · /user, /snippet, /group —— 公开内容搜索
 // /new(/create —— 新建代码段) · /me —— 自己的主页 · /go(/page —— 站点页面)
+// /followers · /following · /favorites · /feedback · /reports · /requests · /changelog —— 账户快捷入口
 // 选中指令后：彩色指令标记 + 参数输入；参数为空时退格一次删除整条指令
 // 关键字搜索属于后续能力（普通搜索页尚未建设），这里先不混入普通文本查询
 
@@ -59,6 +60,16 @@ const COMMANDS: CatalogCommandDef[] = [
   { name: 'group', aliases: ['g'], kind: 'groups', noun: 'groups', description: 'Find a public group' },
   { name: 'new', aliases: ['create'], kind: 'action', noun: '', to: '/new', description: 'Create a snippet' },
   { name: 'me', aliases: ['profile'], kind: 'action', noun: '', to: '/me', description: 'Open your profile' },
+  { name: 'followers', aliases: ['fans'], kind: 'action', noun: '', description: 'Open your followers' },
+  { name: 'following', aliases: ['follows'], kind: 'action', noun: '', description: 'Open people you follow' },
+  { name: 'favorites', aliases: ['saved', 'bookmarks'], kind: 'action', noun: '', to: '/account/favorites', description: 'Open your favorites' },
+  { name: 'feedback', aliases: ['inbox'], kind: 'action', noun: '', to: '/account/activity?tab=feedback', description: 'Open feedback received' },
+  { name: 'reports', aliases: ['myreports'], kind: 'action', noun: '', to: '/account/activity?tab=reports', description: 'Open your reports' },
+  { name: 'requests', aliases: ['request'], kind: 'action', noun: '', to: '/account/requests', description: 'Open your catalog requests' },
+  { name: 'changelog', aliases: ['updates'], kind: 'action', noun: '', to: '/changelog', description: 'Open the changelog' },
+  { name: 'docs', aliases: ['help'], kind: 'action', noun: '', to: '/docs', description: 'Open documentation' },
+  { name: 'account', aliases: ['settings'], kind: 'action', noun: '', to: '/account', description: 'Open account settings' },
+  { name: 'security', aliases: ['2fa', 'passkey'], kind: 'action', noun: '', to: '/account/security', description: 'Open login security' },
   { name: 'go', aliases: ['page'], kind: 'pages', noun: 'pages', description: 'Jump to a page' }
 ]
 
@@ -233,6 +244,19 @@ export function useCatalogCommand(
       if (next.name === 'me') {
         const { user } = useAuthUser()
         go(user.value?.usernameSet ? `/${user.value.username}` : '/account/profile')
+        return
+      }
+      if (next.name === 'followers' || next.name === 'following') {
+        const { user } = useAuthUser()
+        if (!user.value) {
+          go('/sign')
+          return
+        }
+        if (!user.value.usernameSet) {
+          go('/account/profile')
+          return
+        }
+        go(`/${user.value.username}?dialog=${next.name}`)
         return
       }
       if (next.to) go(next.to)
