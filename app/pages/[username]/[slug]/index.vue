@@ -28,7 +28,7 @@
 
       <div class="detail-layout">
         <!-- 左：单卡片分栏，作者为主，其余为次级信息 -->
-        <aside class="detail-side">
+        <aside class="detail-side" :class="{ 'detail-side--with-feedback': kind === 'snippet' }">
           <div class="side-panel">
             <NuxtLink :to="`/${author.username}`" class="side-author">
               <UserAvatar :src="author.avatarUrl" :size="44" />
@@ -108,15 +108,61 @@
               <template v-else>
                 <Button :label="isFavorited ? 'Saved' : 'Save'" size="small" severity="secondary" outlined fluid
                   :loading="favoriteBusy" @click="toggleFavorite" />
-                <Button v-if="visibility === 'public'" label="Report" size="small" text severity="secondary"
-                  @click="openReport" />
-                <Button v-if="kind === 'snippet'" label="Feedback" size="small" text severity="secondary"
-                  @click="openFeedback" />
+                <div v-if="kind === 'snippet' || visibility === 'public'" class="side-subactions">
+                  <Button v-if="kind === 'snippet'" label="Feedback" size="small" severity="secondary" outlined
+                    fluid @click="openFeedback">
+                    <template #icon><Comment /></template>
+                  </Button>
+                  <Button v-if="visibility === 'public'" label="Report" size="small" severity="danger" outlined fluid
+                    @click="openReport">
+                    <template #icon><Flag /></template>
+                  </Button>
+                </div>
                 <Button v-if="kind === 'group' && group?.visibility === 'public'" label="Fork group" size="small"
                   outlined fluid :loading="forking" @click="forkGroup" />
               </template>
             </div>
           </div>
+
+          <section v-if="kind === 'snippet' && snippet" class="feedback-section" aria-labelledby="feedback-title">
+            <header class="feedback-head">
+              <h2 id="feedback-title" class="feedback-title">
+                Feedback
+                <span class="feedback-count">{{ feedbackTotal }}</span>
+              </h2>
+              <InputText v-if="feedbackTotal || feedbackQuery" v-model="feedbackQuery" size="small"
+                class="feedback-search" placeholder="Search feedback" aria-label="Search feedback"
+                autocomplete="off" />
+            </header>
+
+            <p v-if="feedbackLoading && !feedbackItems.length" class="feedback-empty">Loading…</p>
+            <p v-else-if="!feedbackItems.length" class="feedback-empty">
+              {{ feedbackQuery.trim() ? 'No feedback matches this search.' : 'No feedback yet.' }}
+            </p>
+            <div v-else class="feedback-list">
+              <article v-for="item in feedbackItems" :key="item.sid" class="feedback-item">
+                <UserAvatar :src="item.from.avatarUrl" :size="32" />
+                <div class="feedback-main">
+                  <div class="feedback-meta">
+                    <NuxtLink v-if="item.from.username" :to="`/${item.from.username}`" class="feedback-author">
+                      @{{ item.from.username }}
+                    </NuxtLink>
+                    <span v-else class="feedback-author">{{ item.from.nickname }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{{ feedbackTypeLabel(item.type) }}</span>
+                    <span aria-hidden="true">·</span>
+                    <time>{{ formatDate(item.createdAt) }}</time>
+                  </div>
+                  <p class="feedback-detail">{{ item.detail }}</p>
+                </div>
+              </article>
+            </div>
+
+            <div v-if="feedbackItems.length < feedbackTotal" class="feedback-more">
+              <Button label="Load more feedback" size="small" severity="secondary" outlined
+                :loading="feedbackLoading" @click="loadFeedback(false)" />
+            </div>
+          </section>
         </aside>
 
         <!-- 右：代码 / 分组内容 -->
@@ -140,46 +186,6 @@
                 </template>
               </ClientOnly>
             </div>
-
-            <section class="feedback-section" aria-labelledby="feedback-title">
-              <header class="feedback-head">
-                <h2 id="feedback-title" class="feedback-title">
-                  Feedback
-                  <span class="feedback-count">{{ feedbackTotal }}</span>
-                </h2>
-                <InputText v-if="feedbackTotal || feedbackQuery" v-model="feedbackQuery" size="small"
-                  class="feedback-search" placeholder="Search feedback" aria-label="Search feedback"
-                  autocomplete="off" />
-              </header>
-
-              <p v-if="feedbackLoading && !feedbackItems.length" class="feedback-empty">Loading…</p>
-              <p v-else-if="!feedbackItems.length" class="feedback-empty">
-                {{ feedbackQuery.trim() ? 'No feedback matches this search.' : 'No feedback yet.' }}
-              </p>
-              <div v-else class="feedback-list">
-                <article v-for="item in feedbackItems" :key="item.sid" class="feedback-item">
-                  <UserAvatar :src="item.from.avatarUrl" :size="32" />
-                  <div class="feedback-main">
-                    <div class="feedback-meta">
-                      <NuxtLink v-if="item.from.username" :to="`/${item.from.username}`" class="feedback-author">
-                        @{{ item.from.username }}
-                      </NuxtLink>
-                      <span v-else class="feedback-author">{{ item.from.nickname }}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{{ feedbackTypeLabel(item.type) }}</span>
-                      <span aria-hidden="true">·</span>
-                      <time>{{ formatDate(item.createdAt) }}</time>
-                    </div>
-                    <p class="feedback-detail">{{ item.detail }}</p>
-                  </div>
-                </article>
-              </div>
-
-              <div v-if="feedbackItems.length < feedbackTotal" class="feedback-more">
-                <Button label="Load more feedback" size="small" severity="secondary" outlined
-                  :loading="feedbackLoading" @click="loadFeedback(false)" />
-              </div>
-            </section>
           </template>
 
           <template v-else>
@@ -224,6 +230,8 @@
 
 <script setup lang="ts">
 import ArrowUpRight from '@primeicons/vue/arrow-up-right'
+import Comment from '@primeicons/vue/comment'
+import Flag from '@primeicons/vue/flag'
 import { FEEDBACK_TYPES, moderationTypeLabel } from '#shared/utils/moderation'
 
 // 公开内容页 /{username}/{slug}：同一命名空间下渲染代码段或分组
@@ -589,6 +597,11 @@ useHead({
   top: 1.5rem;
 }
 
+/* 左侧加入评论区后内容可能很高，避免 sticky 容器超出视口无法完整阅读 */
+.detail-side--with-feedback {
+  position: static;
+}
+
 .side-panel {
   display: flex;
   flex-direction: column;
@@ -737,6 +750,16 @@ useHead({
   border-top: 1px solid var(--p-content-border-color);
 }
 
+.side-subactions {
+  display: flex;
+  gap: 0.4rem;
+  width: 100%;
+
+  :deep(.p-button) {
+    flex: 1 1 0;
+  }
+}
+
 /* ---------- 右：代码 / 分组列表 ---------- */
 .detail-main {
   display: flex;
@@ -788,15 +811,15 @@ useHead({
 .feedback-section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 0.25rem;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
 }
 
 .feedback-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
 }
 
 .feedback-title {
@@ -818,8 +841,12 @@ useHead({
 }
 
 .feedback-search {
-  width: 15rem;
-  max-width: 45vw;
+  width: 100%;
+  max-width: none;
+}
+
+.feedback-item :deep(.user-avatar) {
+  flex: none;
 }
 
 .feedback-list {
@@ -993,22 +1020,11 @@ useHead({
 
   .detail-side {
     position: static;
-    order: 2;
-  }
-
-  .detail-main {
     order: 1;
   }
 
-  .feedback-head {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-
-  .feedback-search {
-    width: 100%;
-    max-width: none;
+  .detail-main {
+    order: 2;
   }
 }
 </style>

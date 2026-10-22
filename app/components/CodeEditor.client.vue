@@ -200,6 +200,7 @@ onBeforeUnmount(() => {
 
     :deep(.cm-content) {
       padding: 1rem 1.1rem;
+      font-size: 0.82rem;
     }
 
     :deep(.cm-activeLine),
