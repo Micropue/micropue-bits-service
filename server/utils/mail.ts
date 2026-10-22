@@ -10,6 +10,48 @@ const transporter = nodemailer.createTransport({
   }
 })
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function textToHtml(text: string) {
+  const paragraphs = text.replace(/\r\n/g, '\n').split(/\n{2,}/)
+  const body = paragraphs
+    .map(paragraph => `<p style="margin: 0 0 14px;">${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+    .join('')
+  return `
+    <div style="font-family: Montserrat, Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 28px; color: #18181b; font-size: 14px; line-height: 1.7;">
+      ${body || '<p style="margin: 0;"></p>'}
+    </div>
+  `
+}
+
+// 控制台群发 / 抄送：正文按纯文本保存，发送时生成转义后的 HTML
+export async function sendAdminEmail(options: {
+  to: string[]
+  cc: string[]
+  bcc: string[]
+  subject: string
+  text: string
+}) {
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER
+  if (!from) throw new Error('SMTP_FROM / SMTP_USER is not configured')
+  return await transporter.sendMail({
+    from,
+    to: options.to,
+    cc: options.cc.length ? options.cc : undefined,
+    bcc: options.bcc.length ? options.bcc : undefined,
+    subject: options.subject,
+    text: options.text,
+    html: textToHtml(options.text)
+  })
+}
+
 export async function sendVerificationCodeMail(to: string, code: string) {
   await transporter.sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER,

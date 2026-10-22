@@ -98,6 +98,7 @@ import Code from '@primeicons/vue/code'
 import Cog from '@primeicons/vue/cog'
 import Copy from '@primeicons/vue/copy'
 import Database from '@primeicons/vue/database'
+import Envelope from '@primeicons/vue/envelope'
 import Flag from '@primeicons/vue/flag'
 import Folder from '@primeicons/vue/folder'
 import Home from '@primeicons/vue/home'
@@ -168,6 +169,7 @@ const navGroups: { labelKey: string, items: NavItem[] }[] = [
     labelKey: 'nav.system',
     items: [
       { labelKey: 'nav.accounts', to: '/dashboard/users', icon: Users },
+      { labelKey: 'nav.email', to: '/dashboard/emails', icon: Envelope },
       { labelKey: 'nav.administrators', to: '/dashboard/admins', icon: Shield },
       { labelKey: 'nav.settings', to: '/dashboard/settings', icon: Cog }
     ]
@@ -208,6 +210,7 @@ const titleKeys: Record<string, string> = {
   '/dashboard/settings': 'title.settings',
   '/dashboard/reports': 'title.reports',
   '/dashboard/changelogs': 'title.changelog',
+  '/dashboard/emails': 'title.email',
   '/dashboard/auth': 'title.signIn'
 }
 const title = computed(() => {

@@ -402,7 +402,26 @@ const ADMIN_TABLES_SQL: string[] = [
     \`value\` JSON NOT NULL COMMENT '配置值',
     \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (\`key\`)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='后台系统配置表'`
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='后台系统配置表'`,
+
+  // 控制台邮件：草稿 / 发信记录；收件人为 JSON 数组
+  `CREATE TABLE IF NOT EXISTS \`admin_emails\` (
+    \`sid\` ${SID} NOT NULL COMMENT '短UUID',
+    \`subject\` VARCHAR(200) NOT NULL DEFAULT '' COMMENT '主题',
+    \`body\` MEDIUMTEXT NOT NULL COMMENT '纯文本正文',
+    \`to_emails\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '收件人',
+    \`cc_emails\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '抄送',
+    \`bcc_emails\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '密送',
+    \`status\` ENUM('draft','sent','failed') NOT NULL DEFAULT 'draft' COMMENT '状态',
+    \`error\` VARCHAR(1000) NOT NULL DEFAULT '' COMMENT '失败原因',
+    \`message_id\` VARCHAR(255) NULL COMMENT 'SMTP messageId',
+    \`created_by\` CHAR(36) NULL COMMENT '创建管理员UUID',
+    \`sent_at\` DATETIME NULL COMMENT '发送时间',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (\`sid\`),
+    KEY \`idx_admin_emails_status\` (\`status\`,\`created_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='控制台邮件表'`
 ]
 
 // admins 表增量列（旧表升级：AuthApp 密钥与 Passkey 列表）
