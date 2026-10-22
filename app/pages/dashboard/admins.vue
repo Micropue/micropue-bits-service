@@ -22,7 +22,7 @@
           <div class="cell-main">
             <span class="cell-title">
               {{ admin.email }}
-              <Tag v-if="admin.uuid === selfUuid" :value="t('admins.you')" severity="secondary" rounded />
+              <StatusTag v-if="admin.uuid === selfUuid" :label="t('admins.you')" status="you" severity="secondary" />
             </span>
             <span class="cell-sub">{{ admin.name || t('admins.noName') }} · {{ methodSummary(admin) }}</span>
           </div>
@@ -31,8 +31,8 @@
 
       <Column :header="t('admins.col.status')">
         <template #body="{ data: admin }">
-          <Tag :value="admin.status === 'normal' ? t('admins.active') : t('admins.disabled')"
-            :severity="admin.status === 'normal' ? 'secondary' : 'warn'" rounded />
+          <StatusTag :label="admin.status === 'normal' ? t('admins.active') : t('admins.disabled')"
+            :status="admin.status" :severity="admin.status === 'normal' ? 'secondary' : 'warn'" />
         </template>
       </Column>
 

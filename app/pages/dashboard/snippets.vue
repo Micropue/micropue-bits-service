@@ -39,12 +39,13 @@
       </template>
 
       <template #cell-visibility="{ row }">
-        <Tag :value="t(`content.visibility.${row.visibility}`)" :severity="visibilitySeverity(row.visibility)" rounded />
+        <StatusTag :label="t(`content.visibility.${row.visibility}`)" :status="row.visibility"
+          :severity="visibilitySeverity(row.visibility)" />
       </template>
 
       <template #cell-status="{ row }">
-        <Tag :value="t(`content.status.${row.status}`)" :severity="row.status === 'deleted' ? 'danger' : 'secondary'"
-          rounded />
+        <StatusTag :label="t(`content.status.${row.status}`)" :status="row.status"
+          :severity="row.status === 'deleted' ? 'danger' : 'secondary'" />
       </template>
 
       <template #cell-group_name="{ row }">{{ row.group_name ?? '—' }}</template>
@@ -73,10 +74,10 @@
           <p class="c-detail-sub c-mono">/{{ detail.slug }}</p>
         </div>
         <div class="c-tags">
-          <Tag :value="t(`content.visibility.${detail.visibility}`)" :severity="visibilitySeverity(detail.visibility)"
-            rounded />
-          <Tag :value="t(`content.status.${detail.status}`)" :severity="detail.status === 'deleted' ? 'danger' : 'secondary'"
-            rounded />
+          <StatusTag :label="t(`content.visibility.${detail.visibility}`)" :status="detail.visibility"
+            :severity="visibilitySeverity(detail.visibility)" />
+          <StatusTag :label="t(`content.status.${detail.status}`)" :status="detail.status"
+            :severity="detail.status === 'deleted' ? 'danger' : 'secondary'" />
         </div>
       </div>
 

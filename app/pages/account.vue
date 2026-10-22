@@ -31,13 +31,11 @@
 <script setup lang="ts">
 import type { AuthUser } from '~/composables/useAuthUser'
 import User from '@primeicons/vue/user'
-import Bookmark from '@primeicons/vue/bookmark'
-import Flag from '@primeicons/vue/flag'
-import Folder from '@primeicons/vue/folder'
 import Shield from '@primeicons/vue/shield'
 import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
 import ArrowUpRight from '@primeicons/vue/arrow-up-right'
 
+const route = useRoute()
 const { user: authUser } = useAuthUser()
 const usernameSet = computed(() => authUser.value?.usernameSet ?? false)
 const toast = useToast()
@@ -57,6 +55,20 @@ if (data.value?.user) {
   authUser.value = data.value.user
 } else {
   await navigateTo('/sign')
+}
+
+// 旧的账户设置子页面统一迁移到个人主页导航
+const profileSectionRedirects: Record<string, string> = {
+  '/account/favorites': 'favorites',
+  '/account/activity': 'feedback',
+  '/account/requests': 'requests'
+}
+const section = profileSectionRedirects[route.path]
+if (section) {
+  const target = authUser.value?.usernameSet
+    ? `/${authUser.value.username}/${section}`
+    : '/account/profile'
+  await navigateTo({ path: target, query: route.query }, { replace: true })
 }
 
 interface NavItem {
@@ -80,9 +92,6 @@ const sections = computed<NavItem[]>(() => [
     icon: Shield,
     warn: !authUser.value?.hasPassword || !authUser.value?.twoFactorEnabled
   },
-  { label: 'Favorites', to: '/account/favorites', icon: Bookmark },
-  { label: 'Reports & feedback', to: '/account/activity', icon: Flag },
-  { label: 'Language & dependency requests', to: '/account/requests', icon: Folder },
   {
     label: 'My profile',
     to: usernameSet.value ? `/${authUser.value?.username}` : '/account/profile',

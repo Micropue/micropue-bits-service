@@ -19,7 +19,7 @@
 
       <template #cell-target_kind="{ row }">
         <Tag :value="t(`report.target.${row.target.kind}`)" severity="secondary" rounded />
-        <Tag v-if="row.target.deleted" :value="t('content.status.deleted')" severity="danger" rounded />
+        <StatusTag v-if="row.target.deleted" :label="t('content.status.deleted')" status="deleted" severity="danger" />
       </template>
 
       <template #cell-type_label="{ row }">
@@ -37,7 +37,7 @@
       </template>
 
       <template #cell-status="{ row }">
-        <Tag :value="t(`report.status.${row.status}`)" :severity="statusSeverity(row.status)" rounded />
+        <StatusTag :label="t(`report.status.${row.status}`)" :status="row.status" :severity="statusSeverity(row.status)" />
       </template>
 
       <template #cell-actions="{ row }">
@@ -56,7 +56,7 @@
         </div>
         <div class="c-tags">
           <Tag :value="t(`report.target.${detail.target.kind}`)" severity="secondary" rounded />
-          <Tag :value="t(`report.status.${detail.status}`)" :severity="statusSeverity(detail.status)" rounded />
+          <StatusTag :label="t(`report.status.${detail.status}`)" :status="detail.status" :severity="statusSeverity(detail.status)" />
         </div>
       </div>
 

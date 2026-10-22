@@ -211,6 +211,11 @@
                   </span>
                   <span v-for="tag in item.tags" :key="tag.key" class="side-tag">{{ tag.name }}</span>
                 </div>
+                <div class="group-snippet-traffic">
+                  <span :title="`Copies: ${item.copyCount}`"><Copy aria-hidden="true" />{{ item.copyCount }}</span>
+                  <span :title="`Forks: ${item.forkCount}`"><CodeBranch aria-hidden="true" />{{ item.forkCount }}</span>
+                  <span :title="`Favorites: ${item.favoriteCount}`"><Bookmark aria-hidden="true" />{{ item.favoriteCount }}</span>
+                </div>
               </NuxtLink>
             </div>
           </template>
@@ -230,7 +235,10 @@
 
 <script setup lang="ts">
 import ArrowUpRight from '@primeicons/vue/arrow-up-right'
+import Bookmark from '@primeicons/vue/bookmark'
+import CodeBranch from '@primeicons/vue/code-branch'
 import Comment from '@primeicons/vue/comment'
+import Copy from '@primeicons/vue/copy'
 import Flag from '@primeicons/vue/flag'
 import { FEEDBACK_TYPES, moderationTypeLabel } from '#shared/utils/moderation'
 
@@ -283,6 +291,9 @@ interface GroupSnippet {
   intro: string
   visibility: string
   updated_at: string
+  copyCount: number
+  forkCount: number
+  favoriteCount: number
   language: { slug: string, name: string, logo_url: string | null } | null
   tags: TagItem[]
 }
@@ -981,6 +992,27 @@ useHead({
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.group-snippet-traffic {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding-top: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  svg {
+    width: 0.82rem;
+    height: 0.82rem;
+    opacity: 0.65;
+  }
 }
 
 /* ---------- 状态 ---------- */

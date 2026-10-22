@@ -21,8 +21,8 @@
       </template>
 
       <template #cell-published="{ row }">
-        <Tag :value="t(row.published ? 'changelog.published' : 'changelog.draft')"
-          :severity="row.published ? 'secondary' : 'warn'" rounded />
+        <StatusTag :label="t(row.published ? 'changelog.published' : 'changelog.draft')"
+          :status="row.published ? 'published' : 'draft'" :severity="row.published ? 'secondary' : 'warn'" />
       </template>
 
       <template #cell-actions="{ row }">

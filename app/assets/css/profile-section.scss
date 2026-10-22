@@ -1,0 +1,84 @@
+// 个人主页子页面（收藏 / 反馈举报 / 目录申请）共用的容器与面板样式
+// 复用原账户设置页的视觉语言，但不再挂在账户设置侧栏下
+
+.profile-section-content {
+  --panel: color-mix(in srgb, var(--p-text-color) 4%, var(--p-content-background));
+  --hover: color-mix(in srgb, var(--p-text-color) 8%, var(--p-content-background));
+  --active: color-mix(in srgb, var(--p-text-color) 13%, var(--p-content-background));
+  --border: var(--p-content-border-color);
+
+  .section-title {
+    margin: 0 0 1.75rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+
+  .group {
+    margin-bottom: 2rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .group-title {
+    margin: 0 0 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--p-text-muted-color);
+  }
+
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--panel);
+    overflow: hidden;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1rem 1.15rem;
+
+    & + .row {
+      border-top: 1px solid var(--border);
+    }
+  }
+
+  .row-main {
+    min-width: 0;
+  }
+
+  .row-label {
+    display: block;
+    font-size: 0.92rem;
+    font-weight: 500;
+  }
+
+  .row-desc {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.82rem;
+    color: var(--p-text-muted-color);
+  }
+
+  .row-hint {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.74rem;
+    line-height: 1.5;
+    color: var(--p-text-muted-color);
+    opacity: 0.85;
+  }
+
+  .row-control {
+    flex-shrink: 0;
+  }
+
+  .row-value {
+    font-size: 0.9rem;
+    color: var(--p-text-muted-color);
+  }
+}

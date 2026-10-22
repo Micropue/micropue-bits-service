@@ -45,7 +45,7 @@
       </template>
 
       <template #cell-status="{ row }">
-        <Tag :value="t(`review.status.${row.status}`)" :severity="statusSeverity(row.status)" rounded />
+        <StatusTag :label="t(`review.status.${row.status}`)" :status="row.status" :severity="statusSeverity(row.status)" />
         <span v-if="row.status === 'rejected' && row.reject_reason" class="cell-sub">{{ row.reject_reason }}</span>
       </template>
 

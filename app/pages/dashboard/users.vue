@@ -23,8 +23,9 @@
       </template>
 
       <template #cell-status="{ row }">
-        <Tag :value="t(`users.status.${row.status}`)" :severity="row.status === 'normal' ? 'secondary' : 'danger'"
-          rounded :title="row.status === 'disabled' ? disabledHint(row) : undefined" />
+        <StatusTag :label="t(`users.status.${row.status}`)" :status="row.status"
+          :severity="row.status === 'normal' ? 'secondary' : 'danger'"
+          :title="row.status === 'disabled' ? disabledHint(row) : undefined" />
       </template>
 
       <template #cell-actions="{ row }">
@@ -52,8 +53,8 @@
             <span class="detail-sub">{{ usernameLabel(detail) }}</span>
           </div>
         </div>
-        <Tag :value="t(`users.status.${detail.status}`)" :severity="detail.status === 'normal' ? 'secondary' : 'danger'"
-          rounded />
+        <StatusTag :label="t(`users.status.${detail.status}`)" :status="detail.status"
+          :severity="detail.status === 'normal' ? 'secondary' : 'danger'" />
       </div>
 
       <p v-if="detail.status === 'disabled'" class="banner">
@@ -82,23 +83,35 @@
         <h3 class="detail-title">{{ t('users.detail.security') }}</h3>
         <div class="kv">
           <span class="k">{{ t('users.detail.password') }}</span>
-          <span class="v">{{ detail.hasPassword ? t('users.detail.set') : t('users.detail.unset') }}</span>
+          <span class="v status-line">
+            <StatusIcon :status="detail.hasPassword ? 'set' : 'unset'" />
+            {{ detail.hasPassword ? t('users.detail.set') : t('users.detail.unset') }}
+          </span>
         </div>
         <div class="kv">
           <span class="k">AuthApp</span>
-          <span class="v">{{ detail.appBound ? t('users.detail.bound') : t('users.detail.unbound') }}</span>
+          <span class="v status-line">
+            <StatusIcon :status="detail.appBound ? 'bound' : 'unbound'" />
+            {{ detail.appBound ? t('users.detail.bound') : t('users.detail.unbound') }}
+          </span>
         </div>
         <div class="kv">
           <span class="k">{{ t('users.detail.passkeys') }}</span>
-          <span class="v">{{ detail.passkeyCount }}</span>
+          <span class="v status-line"><StatusIcon status="key" /> {{ detail.passkeyCount }}</span>
         </div>
         <div class="kv">
           <span class="k">GitHub</span>
-          <span class="v">{{ detail.githubLogin || t('users.detail.unbound') }}</span>
+          <span class="v status-line">
+            <StatusIcon :status="detail.githubLogin ? 'bound' : 'unbound'" />
+            {{ detail.githubLogin || t('users.detail.unbound') }}
+          </span>
         </div>
         <div class="kv">
           <span class="k">{{ t('users.detail.twoFactor') }}</span>
-          <span class="v">{{ detail.twoFactorEnabled ? t('users.detail.on') : t('users.detail.off') }}</span>
+          <span class="v status-line">
+            <StatusIcon :status="detail.twoFactorEnabled ? 'on' : 'off'" />
+            {{ detail.twoFactorEnabled ? t('users.detail.on') : t('users.detail.off') }}
+          </span>
         </div>
       </section>
 
@@ -603,6 +616,12 @@ useHead({
 .v {
   min-width: 0;
   word-break: break-word;
+}
+
+.status-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .mono {

@@ -1,79 +1,5 @@
 <template>
-  <div class="public-page">
-    <div v-if="pending" class="state-panel">Loading…</div>
-
-    <div v-else-if="profile" class="profile-layout">
-      <!-- 左：资料与统计 -->
-      <aside class="profile-card">
-        <UserAvatar :src="profile.avatarUrl" :size="72" />
-        <h1 class="profile-name">{{ profile.nickname }}</h1>
-        <p class="profile-handle">@{{ profile.username }}</p>
-        <p v-if="profile.bio" class="profile-bio">{{ profile.bio }}</p>
-        <p class="profile-meta">Joined {{ formatDate(profile.createdAt) }}</p>
-
-        <div v-if="links.length" class="profile-links">
-          <a v-for="link in links" :key="link.label + link.url" class="profile-link" :href="link.url" target="_blank"
-            rel="noopener noreferrer">
-            <LinkIcon aria-hidden="true" />
-            <span>{{ link.label }}</span>
-          </a>
-        </div>
-
-        <div class="profile-stats">
-          <div class="stat-group">
-            <span class="stat-group-label">Content</span>
-            <div class="stat-values">
-              <span class="stat-value"><strong>{{ stats?.snippets ?? 0 }}</strong>{{ unit(stats?.snippets ?? 0, 'snippet') }}</span>
-              <span class="stat-value"><strong>{{ stats?.groups ?? 0 }}</strong>{{ unit(stats?.groups ?? 0, 'group') }}</span>
-            </div>
-          </div>
-          <div class="stat-group">
-            <span class="stat-group-label">Community</span>
-            <div class="stat-values">
-              <button type="button" class="stat-value stat-button" @click="openFollowDialog('followers')">
-                <strong>{{ stats?.followers ?? 0 }}</strong>{{ unit(stats?.followers ?? 0, 'follower') }}
-              </button>
-              <button type="button" class="stat-value stat-button" @click="openFollowDialog('following')">
-                <strong>{{ stats?.following ?? 0 }}</strong>{{ unit(stats?.following ?? 0, 'following', 'following') }}
-              </button>
-            </div>
-          </div>
-          <div class="stat-group">
-            <span class="stat-group-label">Traffic</span>
-            <div class="stat-values">
-              <span class="stat-value"><strong>{{ stats?.copies ?? 0 }}</strong>{{ unit(stats?.copies ?? 0, 'copy', 'copies') }}</span>
-              <span class="stat-value"><strong>{{ stats?.favorites ?? 0 }}</strong>{{ unit(stats?.favorites ?? 0, 'favorite') }}</span>
-            </div>
-          </div>
-        </div>
-
-        <p v-if="profile.isOwner && stats?.breakdown" class="profile-breakdown">
-          Public {{ stats.breakdown.public }} · Unlisted {{ stats.breakdown.unlisted }} · Private {{ stats.breakdown.private }}
-        </p>
-
-        <div class="profile-actions">
-          <template v-if="profile.isOwner">
-            <div class="action-grid">
-              <Button label="New snippet" size="small" fluid @click="navigateTo('/new')" />
-              <Button label="New group" size="small" severity="secondary" outlined fluid @click="openGroupCreate" />
-            </div>
-            <div class="action-manage">
-              <Button label="Edit profile" size="small" text fluid @click="navigateTo('/account/profile')" />
-              <Button label="Links" size="small" text fluid @click="openLinks" />
-            </div>
-          </template>
-          <template v-else>
-            <Button v-if="authUser" :label="profile.isFollowing ? 'Following' : 'Follow'"
-              :severity="profile.isFollowing ? 'secondary' : undefined" :outlined="profile.isFollowing" size="small"
-              :loading="followBusy" @click="toggleFollow" />
-            <Button v-else label="Follow" size="small" @click="navigateTo('/sign')" />
-            <Button label="Report" size="small" text severity="secondary" @click="openReportUser" />
-          </template>
-        </div>
-      </aside>
-
-      <!-- 右：代码段与分组 -->
-      <div class="profile-main">
+  <div class="profile-content">
         <section class="content-section" aria-labelledby="snippets-title">
           <header class="section-head">
             <h2 id="snippets-title" class="section-title">
@@ -113,6 +39,11 @@
                     {{ visibilityLabel(snippet.visibility) }}
                   </span>
                   <span v-for="tag in snippet.tags" :key="tag.key" class="tag">{{ tag.name }}</span>
+                </div>
+                <div class="card-traffic">
+                  <span :title="`Copies: ${snippet.copyCount}`"><Copy aria-hidden="true" />{{ snippet.copyCount }}</span>
+                  <span :title="`Forks: ${snippet.forkCount}`"><CodeBranch aria-hidden="true" />{{ snippet.forkCount }}</span>
+                  <span :title="`Favorites: ${snippet.favoriteCount}`"><Bookmark aria-hidden="true" />{{ snippet.favoriteCount }}</span>
                 </div>
               </NuxtLink>
               <div v-if="profile.isOwner" class="card-actions">
@@ -169,6 +100,11 @@
                   </span>
                   <span v-for="tag in group.tags" :key="tag.key" class="tag">{{ tag.name }}</span>
                 </div>
+                <div class="card-traffic">
+                  <span :title="`Snippets: ${group.snippetCount}`"><FolderIcon aria-hidden="true" />{{ group.snippetCount }}</span>
+                  <span :title="`Forks: ${group.forkCount}`"><CodeBranch aria-hidden="true" />{{ group.forkCount }}</span>
+                  <span :title="`Favorites: ${group.favoriteCount}`"><Bookmark aria-hidden="true" />{{ group.favoriteCount }}</span>
+                </div>
               </NuxtLink>
               <div v-if="profile.isOwner" class="card-actions">
                 <Button :label="group.pinned ? 'Unpin' : 'Pin'" size="small" text severity="secondary"
@@ -184,94 +120,22 @@
               @click="loadGroups(false)" />
           </div>
         </section>
-      </div>
-    </div>
   </div>
 
-  <!-- 分组新建/编辑：与分组详情页共用同一弹窗 -->
   <GroupDialog v-model:visible="groupDialogVisible" :group="groupForEdit" @saved="reloadProfile" />
-
-  <!-- 开放链接 -->
-  <Dialog v-model:visible="linksDialog" modal :draggable="false" :style="{ width: '34rem' }" header="Open links">
-    <div class="dialog-form">
-      <p class="dialog-hint">Up to 6 links, http(s) only.</p>
-      <div v-for="(link, index) in linkDraft" :key="index" class="link-row">
-        <InputText v-model="link.label" :name="`link-label-${index}`" maxlength="32" placeholder="Label" fluid />
-        <InputText v-model="link.url" :name="`link-url-${index}`" maxlength="512" placeholder="https://…" fluid />
-        <button type="button" class="link-remove" :aria-label="`Remove link ${link.label || index + 1}`"
-          @click="linkDraft.splice(index, 1)">×</button>
-      </div>
-      <Button v-if="linkDraft.length < 6" label="Add link" severity="secondary" text size="small" @click="addLinkRow" />
-      <p v-if="linksError" class="form-error" role="alert">{{ linksError }}</p>
-    </div>
-    <template #footer>
-      <Button label="Cancel" severity="secondary" text @click="linksDialog = false" />
-      <Button label="Save" :loading="linksSaving" @click="saveLinks" />
-    </template>
-  </Dialog>
-
-  <!-- 粉丝 / 关注列表 -->
-  <Dialog v-model:visible="followDialog" modal :draggable="false" :style="{ width: '32rem' }" :header="followDialogTitle"
-    @update:visible="onFollowDialogVisibility">
-    <div class="follow-dialog">
-      <div class="follow-tabs" role="tablist" aria-label="Followers and following">
-        <button type="button" class="follow-tab" :class="{ 'is-active': followList === 'followers' }" role="tab"
-          :aria-selected="followList === 'followers'" @click="switchFollowList('followers')">
-          Followers <span>{{ stats?.followers ?? 0 }}</span>
-        </button>
-        <button type="button" class="follow-tab" :class="{ 'is-active': followList === 'following' }" role="tab"
-          :aria-selected="followList === 'following'" @click="switchFollowList('following')">
-          Following <span>{{ stats?.following ?? 0 }}</span>
-        </button>
-      </div>
-
-      <InputText v-model="followQuery" name="follow-search" size="small" autocomplete="off" placeholder="Search people"
-        aria-label="Search people" fluid />
-
-      <p v-if="followLoading && !followItems.length" class="follow-state">Loading…</p>
-      <p v-else-if="!followItems.length" class="follow-state">
-        {{ followQuery.trim() ? 'No one matches this search.' : 'No one here yet.' }}
-      </p>
-      <div v-else class="follow-list">
-        <div v-for="person in followItems" :key="person.sid" class="follow-row">
-          <NuxtLink v-if="person.username" :to="`/${person.username}`" class="follow-person"
-            @click="followDialog = false">
-            <UserAvatar :src="person.avatarUrl" :size="36" />
-            <span class="follow-person-main">
-              <span class="follow-name">{{ person.nickname }}</span>
-              <span class="follow-handle">@{{ person.username }}</span>
-            </span>
-          </NuxtLink>
-          <div v-else class="follow-person follow-person--static">
-            <UserAvatar :src="person.avatarUrl" :size="36" />
-            <span class="follow-person-main">
-              <span class="follow-name">{{ person.nickname }}</span>
-              <span class="follow-handle">No public profile</span>
-            </span>
-          </div>
-          <Button v-if="followCanManage" :label="followList === 'followers' ? 'Remove' : 'Unfollow'" size="small" text
-            severity="danger" @click="removeFollow(person)" />
-        </div>
-      </div>
-
-      <div v-if="followItems.length < followTotal" class="follow-more">
-        <Button label="Load more" size="small" severity="secondary" outlined :loading="followLoading"
-          @click="loadFollows(false)" />
-      </div>
-    </div>
-  </Dialog>
 
   <ProfileOrderDialog v-if="profile?.isOwner" v-model:visible="orderDialog" :kind="orderKind"
     @saved="reloadProfile" />
-  <ReportDialog v-if="profile && !profile.isOwner" v-model:visible="reportUserDialog" target-kind="user"
-    :username="profile.username" :target-name="profile.nickname" />
-  <ConfirmDialog />
-  <Toast />
 </template>
 
 <script setup lang="ts">
+definePageMeta({ layout: 'profile' })
+
 import LinkIcon from '@primeicons/vue/link'
 import FolderIcon from '@primeicons/vue/folder'
+import Bookmark from '@primeicons/vue/bookmark'
+import CodeBranch from '@primeicons/vue/code-branch'
+import Copy from '@primeicons/vue/copy'
 
 // 用户主页 /{username}：公开视图 + 作者本人管理视图
 interface Profile {
@@ -299,6 +163,8 @@ interface SnippetItem {
   group_sid: string | null
   pinned: boolean
   favoriteCount: number
+  copyCount: number
+  forkCount: number
   language: { slug: string, name: string, logo_url: string | null } | null
   tags: TagItem[]
 }
@@ -312,6 +178,7 @@ interface GroupItem {
   updated_at: string
   pinned: boolean
   favoriteCount: number
+  forkCount: number
   snippetCount: number
   tags: TagItem[]
 }
@@ -448,6 +315,9 @@ watch(groupQuery, () => groupSearch.run())
 async function reloadProfile() {
   await Promise.all([refresh(), loadSnippets(true), loadGroups(true)])
 }
+
+const contentRefresh = useState('profile-content-refresh', () => 0)
+watch(contentRefresh, () => { void reloadProfile() })
 
 function visibilityLabel(value: string) {
   return VISIBILITY_OPTIONS.find(option => option.value === value)?.label ?? value
@@ -688,9 +558,6 @@ function onFollowDialogVisibility(open: boolean) {
   void navigateTo({ path: route.path, query }, { replace: true })
 }
 
-watch(profile, openFollowDialogFromQuery, { immediate: true })
-watch(() => route.query.dialog, openFollowDialogFromQuery)
-
 function switchFollowList(list: FollowList) {
   if (followList.value === list) return
   followList.value = list
@@ -746,6 +613,12 @@ useHead({
 </script>
 
 <style scoped lang="scss">
+.profile-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+}
+
 .public-page {
   width: min(1200px, 94vw);
   margin: 0 auto;
@@ -840,14 +713,12 @@ useHead({
 
 /* 统计分组：内容 / 社区 / 流量，避免六项数字并排、没有重心 */
 .stat-group {
-  display: grid;
-  grid-template-columns: 4.8rem minmax(0, 1fr);
-  align-items: start;
-  gap: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
 .stat-group-label {
-  padding-top: 0.18rem;
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -1098,6 +969,27 @@ useHead({
   gap: 0.35rem;
   margin-top: auto;
   padding-top: 0.3rem;
+}
+
+.card-traffic {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--p-text-muted-color);
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    opacity: 0.65;
+  }
 }
 
 .tag {

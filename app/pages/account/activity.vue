@@ -19,8 +19,8 @@
     <article v-for="item in items" :key="item.sid" class="activity-card">
       <div class="activity-head">
         <div class="activity-title-row">
-          <Tag :value="tab === 'feedback' ? statusLabel(item.status) : statusLabel(item.status)"
-            :severity="item.status === 'closed' ? 'secondary' : 'warn'" rounded />
+          <StatusTag :label="statusLabel(item.status)" :status="item.status"
+            :severity="item.status === 'closed' ? 'secondary' : 'warn'" />
           <span class="activity-type">{{ typeLabel(item) }}</span>
         </div>
         <span class="activity-date">{{ formatDate(item.createdAt) }}</span>

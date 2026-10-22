@@ -3,8 +3,8 @@
     <section class="dash-card dash-card--wide">
       <div class="dash-card-head">
         <h2 class="dash-card-title">{{ t('sec.title') }}</h2>
-        <Tag v-if="verified" :value="t('sec.verified')" severity="secondary" rounded />
-        <Tag v-else :value="t('sec.needsVerify')" severity="warn" rounded />
+        <StatusTag v-if="verified" :label="t('sec.verified')" status="verified" severity="secondary" />
+        <StatusTag v-else :label="t('sec.needsVerify')" status="pending" severity="warn" />
       </div>
 
       <div class="sec-rows">
@@ -14,8 +14,9 @@
             <span class="dash-row-label">{{ t('method.email.label') }}</span>
             <span class="dash-row-desc">{{ t('sec.email.desc', { email: data?.email ?? '' }) }}</span>
           </div>
-          <Tag :value="data?.methods.email ? t('sec.alwaysOn') : t('sec.turnedOff')"
-            :severity="data?.methods.email ? 'secondary' : 'warn'" rounded />
+          <StatusTag :label="data?.methods.email ? t('sec.alwaysOn') : t('sec.turnedOff')"
+            :status="data?.methods.email ? 'always-on' : 'turned-off'"
+            :severity="data?.methods.email ? 'secondary' : 'warn'" />
         </div>
 
         <!-- AuthApp -->
@@ -27,8 +28,9 @@
             </span>
           </div>
           <div class="sec-actions">
-            <Tag :value="app.bound ? t('sec.bound') : t('sec.unbound')"
-              :severity="app.bound ? 'secondary' : 'warn'" rounded />
+            <StatusTag :label="app.bound ? t('sec.bound') : t('sec.unbound')"
+              :status="app.bound ? 'bound' : 'unbound'"
+              :severity="app.bound ? 'secondary' : 'warn'" />
             <Button v-if="app.bound" :label="t('sec.remove')" severity="danger" text size="small" :disabled="busy"
               @click="askRemoveApp" />
             <Button v-else :label="t('sec.enable')" size="small" :disabled="busy" @click="startAppSetup" />
@@ -42,8 +44,9 @@
             <span class="dash-row-desc">{{ t('sec.passkey.desc', { max: data?.maxPasskeys ?? 5 }) }}</span>
           </div>
           <div class="sec-actions">
-            <Tag :value="passkeys.length ? t('sec.bound') : t('sec.unbound')"
-              :severity="passkeys.length ? 'secondary' : 'warn'" rounded />
+            <StatusTag :label="passkeys.length ? t('sec.bound') : t('sec.unbound')"
+              :status="passkeys.length ? 'bound' : 'unbound'"
+              :severity="passkeys.length ? 'secondary' : 'warn'" />
             <Button :label="t('sec.passkey.add')" size="small"
               :disabled="busy || passkeys.length >= (data?.maxPasskeys ?? 5)" @click="addPasskey" />
           </div>

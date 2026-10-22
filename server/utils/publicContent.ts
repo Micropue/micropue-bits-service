@@ -63,7 +63,7 @@ export async function fetchUserSnippets(ownerUuid: string, includeAll = false, o
     : "(c.`pinned_at` IS NOT NULL) DESC, c.`pinned_at` DESC, c.`sort_order` ASC, c.`updated_at` DESC"
   const [rows] = await useDb().query<RowDataPacket[]>(
     `SELECT c.\`sid\`, c.\`slug\`, c.\`name\`, c.\`intro\`, c.\`visibility\`, c.\`updated_at\`, c.\`group_sid\`,
-            c.\`pinned_at\`, c.\`favorite_count\`,
+            c.\`pinned_at\`, c.\`favorite_count\`, c.\`copy_count\`, c.\`fork_count\`,
             l.\`slug\` AS \`language_slug\`, l.\`name\` AS \`language_name\`, l.\`logo_url\` AS \`language_logo\`
        FROM \`contents\` c
        LEFT JOIN \`languages\` l ON l.\`sid\` = c.\`language_sid\`
@@ -83,6 +83,8 @@ export async function fetchUserSnippets(ownerUuid: string, includeAll = false, o
     group_sid: row.group_sid as string | null,
     pinned: !!row.pinned_at,
     favoriteCount: Number(row.favorite_count ?? 0),
+    copyCount: Number(row.copy_count ?? 0),
+    forkCount: Number(row.fork_count ?? 0),
     language: row.language_slug
       ? { slug: row.language_slug as string, name: row.language_name as string, logo_url: row.language_logo as string | null }
       : null
@@ -115,7 +117,7 @@ export async function fetchUserGroups(ownerUuid: string, includeAll = false, opt
     : "(g.`pinned_at` IS NOT NULL) DESC, g.`pinned_at` DESC, g.`sort_order` ASC, g.`updated_at` DESC"
   const [rows] = await useDb().query<RowDataPacket[]>(
     `SELECT g.\`sid\`, g.\`slug\`, g.\`name\`, g.\`intro\`, g.\`visibility\`, g.\`updated_at\`,
-            g.\`pinned_at\`, g.\`favorite_count\`,
+            g.\`pinned_at\`, g.\`favorite_count\`, g.\`fork_count\`,
             (SELECT COUNT(*) FROM \`contents\` s
               WHERE s.\`group_sid\` = g.\`sid\` AND s.\`kind\` = 'snippet' AND s.\`deleted_at\` IS NULL
                 ${includeAll ? '' : "AND s.`visibility` = 'public'"}) AS \`snippet_count\`
@@ -135,6 +137,7 @@ export async function fetchUserGroups(ownerUuid: string, includeAll = false, opt
     updated_at: row.updated_at as string,
     pinned: !!row.pinned_at,
     favoriteCount: Number(row.favorite_count ?? 0),
+    forkCount: Number(row.fork_count ?? 0),
     snippetCount: Number(row.snippet_count ?? 0)
   })))
   return { items, total: Number(countRow?.total ?? 0) }
@@ -235,6 +238,7 @@ export async function fetchGroupBySlug(ownerUuid: string, slug: string): Promise
 export async function fetchGroupSnippets(groupSid: string, includeAll = false) {
   const [rows] = await useDb().query<RowDataPacket[]>(
     `SELECT c.\`sid\`, c.\`slug\`, c.\`name\`, c.\`intro\`, c.\`visibility\`, c.\`updated_at\`,
+            c.\`copy_count\`, c.\`fork_count\`, c.\`favorite_count\`,
             l.\`slug\` AS \`language_slug\`, l.\`name\` AS \`language_name\`, l.\`logo_url\` AS \`language_logo\`
        FROM \`contents\` c
        LEFT JOIN \`languages\` l ON l.\`sid\` = c.\`language_sid\`
@@ -250,6 +254,9 @@ export async function fetchGroupSnippets(groupSid: string, includeAll = false) {
     intro: row.intro as string,
     visibility: row.visibility as string,
     updated_at: row.updated_at as string,
+    copyCount: Number(row.copy_count ?? 0),
+    forkCount: Number(row.fork_count ?? 0),
+    favoriteCount: Number(row.favorite_count ?? 0),
     language: row.language_slug
       ? { slug: row.language_slug as string, name: row.language_name as string, logo_url: row.language_logo as string | null }
       : null

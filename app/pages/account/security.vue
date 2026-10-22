@@ -31,6 +31,7 @@
         <div class="row-control value-action">
           <span v-if="githubLinked" class="github-account">
             <UserAvatar :src="githubAvatarUrl" :size="24" />
+            <StatusIcon status="bound" />
             <span class="row-value">{{ githubLogin ? '@' + githubLogin : 'Linked' }}</span>
           </span>
           <Button v-if="!githubLinked" label="Link" severity="success" outlined size="small" @click="openGithubLink" />
@@ -44,7 +45,7 @@
           <span class="row-desc">Sign in without a password using passkeys.</span>
         </div>
         <div class="row-control value-action">
-          <span class="row-value">{{ passkeys.length }}/{{ passkeyMax }}</span>
+          <span class="row-value status-line"><StatusIcon status="key" /> {{ passkeys.length }}/{{ passkeyMax }}</span>
           <Button label="Manage" severity="secondary" outlined size="small" @click="passkeysOpen = true" />
         </div>
       </div>
@@ -54,7 +55,7 @@
           <span class="row-desc">Use a time-based one-time code app for two-factor authentication.</span>
         </div>
         <div class="row-control value-action">
-          <span v-if="totpEnabled" class="row-value">Set up</span>
+          <span v-if="totpEnabled" class="row-value status-line"><StatusIcon status="set" /> Set up</span>
           <Button :label="totpEnabled ? 'Manage' : 'Set up'" :severity="totpEnabled ? 'secondary' : 'success'" outlined size="small"
             @click="totpOpen = true" />
         </div>
@@ -74,7 +75,7 @@
           </span>
         </div>
         <div class="row-control value-action">
-          <span class="row-value">{{ twoFactorEnabled ? 'On' : 'Off' }}</span>
+          <span class="row-value status-line"><StatusIcon :status="twoFactorEnabled ? 'on' : 'off'" /> {{ twoFactorEnabled ? 'On' : 'Off' }}</span>
           <Button :label="twoFactorEnabled ? 'Manage' : 'Set up'" :severity="twoFactorEnabled ? 'secondary' : 'warn'" outlined size="small"
             @click="twoFactorOpen = true" />
         </div>
@@ -492,5 +493,11 @@ async function pkSubmit() {
   margin-top: 0.15rem;
   font-size: 0.8rem;
   color: var(--p-text-muted-color);
+}
+
+.status-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 </style>

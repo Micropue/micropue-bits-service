@@ -45,7 +45,7 @@
       </template>
 
       <template #cell-status="{ row }">
-        <Tag :value="t(`email.status.${row.status}`)" :severity="statusSeverity(row.status)" rounded />
+        <StatusTag :label="t(`email.status.${row.status}`)" :status="row.status" :severity="statusSeverity(row.status)" />
       </template>
 
       <template #cell-time="{ row }">
@@ -130,7 +130,7 @@
     <div v-if="detail" class="email-detail">
       <div class="email-detail-head">
         <h3 class="email-detail-subject">{{ detail.subject || t('email.untitled') }}</h3>
-        <Tag :value="t(`email.status.${detail.status}`)" :severity="statusSeverity(detail.status)" rounded />
+        <StatusTag :label="t(`email.status.${detail.status}`)" :status="detail.status" :severity="statusSeverity(detail.status)" />
       </div>
       <div class="email-detail-grid">
         <span class="c-k">{{ t('email.from') }}</span><span class="c-v">{{ fromEmail }}</span>

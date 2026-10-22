@@ -41,9 +41,6 @@ const SITE_PAGES: SitePage[] = [
   { name: 'Dependencies', to: '/dependencies', keywords: 'framework library tool runtime catalog' },
   { name: 'Submit an entry', to: '/request', keywords: 'request submit language dependency' },
   { name: 'Account', to: '/account', keywords: 'profile me settings' },
-  { name: 'My requests', to: '/account/requests', keywords: 'requests submissions status review' },
-  { name: 'Favorites', to: '/account/favorites', keywords: 'saved bookmarks snippets groups' },
-  { name: 'Reports & feedback', to: '/account/activity', keywords: 'reports feedback inbox' },
   { name: 'Login security', to: '/account/security', keywords: 'security password passkey github devices two-factor' },
   { name: 'Sign in', to: '/sign', keywords: 'login signup' }
 ]
@@ -257,6 +254,26 @@ export function useCatalogCommand(
           return
         }
         go(`/${user.value.username}?dialog=${next.name}`)
+        return
+      }
+      // 收藏 / 反馈 / 举报 / 目录申请：进入个人主页下的私有子页面
+      const profileSection: Record<string, string> = {
+        favorites: 'favorites',
+        feedback: 'feedback?tab=feedback',
+        reports: 'feedback?tab=reports',
+        requests: 'requests'
+      }
+      if (profileSection[next.name]) {
+        const { user } = useAuthUser()
+        if (!user.value) {
+          go('/sign')
+          return
+        }
+        if (!user.value.usernameSet) {
+          go('/account/profile')
+          return
+        }
+        go(`/${user.value.username}/${profileSection[next.name]}`)
         return
       }
       if (next.to) go(next.to)

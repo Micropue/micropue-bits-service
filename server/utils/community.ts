@@ -85,7 +85,8 @@ export async function fetchFavorites(
     ? 'l.`slug` AS `language_slug`, l.`name` AS `language_name`, l.`logo_url` AS `language_logo`'
     : 'NULL AS `language_slug`, NULL AS `language_name`, NULL AS `language_logo`'
   const [rows] = await useDb().query<RowDataPacket[]>(
-    `SELECT c.\`sid\`, c.\`slug\`, c.\`name\`, c.\`intro\`, c.\`visibility\`, c.\`updated_at\`, c.\`favorite_count\`,
+    `SELECT c.\`sid\`, c.\`slug\`, c.\`name\`, c.\`intro\`, c.\`visibility\`, c.\`updated_at\`,
+            c.\`favorite_count\`, c.\`copy_count\`, c.\`fork_count\`,
             f.\`created_at\` AS \`favorited_at\`,
             u.\`username\`, u.\`nickname\`, u.\`github_id\`,
             ${languageSelect},
@@ -109,6 +110,8 @@ export async function fetchFavorites(
     updated_at: row.updated_at as string,
     favoritedAt: row.favorited_at as string,
     favoriteCount: Number(row.favorite_count ?? 0),
+    copyCount: Number(row.copy_count ?? 0),
+    forkCount: Number(row.fork_count ?? 0),
     snippetCount: kind === 'group' ? Number(row.snippet_count ?? 0) : undefined,
     language: row.language_slug
       ? { slug: row.language_slug as string, name: row.language_name as string, logo_url: row.language_logo as string | null }
