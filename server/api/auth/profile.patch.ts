@@ -2,6 +2,7 @@
 // 校验规则统一来自 shared/utils/validators.ts
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'auth:profile-update', 20, 3600)
   const body = await readBody<{ username?: string; nickname?: string; password?: string }>(event)
 
   let username = typeof body?.username === 'string' ? body.username.trim().toLowerCase() : undefined

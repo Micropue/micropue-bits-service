@@ -1,8 +1,9 @@
 // 开始绑定 AuthApp：需登录 + 当前密码校验；返回密钥 / otpauth URI / 二维码（明文密钥仅此返回一次，激活前存 Redis）
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'auth:totp-setup', 10, 3600)
   const body = await readBody<{ password?: string }>(event)
-  await assertSensitiveConfirm(user, body?.password)
+  await assertSensitiveConfirm(event, user, body?.password)
 
   if (user.totp_secret) {
     throw createError({ statusCode: 409, statusMessage: 'Authenticator app is already set up', data: { field: 'totp' } })

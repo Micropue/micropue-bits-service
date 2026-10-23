@@ -1,6 +1,7 @@
 // 修改管理员：名称、状态（禁用自己会把当前登录踢出，禁止）
 export default defineEventHandler(async event => {
   const self = await requireAdmin(event)
+  await enforceUserRateLimit(event, self.uuid, 'admin:admins:update', 20, 3600)
   const uuid = String(getRouterParam(event, 'uuid') ?? '')
   const target = await fetchAdminByUuid(uuid)
   if (!target) throw createError({ statusCode: 404, statusMessage: 'Administrator not found' })

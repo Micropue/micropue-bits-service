@@ -3,6 +3,7 @@ import { generateAuthenticationOptions } from '@simplewebauthn/server'
 
 // Passkey 登录第一步：不指定账号（discoverable credential），由浏览器弹出已绑定设备的通行密钥
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'console:passkey-login-options', 30, 600)
   const methods = await getAuthMethods()
   if (!methods.passkey) {
     throw createError({ statusCode: 403, statusMessage: 'Passkey sign-in is disabled' })

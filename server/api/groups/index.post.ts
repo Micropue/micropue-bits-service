@@ -1,6 +1,7 @@
 // 创建代码段分组（本人）：与代码段共用 /{username}/{slug} 命名空间
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'groups:create', 20, 3600)
   const body = await readBody<Record<string, unknown>>(event)
 
   const fields = readGroupFields(body, user)

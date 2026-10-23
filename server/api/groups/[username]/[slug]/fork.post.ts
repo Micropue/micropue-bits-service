@@ -4,6 +4,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 // 新分组默认私有；每条复制品记录 fork_from_sid，原分组 / 原代码段 fork_count +1
 export default defineEventHandler(async event => {
   const viewer = await requireAuth(event)
+  await enforceUserRateLimit(event, viewer.uuid, 'groups:fork', 3, 3600)
   const ownerName = String(getRouterParam(event, 'username') ?? '').trim()
   const slug = String(getRouterParam(event, 'slug') ?? '').trim()
 

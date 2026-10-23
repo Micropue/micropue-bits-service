@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 // 保存作者拖拽排序（只改非置顶项；置顶项始终在顶部）
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'profile:order', 20, 3600)
   const body = await readBody<{ kind?: string, slugs?: unknown }>(event)
   const kind = body?.kind === 'group' ? 'group' : 'snippet'
   const slugs = Array.isArray(body?.slugs)

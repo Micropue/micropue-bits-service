@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 // 编辑代码段分组（本人）：名称/介绍/可见性/标签；slug 不可修改
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'groups:update', 60, 3600)
   const slug = String(getRouterParam(event, 'slug') ?? '')
   const body = await readBody<Record<string, unknown>>(event)
 

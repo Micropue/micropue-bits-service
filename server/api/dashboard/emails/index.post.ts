@@ -18,6 +18,13 @@ export default defineEventHandler(async event => {
     throw createError({ statusCode: 400, statusMessage: 'Add a subject or body before saving', data: { field: 'subject' } })
   }
 
+  if (action === 'send') {
+    await enforceUserRateLimit(event, admin.uuid, 'admin:emails:send', 10, 3600)
+    const recipients = input.to.length + input.cc.length + input.bcc.length
+    await enforceUserRateLimit(event, admin.uuid, 'admin:emails:recipients', 500, 3600, recipients)
+    await enforceUserRateLimit(event, admin.uuid, 'admin:emails:recipients-daily', 2000, 86400, recipients)
+  }
+
   const sid = shortId()
   await useDb().execute(
     `INSERT INTO \`admin_emails\`

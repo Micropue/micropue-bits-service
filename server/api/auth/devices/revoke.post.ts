@@ -2,6 +2,7 @@
 // 当前设备不允许在此下线（应使用「Sign out」）
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'auth:devices-revoke', 20, 3600)
   const body = await readBody<{ id?: string }>(event)
   const id = String(body?.id ?? '')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Missing device id' })

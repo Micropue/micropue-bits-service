@@ -4,6 +4,7 @@ import type { H3Event } from 'h3'
 import type { RowDataPacket } from 'mysql2/promise'
 import { useDb } from './db'
 import { verifyPassword } from './password'
+import { enforceIpRateLimit } from './rateLimit'
 import { describeUserAgent, normalizePasskeys } from './webauthn'
 
 // 登录会话：JWT 载荷含 用户UUID + 登录校验TOKEN + 过期时间（规范详见 项目综合设计.md「三、登录安全」）
@@ -228,8 +229,51 @@ export async function requireAuth(event: H3Event): Promise<AuthUser> {
 
 // 敏感操作（如修改邮箱）要求再次确认当前密码
 // - 未设置密码（邮箱验证码注册且未补设）：返回 409，前端提示先设置密码
-// - 密码错误：返回 403
-export async function assertPasswordConfirm(user: AuthUser, password: unknown) {
+// - 密码错误：返回 403；同一账户连续失败 5 次锁定 10 分钟
+const PASSWORD_FAIL_LIMIT = 5
+const PASSWORD_FAIL_WINDOW = 15 * 60
+const PASSWORD_LOCK_SECONDS = 10 * 60
+
+async function assertPasswordNotLocked(event: H3Event, user: AuthUser) {
+  const ttl = await useRedis().ttl(AUTH_KEYS.passwordLock(user.uuid))
+  if (ttl > 0) {
+    setResponseHeader(event, 'Retry-After', String(ttl))
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Too many incorrect password attempts, please try again later',
+      data: { retryAfterSeconds: ttl }
+    })
+  }
+}
+
+async function registerPasswordFailure(event: H3Event, user: AuthUser) {
+  const redis = useRedis()
+  const key = AUTH_KEYS.passwordFail(user.uuid)
+  const count = await redis.incr(key)
+  if (count === 1) await redis.expire(key, PASSWORD_FAIL_WINDOW)
+
+  if (count >= PASSWORD_FAIL_LIMIT) {
+    await redis.set(AUTH_KEYS.passwordLock(user.uuid), '1', 'EX', PASSWORD_LOCK_SECONDS)
+    await redis.del(key)
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Too many incorrect password attempts, please try again later',
+      data: { retryAfterSeconds: PASSWORD_LOCK_SECONDS }
+    })
+  }
+
+  // IP 维度兜底：防止持有大量账户的攻击者绕过单账户计数
+  await enforceIpRateLimit(
+    event,
+    'auth:password-fail:ip',
+    30,
+    PASSWORD_FAIL_WINDOW,
+    1,
+    'Too many incorrect password attempts, please try again later'
+  )
+}
+
+export async function assertPasswordConfirm(event: H3Event, user: AuthUser, password: unknown) {
   if (!user.password_hash) {
     throw createError({
       statusCode: 409,
@@ -237,9 +281,98 @@ export async function assertPasswordConfirm(user: AuthUser, password: unknown) {
       data: { field: 'password', code: 'NO_PASSWORD' }
     })
   }
+
+  await assertPasswordNotLocked(event, user)
   if (typeof password !== 'string' || !(await verifyPassword(password, user.password_hash))) {
+    await registerPasswordFailure(event, user)
     throw createError({ statusCode: 403, statusMessage: 'Incorrect password', data: { field: 'password' } })
   }
+
+  // 成功即清除连续失败计数
+  await useRedis().del(AUTH_KEYS.passwordFail(user.uuid))
+}
+
+// TOTP / 恢复码失败锁定：防止会话盗用后暴力尝试 6 位码或恢复码
+const OTP_FAIL_LIMIT = 5
+const OTP_FAIL_WINDOW = 15 * 60
+const OTP_LOCK_SECONDS = 10 * 60
+
+export async function assertTotpNotLocked(uuid: string) {
+  const ttl = await useRedis().ttl(AUTH_KEYS.totpLock(uuid))
+  if (ttl > 0) {
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Too many incorrect authenticator codes, please try again later',
+      data: { retryAfterSeconds: ttl }
+    })
+  }
+}
+
+export async function registerTotpFailure(event: H3Event, uuid: string) {
+  const redis = useRedis()
+  const key = AUTH_KEYS.totpFail(uuid)
+  const count = await redis.incr(key)
+  if (count === 1) await redis.expire(key, OTP_FAIL_WINDOW)
+  if (count >= OTP_FAIL_LIMIT) {
+    await redis.set(AUTH_KEYS.totpLock(uuid), '1', 'EX', OTP_LOCK_SECONDS)
+    await redis.del(key)
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Too many incorrect authenticator codes, please try again later',
+      data: { retryAfterSeconds: OTP_LOCK_SECONDS }
+    })
+  }
+  await enforceIpRateLimit(
+    event,
+    'auth:totp-fail:ip',
+    30,
+    OTP_FAIL_WINDOW,
+    1,
+    'Too many incorrect authenticator codes, please try again later'
+  )
+}
+
+export async function clearTotpFailure(uuid: string) {
+  await useRedis().del(AUTH_KEYS.totpFail(uuid))
+}
+
+export async function assertRecoveryNotLocked(uuid: string) {
+  const ttl = await useRedis().ttl(AUTH_KEYS.recoveryLock(uuid))
+  if (ttl > 0) {
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Too many incorrect recovery codes, please try again later',
+      data: { retryAfterSeconds: ttl }
+    })
+  }
+}
+
+export async function registerRecoveryFailure(event: H3Event, uuid: string) {
+  const redis = useRedis()
+  const key = AUTH_KEYS.recoveryFail(uuid)
+  const count = await redis.incr(key)
+  if (count === 1) await redis.expire(key, OTP_FAIL_WINDOW)
+  if (count >= OTP_FAIL_LIMIT) {
+    await redis.set(AUTH_KEYS.recoveryLock(uuid), '1', 'EX', OTP_LOCK_SECONDS)
+    await redis.del(key)
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Too many incorrect recovery codes, please try again later',
+      data: { retryAfterSeconds: OTP_LOCK_SECONDS }
+    })
+  }
+  await enforceIpRateLimit(
+    event,
+    'auth:recovery-fail:ip',
+    30,
+    OTP_FAIL_WINDOW,
+    1,
+    'Too many incorrect recovery codes, please try again later'
+  )
+}
+
+export async function clearRecoveryFailure(uuid: string) {
+  await useRedis().del(AUTH_KEYS.recoveryFail(uuid))
 }
 
 // 敏感操作二次验证授权标记：通过密码 / 两步验证后发放短期标记，
@@ -259,7 +392,7 @@ export async function clearSensitiveVerify(uuid: string) {
 }
 
 // 敏感操作身份确认：已通过二次验证（两步验证）则直接通过，否则回退到当前密码校验
-export async function assertSensitiveConfirm(user: AuthUser, password: unknown) {
+export async function assertSensitiveConfirm(event: H3Event, user: AuthUser, password: unknown) {
   if (await hasSensitiveVerify(user.uuid)) return
-  await assertPasswordConfirm(user, password)
+  await assertPasswordConfirm(event, user, password)
 }

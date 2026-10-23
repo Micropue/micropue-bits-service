@@ -4,6 +4,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 
 // Passkey 登录第二步：按 credentialId 定位管理员 → 校验断言 → 签发控制台会话
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'console:passkey-login-verify', 20, 600)
   const body = await readBody<{ challengeId?: string; response?: AuthenticationResponseJSON }>(event)
   const challengeId = String(body?.challengeId ?? '')
   const response = body?.response

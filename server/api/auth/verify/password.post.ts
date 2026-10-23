@@ -2,7 +2,7 @@
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
   const body = await readBody<{ password?: string }>(event)
-  await assertPasswordConfirm(user, body?.password)
+  await assertPasswordConfirm(event, user, body?.password)
   await grantSensitiveVerify(user.uuid)
   return { ok: true, method: 'password' }
 })

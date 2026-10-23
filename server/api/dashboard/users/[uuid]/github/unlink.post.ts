@@ -1,7 +1,8 @@
 // 解除用户的 GitHub 绑定（用户换号 / GitHub 账号丢失时的救援）
 // 邮箱验证码始终可用，解绑不会锁死账号
 export default defineEventHandler(async event => {
-  await requireAdmin(event)
+  const admin = await requireAdmin(event)
+  await enforceUserRateLimit(event, admin.uuid, 'admin:users:github-unlink', 20, 3600)
 
   const uuid = String(getRouterParam(event, 'uuid') ?? '')
   const user = await fetchUserRow(uuid)

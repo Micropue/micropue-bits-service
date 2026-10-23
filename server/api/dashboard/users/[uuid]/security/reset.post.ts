@@ -1,7 +1,8 @@
 // 重置第二因子（用户丢失设备时的救援）：scope = app（AuthApp + 恢复码）或 passkeys（全部通行密钥）
 // 不会锁死账号：邮箱验证码始终可用；若移除后已无任何第二因子，同时关闭 two_factor_enabled
 export default defineEventHandler(async event => {
-  await requireAdmin(event)
+  const admin = await requireAdmin(event)
+  await enforceUserRateLimit(event, admin.uuid, 'admin:users:security-reset', 20, 3600)
 
   const uuid = String(getRouterParam(event, 'uuid') ?? '')
   const body = await readBody<{ scope?: string }>(event)

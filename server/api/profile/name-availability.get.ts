@@ -5,6 +5,7 @@ import { slugifyContentName } from '../../utils/contentInput'
 export default defineEventHandler(async event => {
   setHeader(event, 'cache-control', 'no-store')
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'profile:name-availability', 60, 60)
   const query = getQuery(event)
   const kind = query.kind === 'group' ? 'group' : 'snippet'
   const name = String(query.name ?? '').trim().slice(0, 60)

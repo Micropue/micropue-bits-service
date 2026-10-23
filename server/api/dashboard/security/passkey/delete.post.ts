@@ -1,6 +1,7 @@
 // 删除已绑定的 Passkey
 export default defineEventHandler(async event => {
   const admin = await requireAdmin(event)
+  await enforceUserRateLimit(event, admin.uuid, 'console:passkey-delete', 10, 3600)
   await assertConsoleVerify(admin)
 
   const body = await readBody<{ id?: string }>(event)

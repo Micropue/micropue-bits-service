@@ -3,6 +3,7 @@ import { generateAuthenticationOptions } from '@simplewebauthn/server'
 
 // 开始 Passkey 登录：无用户名（discoverable），返回登录选项 + challengeId
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'auth:passkey-login-options', 30, 600)
   const { rpID } = rpConfig(event)
   const options = await generateAuthenticationOptions({
     rpID,

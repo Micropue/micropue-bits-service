@@ -11,15 +11,25 @@ export default defineEventHandler(async event => {
   const invalid = () => createError({ statusCode: 400, statusMessage: 'Incorrect authenticator code' })
   if (!email || !/^\d{6}$/.test(code)) throw invalid()
 
+  await enforceIpRateLimit(event, 'console:app-verify', 30, 3600)
+  await assertAdminAppNotLocked(email)
+
   const admin = await fetchAdminByEmail(email)
   // 账号不存在 / 未绑定 AuthApp / 被禁用：一律同一提示，不暴露账号状态
-  if (!admin || admin.status !== 'normal' || !admin.totp_secret) throw invalid()
+  if (!admin || admin.status !== 'normal' || !admin.totp_secret) {
+    await registerAdminAppFailure(event, email)
+    throw invalid()
+  }
 
   const { valid, timeStep } = await verifyTotp(decryptSecret(admin.totp_secret), code, await usedTimeStep(admin.uuid))
-  if (!valid) throw invalid()
+  if (!valid) {
+    await registerAdminAppFailure(event, email)
+    throw invalid()
+  }
 
   // 防重放：记录已用时间步，同一 30 秒窗口内的码不能再用
   await rememberTimeStep(admin.uuid, timeStep)
+  await clearAdminAppFailure(email)
 
   await issueAdminSession(event, admin)
   return { admin: publicAdmin(admin) }

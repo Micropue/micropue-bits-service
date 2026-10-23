@@ -1,5 +1,6 @@
 // 两步验证 - 恢复码校验（消费一次性码）
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'auth:2fa-recovery-verify', 30, 3600)
   const body = await readBody<{ ticket?: string; code?: string }>(event)
   const ticket = String(body?.ticket ?? '')
   const code = String(body?.code ?? '').trim()

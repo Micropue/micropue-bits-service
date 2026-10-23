@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 // 关注用户（本人操作）：不能关注自己；重复关注幂等
 export default defineEventHandler(async event => {
   const viewer = await requireAuth(event)
+  await enforceUserRateLimit(event, viewer.uuid, 'users:follow', 120, 3600)
   const username = String(getRouterParam(event, 'username') ?? '').trim()
 
   const target = await findPublicUser(username)

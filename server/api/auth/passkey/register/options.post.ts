@@ -3,9 +3,11 @@ import { generateRegistrationOptions } from '@simplewebauthn/server'
 // 开始注册 Passkey：需登录 + 当前密码校验；返回 WebAuthn 注册选项
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'auth:passkey-register', 10, 3600)
+  await enforceIpRateLimit(event, 'auth:passkey-register:ip', 20, 600)
   const body = await readBody<{ password?: string }>(event)
   // 敏感操作身份校验（无密码账户 → 409 NO_PASSWORD）
-  await assertSensitiveConfirm(user, body?.password)
+  await assertSensitiveConfirm(event, user, body?.password)
 
   const passkeys = normalizePasskeys(user.passkeys)
   if (passkeys.length >= MAX_PASSKEYS) {

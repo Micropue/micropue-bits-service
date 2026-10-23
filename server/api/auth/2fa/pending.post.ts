@@ -1,5 +1,6 @@
 // 查询待校验的两步验证票据（GitHub 跳转登录后由前端读回可用第二因子）
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'auth:2fa-pending', 30, 600)
   const body = await readBody<{ ticket?: string }>(event)
   const ticket = String(body?.ticket ?? '')
   if (!ticket) throw createError({ statusCode: 400, statusMessage: 'Missing ticket' })

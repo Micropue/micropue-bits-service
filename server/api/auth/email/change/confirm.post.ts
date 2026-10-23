@@ -14,9 +14,10 @@ interface SessionData {
 
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceIpRateLimit(event, 'auth:email-change-confirm', 30, 3600)
   const body = await readBody<{ password?: string; sessionId?: string; code?: string }>(event)
 
-  await assertSensitiveConfirm(user, body?.password)
+  await assertSensitiveConfirm(event, user, body?.password)
 
   const sessionId = String(body?.sessionId ?? '').trim()
   const code = String(body?.code ?? '').trim()

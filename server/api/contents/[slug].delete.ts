@@ -1,6 +1,7 @@
 // 删除代码段（本人）：软删；原地址不再可访问，保留收藏/反馈等关系
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'contents:delete', 20, 3600)
   const slug = String(getRouterParam(event, 'slug') ?? '')
 
   const [result] = await useDb().execute(

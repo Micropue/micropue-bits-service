@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 // 取消收藏（幂等）
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'content:favorite', 120, 3600)
   const username = String(getRouterParam(event, 'username') ?? '').trim()
   const slug = String(getRouterParam(event, 'slug') ?? '').trim()
   const owner = await findPublicUser(username)

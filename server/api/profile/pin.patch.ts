@@ -4,6 +4,7 @@ import { MAX_PINNED_PER_KIND } from '#shared/utils/moderation'
 // 置顶 / 取消置顶自己的代码段或分组
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'profile:pin', 60, 3600)
   const body = await readBody<{ kind?: string, slug?: string, pinned?: boolean }>(event)
   const kind = body?.kind === 'group' ? 'group' : 'snippet'
   const slug = String(body?.slug ?? '').trim()

@@ -1,8 +1,9 @@
 // 删除已绑定的 Passkey：需登录 + 当前密码校验
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'auth:passkey-delete', 10, 3600)
   const body = await readBody<{ password?: string; id?: string }>(event)
-  await assertSensitiveConfirm(user, body?.password)
+  await assertSensitiveConfirm(event, user, body?.password)
 
   const id = String(body?.id ?? '')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Missing passkey id' })

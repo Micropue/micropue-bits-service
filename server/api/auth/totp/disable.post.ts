@@ -1,8 +1,9 @@
 // 解绑 AuthApp：需登录 + 当前密码校验；若两步验证因此再无可用第二因子（无 Passkey），则同步关闭两步验证
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'auth:totp-disable', 10, 3600)
   const body = await readBody<{ password?: string }>(event)
-  await assertSensitiveConfirm(user, body?.password)
+  await assertSensitiveConfirm(event, user, body?.password)
 
   const db = useDb()
   await db.execute('UPDATE `users` SET `totp_secret` = NULL WHERE `uuid` = ?', [user.uuid])

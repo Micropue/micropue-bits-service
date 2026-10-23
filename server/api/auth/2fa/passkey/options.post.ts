@@ -3,6 +3,7 @@ import { generateAuthenticationOptions } from '@simplewebauthn/server'
 
 // 两步验证 - 开始 Passkey 校验：按票据定位用户，allowCredentials = 其已绑定 Passkey
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'auth:2fa-passkey-options', 30, 600)
   const body = await readBody<{ ticket?: string }>(event)
   const user = await resolveTwoFaTicket(String(body?.ticket ?? ''))
   const passkeys = normalizePasskeys(user.passkeys)

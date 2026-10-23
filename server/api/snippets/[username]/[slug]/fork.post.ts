@@ -4,6 +4,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 // 需要用户名（复制品默认私有，但仍要能在自己的主页里找到并编辑）
 export default defineEventHandler(async event => {
   const viewer = await requireAuth(event)
+  await enforceUserRateLimit(event, viewer.uuid, 'snippets:fork', 10, 3600)
   const username = String(getRouterParam(event, 'username') ?? '').trim()
   const slug = String(getRouterParam(event, 'slug') ?? '').trim()
 

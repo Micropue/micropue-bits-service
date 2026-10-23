@@ -24,14 +24,9 @@ export default defineEventHandler(async event => {
         data: { retryAfterSeconds: ttl }
       })
     }
-    // 验证当前密码（已通过两步验证授权则免输）
+    // 验证当前密码（已通过两步验证授权则免输）；失败次数由统一校验器限制
     if (!(await hasSensitiveVerify(user.uuid))) {
-      if (
-        typeof body?.currentPassword !== 'string' ||
-        !(await verifyPassword(body.currentPassword, user.password_hash))
-      ) {
-        throw createError({ statusCode: 403, statusMessage: 'Incorrect password', data: { field: 'currentPassword' } })
-      }
+      await assertPasswordConfirm(event, user, body?.currentPassword)
     }
   }
 

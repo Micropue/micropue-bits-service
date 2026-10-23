@@ -3,7 +3,9 @@ import type { RegistrationResponseJSON } from '@simplewebauthn/server'
 
 // 完成绑定 Passkey：校验注册响应并写入 admins.passkeys
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'console:security-passkey-verify', 20, 600)
   const admin = await requireAdmin(event)
+  await enforceUserRateLimit(event, admin.uuid, 'console:security-passkey', 10, 3600)
   await assertConsoleVerify(admin)
 
   const body = await readBody<{ response?: RegistrationResponseJSON }>(event)

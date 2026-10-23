@@ -25,6 +25,7 @@ interface UserRow extends RowDataPacket {
 }
 
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'auth:email-verify', 30, 3600)
   const body = await readBody<{ sessionId?: string; code?: string }>(event)
   const sessionId = String(body?.sessionId ?? '').trim()
   const code = String(body?.code ?? '').trim()

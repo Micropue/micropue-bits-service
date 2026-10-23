@@ -4,6 +4,7 @@ import type { RegistrationResponseJSON } from '@simplewebauthn/server'
 // 完成注册 Passkey：校验注册响应并写入 users.passkeys
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'auth:passkey-register-verify', 20, 3600)
   const body = await readBody<{ response?: RegistrationResponseJSON }>(event)
   if (!body?.response) {
     throw createError({ statusCode: 400, statusMessage: 'Missing registration response' })

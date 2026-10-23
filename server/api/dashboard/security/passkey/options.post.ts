@@ -2,7 +2,9 @@ import { generateRegistrationOptions } from '@simplewebauthn/server'
 
 // 开始绑定 Passkey：返回 WebAuthn 注册选项（challenge 存 Redis）
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'console:security-passkey-options', 30, 600)
   const admin = await requireAdmin(event)
+  await enforceUserRateLimit(event, admin.uuid, 'console:security-passkey', 10, 3600)
   await assertConsoleVerify(admin)
 
   if (admin.passkeys.length >= MAX_PASSKEYS) {

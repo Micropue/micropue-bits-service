@@ -3,6 +3,7 @@ import type { AuthenticationResponseJSON } from '@simplewebauthn/server'
 
 // 两步验证 - 完成 Passkey 校验
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'auth:2fa-passkey-verify', 20, 600)
   const body = await readBody<{ ticket?: string; challengeId?: string; response?: AuthenticationResponseJSON }>(event)
   const ticket = String(body?.ticket ?? '')
   const challengeId = String(body?.challengeId ?? '')

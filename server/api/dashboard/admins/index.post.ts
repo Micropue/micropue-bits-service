@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 
 // 新增管理员
 export default defineEventHandler(async event => {
-  await requireAdmin(event)
+  const admin = await requireAdmin(event)
+  await enforceUserRateLimit(event, admin.uuid, 'admin:admins:create', 5, 3600)
   const body = await readBody<{ email?: string; name?: string }>(event)
 
   const email = String(body?.email ?? '').trim().toLowerCase()

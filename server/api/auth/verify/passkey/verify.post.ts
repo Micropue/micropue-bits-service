@@ -3,6 +3,7 @@ import type { AuthenticationResponseJSON } from '@simplewebauthn/server'
 
 // 敏感操作二次验证：Passkey 断言通过后发放授权标记
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'auth:verify-passkey-verify', 20, 600)
   const user = await requireAuth(event)
   const body = await readBody<{ challengeId?: string; response?: AuthenticationResponseJSON }>(event)
   const challengeId = String(body?.challengeId ?? '')

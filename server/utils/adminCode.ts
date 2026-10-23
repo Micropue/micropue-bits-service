@@ -3,6 +3,7 @@ import type { H3Event } from 'h3'
 import { ADMIN_CODE_ALPHABET, ADMIN_CODE_LENGTH, ADMIN_CODE_TTL_SECONDS } from '#shared/utils/admin'
 import { fetchAdminByEmail, issueAdminSession, type AdminUser } from './adminAuth'
 import { sendAdminCodeMail } from './mail'
+import { enforceIpRateLimit } from './rateLimit'
 
 // 控制台「分步骤动态认证码」核心：发码 + 校验（登录用）
 // 风控顺序：账户锁定 → 重发冷却 → 三层限额（IP / IP×邮箱 / 邮箱）→ 发码
@@ -202,4 +203,52 @@ export async function verifyAdminCode(event: H3Event, rawEmail: unknown, rawCode
   const admin = await consumeAdminCode(rawEmail, rawCode)
   await issueAdminSession(event, admin)
   return admin
+}
+
+// AuthApp 登录失败锁定：与邮箱码登录使用同一账户锁定时长
+const APP_FAIL_LIMIT = 3
+const APP_FAIL_WINDOW = 15 * 60
+const APP_LOCK_SECONDS = 3600
+
+export async function assertAdminAppNotLocked(rawEmail: unknown) {
+  const email = normalizeEmail(rawEmail)
+  const ttl = await useRedis().ttl(AUTH_KEYS.consoleAppLock(email))
+  if (ttl > 0) {
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Too many incorrect authenticator codes',
+      data: { retryAfterSeconds: ttl }
+    })
+  }
+}
+
+export async function registerAdminAppFailure(event: H3Event, rawEmail: unknown) {
+  const email = normalizeEmail(rawEmail)
+  const redis = useRedis()
+  const key = AUTH_KEYS.consoleAppFail(email)
+  const count = await redis.incr(key)
+  if (count === 1) await redis.expire(key, APP_FAIL_WINDOW)
+
+  if (count >= APP_FAIL_LIMIT) {
+    await redis.set(AUTH_KEYS.consoleAppLock(email), '1', 'EX', APP_LOCK_SECONDS)
+    await redis.del(key)
+    throw createError({
+      statusCode: 423,
+      statusMessage: 'Too many incorrect authenticator codes',
+      data: { retryAfterSeconds: APP_LOCK_SECONDS }
+    })
+  }
+
+  await enforceIpRateLimit(
+    event,
+    'console:app-fail:ip',
+    30,
+    APP_FAIL_WINDOW,
+    1,
+    'Too many incorrect authenticator codes, please try again later'
+  )
+}
+
+export async function clearAdminAppFailure(rawEmail: unknown) {
+  await useRedis().del(AUTH_KEYS.consoleAppFail(normalizeEmail(rawEmail)))
 }

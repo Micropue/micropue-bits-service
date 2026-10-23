@@ -3,6 +3,7 @@ import { generateAuthenticationOptions } from '@simplewebauthn/server'
 
 // 敏感操作二次验证：Passkey 认证选项（allowCredentials = 账户已绑定 Passkey）
 export default defineEventHandler(async event => {
+  await enforceIpRateLimit(event, 'auth:verify-passkey-options', 30, 600)
   const user = await requireAuth(event)
   const passkeys = normalizePasskeys(user.passkeys)
   if (passkeys.length === 0) {

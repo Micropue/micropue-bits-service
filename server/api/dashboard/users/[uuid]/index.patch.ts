@@ -3,6 +3,7 @@
 // 并清空 login_devices —— 重新启用后需要重新登录，旧会话不会复活
 export default defineEventHandler(async event => {
   const admin = await requireAdmin(event)
+  await enforceUserRateLimit(event, admin.uuid, 'admin:users:update', 30, 3600)
 
   const uuid = String(getRouterParam(event, 'uuid') ?? '')
   const body = await readBody<{ status?: string, reason?: unknown }>(event)

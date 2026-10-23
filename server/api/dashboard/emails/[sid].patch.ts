@@ -2,7 +2,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 
 // 编辑草稿或发送草稿
 export default defineEventHandler(async event => {
-  await requireAdmin(event)
+  const admin = await requireAdmin(event)
   const sid = String(getRouterParam(event, 'sid') ?? '')
   const body = await readBody<Record<string, unknown>>(event)
   const action = body.action === 'send' ? 'send' : 'draft'
@@ -27,6 +27,13 @@ export default defineEventHandler(async event => {
   }
   if (action === 'draft' && !input.subject.trim() && !input.body.trim()) {
     throw createError({ statusCode: 400, statusMessage: 'Add a subject or body before saving', data: { field: 'subject' } })
+  }
+
+  if (action === 'send') {
+    await enforceUserRateLimit(event, admin.uuid, 'admin:emails:send', 10, 3600)
+    const recipients = input.to.length + input.cc.length + input.bcc.length
+    await enforceUserRateLimit(event, admin.uuid, 'admin:emails:recipients', 500, 3600, recipients)
+    await enforceUserRateLimit(event, admin.uuid, 'admin:emails:recipients-daily', 2000, 86400, recipients)
   }
 
   await useDb().execute(

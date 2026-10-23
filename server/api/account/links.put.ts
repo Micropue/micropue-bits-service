@@ -25,6 +25,7 @@ function readLinks(value: unknown): LinkInput[] {
 
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'account:links', 10, 3600)
   const body = await readBody<{ links?: unknown }>(event)
   const links = readLinks(body?.links)
 

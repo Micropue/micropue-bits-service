@@ -5,7 +5,7 @@ export default defineEventHandler(async event => {
   const body = await readBody<{ password?: string; email?: string; captchaToken?: string }>(event)
 
   // 需要当前密码才能发起修改（未设置密码 → 409 NO_PASSWORD）
-  await assertSensitiveConfirm(user, body?.password)
+  await assertSensitiveConfirm(event, user, body?.password)
 
   const email = String(body?.email ?? '').trim().toLowerCase()
   if (email === user.email.toLowerCase()) {

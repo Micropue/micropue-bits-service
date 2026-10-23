@@ -16,6 +16,14 @@ export const AUTH_KEYS = {
   fail: (email: string) => `auth:email:fail:${email}`,
   // 账户临时锁定（存在即禁止新设备登录 / 发码）
   lock: (email: string) => `auth:email:lock:${email}`,
+  // 敏感操作密码 / TOTP / 恢复码的失败计数与锁定
+  passwordFail: (uuid: string) => `auth:password:fail:${uuid}`,
+  passwordLock: (uuid: string) => `auth:password:lock:${uuid}`,
+  totpFail: (uuid: string) => `auth:totp:fail:${uuid}`,
+  totpLock: (uuid: string) => `auth:totp:lock:${uuid}`,
+  totpSetupFail: (uuid: string) => `auth:totp:setup:fail:${uuid}`,
+  recoveryFail: (uuid: string) => `auth:recovery:fail:${uuid}`,
+  recoveryLock: (uuid: string) => `auth:recovery:lock:${uuid}`,
   // 邮箱修改冷却：每账户 24 小时内最多修改一次（值为上次修改时间戳）
   emailChange: (uuid: string) => `auth:email:change:${uuid}`,
   // 密码修改冷却：每账户 1 小时内最多修改一次
@@ -51,6 +59,11 @@ export const AUTH_KEYS = {
   // 账户级错码计数与临时锁定
   consoleFail: (email: string) => `console:code:fail:${email}`,
   consoleLock: (email: string) => `console:code:lock:${email}`,
+  // AuthApp 动态码登录的失败计数与账户锁定
+  consoleAppFail: (email: string) => `console:app:fail:${email}`,
+  consoleAppLock: (email: string) => `console:app:lock:${email}`,
+  // AuthApp 首次绑定动态码的失败计数
+  consoleTotpSetupFail: (uuid: string) => `console:totp:setup:fail:${uuid}`,
   // 敏感操作身份确认授权（绑定/解绑 AuthApp、Passkey 前须先验证一次）
   consoleGrant: (uuid: string) => `console:grant:${uuid}`,
   // AuthApp 待激活密钥（绑定流程中，激活前临时存放）

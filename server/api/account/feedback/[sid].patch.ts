@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 // 作者更新自己代码段反馈的状态
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'account:feedback-status', 60, 3600)
   const sid = String(getRouterParam(event, 'sid') ?? '')
   const body = await readBody<{ status?: string }>(event)
   const status = String(body?.status ?? '')

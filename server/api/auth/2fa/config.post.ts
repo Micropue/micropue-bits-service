@@ -3,8 +3,9 @@
 // 关闭 → 清空恢复码
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'auth:2fa-config', 10, 3600)
   const body = await readBody<{ enabled?: boolean; password?: string }>(event)
-  await assertSensitiveConfirm(user, body?.password)
+  await assertSensitiveConfirm(event, user, body?.password)
 
   const db = useDb()
 

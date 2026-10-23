@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 // 删除代码段分组（本人）：只解除组内代码段的归属，不删除代码段
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'groups:delete', 10, 3600)
   const slug = String(getRouterParam(event, 'slug') ?? '')
 
   const [rows] = await useDb().query<RowDataPacket[]>(

@@ -2,6 +2,7 @@
 // 校验与分组/标签/依赖写入的统一实现见 server/utils/contentInput.ts
 export default defineEventHandler(async event => {
   const user = await requireAuth(event)
+  await enforceUserRateLimit(event, user.uuid, 'contents:create', 30, 3600)
   const body = await readBody<Record<string, unknown>>(event)
 
   const fields = await readSnippetFields(body, user)
