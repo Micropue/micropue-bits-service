@@ -1,80 +1,93 @@
 <template>
   <aside class="profile-card" :aria-busy="!profile">
     <template v-if="profile">
-    <UserAvatar :src="profile.avatarUrl" :size="72" />
-    <h1 class="profile-name">{{ profile.nickname }}</h1>
-    <p class="profile-handle">@{{ profile.username }}</p>
-    <p v-if="profile.bio" class="profile-bio">{{ profile.bio }}</p>
-    <p class="profile-meta">Joined {{ formatDate(profile.createdAt) }}</p>
+      <UserAvatar :src="profile.avatarUrl" :size="72" />
+      <h1 class="profile-name">{{ profile.nickname }}</h1>
+      <p class="profile-handle">@{{ profile.username }}</p>
+      <p v-if="profile.bio" class="profile-bio">{{ profile.bio }}</p>
+      <p class="profile-meta">Joined {{ formatDate(profile.createdAt) }}</p>
 
-    <div v-if="links.length" class="profile-links">
-      <a v-for="link in links" :key="link.label + link.url" class="profile-link" :href="link.url" target="_blank"
-        rel="noopener noreferrer">
-        <LinkIcon aria-hidden="true" />
-        <span>{{ link.label }}</span>
-      </a>
-    </div>
+      <div v-if="links.length" class="profile-links">
+        <a v-for="link in links" :key="link.label + link.url" class="profile-link" :href="link.url" target="_blank"
+          rel="noopener noreferrer">
+          <LinkIcon aria-hidden="true" />
+          <span>{{ link.label }}</span>
+        </a>
+      </div>
 
-    <div class="profile-stats">
-      <div class="stat-group">
-        <span class="stat-group-label">Content</span>
-        <div class="stat-values">
-          <span class="stat-value"><strong>{{ stats?.snippets ?? 0 }}</strong>{{ unit(stats?.snippets ?? 0, 'snippet') }}</span>
-          <span class="stat-value"><strong>{{ stats?.groups ?? 0 }}</strong>{{ unit(stats?.groups ?? 0, 'group') }}</span>
+      <div class="profile-stats">
+        <div class="stat-group">
+          <span class="stat-group-label">Content</span>
+          <div class="stat-values">
+            <span class="stat-value"><strong>{{ stats?.snippets ?? 0 }}</strong>{{ unit(stats?.snippets ?? 0, 'snippet')
+              }}</span>
+            <span class="stat-value"><strong>{{ stats?.groups ?? 0 }}</strong>{{ unit(stats?.groups ?? 0, 'group')
+              }}</span>
+          </div>
+        </div>
+        <div class="stat-group">
+          <span class="stat-group-label">Community</span>
+          <div class="stat-values">
+            <button type="button" class="stat-value stat-button" @click="openFollowDialog('followers')">
+              <strong>{{ stats?.followers ?? 0 }}</strong>{{ unit(stats?.followers ?? 0, 'follower') }}
+            </button>
+            <button type="button" class="stat-value stat-button" @click="openFollowDialog('following')">
+              <strong>{{ stats?.following ?? 0 }}</strong>{{ unit(stats?.following ?? 0, 'following', 'following') }}
+            </button>
+          </div>
+        </div>
+        <div class="stat-group">
+          <span class="stat-group-label">Traffic</span>
+          <div class="stat-values">
+            <span class="stat-value"><strong>{{ stats?.copies ?? 0 }}</strong>{{ unit(stats?.copies ?? 0, 'copy',
+              'copies') }}</span>
+            <span class="stat-value"><strong>{{ stats?.favorites ?? 0 }}</strong>{{ unit(stats?.favorites ?? 0,
+              'favorite') }}</span>
+          </div>
         </div>
       </div>
-      <div class="stat-group">
-        <span class="stat-group-label">Community</span>
-        <div class="stat-values">
-          <button type="button" class="stat-value stat-button" @click="openFollowDialog('followers')">
-            <strong>{{ stats?.followers ?? 0 }}</strong>{{ unit(stats?.followers ?? 0, 'follower') }}
-          </button>
-          <button type="button" class="stat-value stat-button" @click="openFollowDialog('following')">
-            <strong>{{ stats?.following ?? 0 }}</strong>{{ unit(stats?.following ?? 0, 'following', 'following') }}
-          </button>
-        </div>
-      </div>
-      <div class="stat-group">
-        <span class="stat-group-label">Traffic</span>
-        <div class="stat-values">
-          <span class="stat-value"><strong>{{ stats?.copies ?? 0 }}</strong>{{ unit(stats?.copies ?? 0, 'copy', 'copies') }}</span>
-          <span class="stat-value"><strong>{{ stats?.favorites ?? 0 }}</strong>{{ unit(stats?.favorites ?? 0, 'favorite') }}</span>
-        </div>
-      </div>
-    </div>
 
-    <p v-if="profile.isOwner && stats?.breakdown" class="profile-breakdown">
-      Public {{ stats.breakdown.public }} · Unlisted {{ stats.breakdown.unlisted }} · Private {{ stats.breakdown.private }}
-    </p>
+      <p v-if="profile.isOwner && stats?.breakdown" class="profile-breakdown">
+        Public {{ stats.breakdown.public }} · Unlisted {{ stats.breakdown.unlisted }} · Private {{
+          stats.breakdown.private }}
+      </p>
 
-    <div class="profile-actions">
-      <template v-if="profile.isOwner">
-        <div class="action-grid">
-          <Button label="New snippet" size="small" fluid @click="navigateTo('/new')">
-            <template #icon><Plus /></template>
-          </Button>
-          <Button label="New group" size="small" severity="secondary" outlined fluid @click="openGroupCreate">
-            <template #icon><FolderPlus /></template>
-          </Button>
-        </div>
-        <div class="action-manage">
-          <Button label="Edit profile" size="small" severity="secondary" outlined fluid
-            @click="navigateTo('/account/profile')">
-            <template #icon><UserEdit /></template>
-          </Button>
-          <Button label="Links" size="small" severity="secondary" outlined fluid @click="openLinks">
-            <template #icon><LinkIcon /></template>
-          </Button>
-        </div>
-      </template>
-      <template v-else>
-        <Button v-if="authUser" :label="profile.isFollowing ? 'Following' : 'Follow'"
-          :severity="profile.isFollowing ? 'secondary' : undefined" :outlined="profile.isFollowing" size="small"
-          :loading="followBusy" @click="toggleFollow" />
-        <Button v-else label="Follow" size="small" @click="navigateTo('/sign')" />
-        <Button label="Report" size="small" text severity="secondary" @click="openReportUser" />
-      </template>
-    </div>
+      <div class="profile-actions">
+        <template v-if="profile.isOwner">
+          <div class="action-grid">
+            <Button label="New snippet" size="small" fluid @click="navigateTo('/new')">
+              <template #icon>
+                <Plus />
+              </template>
+            </Button>
+            <Button label="New group" size="small" severity="secondary" outlined fluid @click="openGroupCreate">
+              <template #icon>
+                <FolderPlus />
+              </template>
+            </Button>
+          </div>
+          <div class="action-manage">
+            <Button label="Edit profile" size="small" severity="secondary" outlined fluid
+              @click="navigateTo('/account/profile')">
+              <template #icon>
+                <UserEdit />
+              </template>
+            </Button>
+            <Button label="Links" size="small" severity="secondary" outlined fluid @click="openLinks">
+              <template #icon>
+                <LinkIcon />
+              </template>
+            </Button>
+          </div>
+        </template>
+        <template v-else>
+          <Button v-if="authUser" :label="profile.isFollowing ? 'Following' : 'Follow'"
+            :severity="profile.isFollowing ? 'secondary' : undefined" :outlined="profile.isFollowing" size="small"
+            :loading="followBusy" @click="toggleFollow" />
+          <Button v-else label="Follow" size="small" @click="navigateTo('/sign')" />
+          <Button label="Report" size="small" text severity="secondary" @click="openReportUser" />
+        </template>
+      </div>
     </template>
     <div v-else class="profile-loading">
       <ProgressSpinner aria-label="Loading profile" />
@@ -101,8 +114,8 @@
     </template>
   </Dialog>
 
-  <Dialog v-model:visible="followDialog" modal :draggable="false" :style="{ width: '32rem' }" :header="followDialogTitle"
-    @update:visible="onFollowDialogVisibility">
+  <Dialog v-model:visible="followDialog" modal :draggable="false" :style="{ width: '32rem' }"
+    :header="followDialogTitle" @update:visible="onFollowDialogVisibility">
     <div class="follow-dialog">
       <div class="follow-tabs" role="tablist" aria-label="Followers and following">
         <button type="button" class="follow-tab" :class="{ 'is-active': followList === 'followers' }" role="tab"
@@ -418,27 +431,159 @@ function removeFollow(person: FollowPerson) {
 </script>
 
 <style scoped lang="scss">
-.profile-card { position:sticky; top:1.5rem; display:flex; flex-direction:column; gap:.6rem; min-height:18rem; padding:1.5rem; border:1px solid var(--p-content-border-color); border-radius:1rem; background:var(--p-content-background); }
-.profile-loading { display:grid; flex:1; place-items:center; min-height:15rem; }
-.profile-name { margin:.4rem 0 0; font-size:1.5rem; font-weight:700; letter-spacing:-.02em; word-break:break-word; }
-.profile-handle { margin:0; font-size:.9rem; color:var(--p-text-muted-color); }
-.profile-bio { margin:.5rem 0 0; font-size:.9rem; line-height:1.7; color:var(--p-text-muted-color); white-space:pre-line; }
-.profile-meta { margin:.4rem 0 0; font-size:.78rem; color:var(--p-text-muted-color); }
-.profile-links { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.2rem; }
-.profile-link { display:inline-flex; align-items:center; gap:.3rem; padding:.15rem .5rem; border:1px solid var(--p-content-border-color); border-radius:999px; color:inherit; font-size:.74rem; text-decoration:none; }
-.profile-link svg { width:.8rem; height:.8rem; }
-.profile-stats { display:flex; flex-direction:column; gap:.7rem; margin:.9rem 0 0; padding-top:.9rem; border-top:1px solid var(--p-content-border-color); }
-.stat-group { display:flex; flex-direction:column; gap:.15rem; }
-.stat-group-label { font-size:.68rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--p-text-muted-color); }
-.stat-values { display:flex; flex-wrap:wrap; gap:.2rem .6rem; }
-.stat-value { font-size:.8rem; color:var(--p-text-muted-color); white-space:nowrap; }
-.stat-value strong { margin-right:.28rem; font-size:1.05rem; font-weight:600; color:var(--p-text-color); font-variant-numeric:tabular-nums; }
-.stat-button { padding:0; border:0; background:none; font:inherit; cursor:pointer; }
-.stat-button:hover { color:var(--p-text-color); }
-.profile-breakdown { margin:0; font-size:.72rem; color:var(--p-text-muted-color); }
-.profile-actions { display:flex; flex-direction:column; gap:.45rem; margin-top:.5rem; padding-top:.75rem; border-top:1px solid var(--p-content-border-color); }
-.action-grid { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
-.action-manage { display:grid; grid-template-columns:1fr 1fr; gap:.2rem; }
+.profile-card {
+  position: sticky;
+  top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  min-height: 18rem;
+  padding: 1.5rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 1rem;
+  background: var(--p-content-background);
+}
+
+.profile-loading {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 15rem;
+}
+
+.profile-name {
+  margin: .4rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  word-break: break-word;
+}
+
+.profile-handle {
+  margin: 0;
+  font-size: .9rem;
+  color: var(--p-text-muted-color);
+}
+
+.profile-bio {
+  margin: .5rem 0 0;
+  font-size: .9rem;
+  line-height: 1.7;
+  color: var(--p-text-muted-color);
+  white-space: pre-line;
+}
+
+.profile-meta {
+  margin: .4rem 0 0;
+  font-size: .78rem;
+  color: var(--p-text-muted-color);
+}
+
+.profile-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-top: .2rem;
+}
+
+.profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .15rem .5rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 999px;
+  color: inherit;
+  font-size: .74rem;
+  text-decoration: none;
+}
+
+.profile-link svg {
+  width: .8rem;
+  height: .8rem;
+}
+
+.profile-stats {
+  display: flex;
+  flex-direction: column;
+  gap: .7rem;
+  margin: .9rem 0 0;
+  padding-top: .9rem;
+  border-top: 1px solid var(--p-content-border-color);
+}
+
+.stat-group {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+
+.stat-group-label {
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+}
+
+.stat-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .2rem .6rem;
+}
+
+.stat-value {
+  font-size: .8rem;
+  color: var(--p-text-muted-color);
+  white-space: nowrap;
+}
+
+.stat-value strong {
+  margin-right: .28rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--p-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stat-button:hover {
+  color: var(--p-text-color);
+}
+
+.profile-breakdown {
+  margin: 0;
+  font-size: .72rem;
+  color: var(--p-text-muted-color);
+}
+
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  margin-top: .5rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--p-content-border-color);
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .4rem;
+}
+
+.action-manage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .4rem;
+}
 
 .action-grid,
 .action-manage {
@@ -456,23 +601,132 @@ function removeFollow(person: FollowPerson) {
     font-size: .85rem;
   }
 }
-.dialog-hint { margin:0 0 .5rem; font-size:.8rem; color:var(--p-text-muted-color); }
-.dialog-form { display:flex; flex-direction:column; gap:.65rem; }
-.link-row { display:grid; grid-template-columns:10rem minmax(0,1fr) auto; gap:.5rem; align-items:center; }
-.link-remove { border:0; background:none; color:var(--p-text-muted-color); font-size:1.1rem; cursor:pointer; }
-.follow-dialog { display:flex; flex-direction:column; gap:.65rem; }
-.follow-tabs { display:flex; gap:.3rem; border-bottom:1px solid var(--p-content-border-color); }
-.follow-tab { padding:.45rem .5rem; border:0; border-bottom:2px solid transparent; background:none; color:var(--p-text-muted-color); font:inherit; font-size:.82rem; cursor:pointer; }
-.follow-tab.is-active { border-bottom-color:var(--p-primary-color); color:var(--p-text-color); }
-.follow-tab span { margin-left:.25rem; font-size:.72rem; }
-.follow-list { display:flex; flex-direction:column; max-height:22rem; overflow-y:auto; }
-.follow-row { display:flex; align-items:center; gap:.5rem; padding:.5rem 0; border-top:1px solid var(--p-content-border-color); }
-.follow-person { display:flex; flex:1; align-items:center; gap:.55rem; min-width:0; color:inherit; text-decoration:none; }
-.follow-person-main { display:flex; flex-direction:column; min-width:0; }
-.follow-name { font-size:.85rem; font-weight:500; }
-.follow-handle { font-size:.72rem; color:var(--p-text-muted-color); }
-.follow-state { padding:1rem 0; font-size:.82rem; color:var(--p-text-muted-color); }
-.follow-more { display:flex; justify-content:center; }
-.form-error { margin:0; font-size:.82rem; color:var(--p-red-500,#ef4444); }
-@media (max-width: 900px) { .profile-card { position:static; } .link-row { grid-template-columns:1fr; } }
+
+.dialog-hint {
+  margin: 0 0 .5rem;
+  font-size: .8rem;
+  color: var(--p-text-muted-color);
+}
+
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: .65rem;
+}
+
+.link-row {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr) auto;
+  gap: .5rem;
+  align-items: center;
+}
+
+.link-remove {
+  border: 0;
+  background: none;
+  color: var(--p-text-muted-color);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.follow-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: .65rem;
+}
+
+.follow-tabs {
+  display: flex;
+  gap: .3rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+
+.follow-tab {
+  padding: .45rem .5rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--p-text-muted-color);
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+}
+
+.follow-tab.is-active {
+  border-bottom-color: var(--p-primary-color);
+  color: var(--p-text-color);
+}
+
+.follow-tab span {
+  margin-left: .25rem;
+  font-size: .72rem;
+}
+
+.follow-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.follow-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem 0;
+  border-top: 1px solid var(--p-content-border-color);
+}
+
+.follow-person {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: .55rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.follow-person-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.follow-name {
+  font-size: .85rem;
+  font-weight: 500;
+}
+
+.follow-handle {
+  font-size: .72rem;
+  color: var(--p-text-muted-color);
+}
+
+.follow-state {
+  padding: 1rem 0;
+  font-size: .82rem;
+  color: var(--p-text-muted-color);
+}
+
+.follow-more {
+  display: flex;
+  justify-content: center;
+}
+
+.form-error {
+  margin: 0;
+  font-size: .82rem;
+  color: var(--p-red-500, #ef4444);
+}
+
+@media (max-width: 900px) {
+  .profile-card {
+    position: static;
+  }
+
+  .link-row {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
