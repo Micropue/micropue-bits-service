@@ -9,6 +9,10 @@
           <Tag v-if="visibility === 'private'" value="Private" severity="warn" rounded />
           <Tag v-else-if="visibility === 'unlisted'" value="Unlisted" severity="secondary" rounded />
           <Tag v-if="isOwner" value="Your content" severity="secondary" outlined rounded />
+          <Button class="share-button" :label="linkCopied ? 'Copied' : 'Share'" size="small"
+            severity="secondary" outlined @click="shareContent">
+            <template #icon><ShareAlt /></template>
+          </Button>
         </div>
         <p class="content-meta">
           <template v-if="kind === 'snippet'">
@@ -240,6 +244,7 @@ import CodeBranch from '@primeicons/vue/code-branch'
 import Comment from '@primeicons/vue/comment'
 import Copy from '@primeicons/vue/copy'
 import Flag from '@primeicons/vue/flag'
+import ShareAlt from '@primeicons/vue/share-alt'
 import { FEEDBACK_TYPES, moderationTypeLabel } from '#shared/utils/moderation'
 
 // 公开内容页 /{username}/{slug}：同一命名空间下渲染代码段或分组
@@ -459,6 +464,29 @@ function formatDate(value: string) {
   return value ? new Date(value).toLocaleDateString('en', { dateStyle: 'medium' }) : '—'
 }
 
+const linkCopied = ref(false)
+let shareTimer: ReturnType<typeof setTimeout> | null = null
+
+async function shareContent() {
+  const contentSlug = snippet.value?.slug ?? group.value?.slug
+  if (!contentSlug) return
+  const url = `${window.location.origin}/${encodeURIComponent(author.value.username)}/${encodeURIComponent(contentSlug)}`
+  try {
+    await navigator.clipboard.writeText(url)
+    linkCopied.value = true
+    if (shareTimer) clearTimeout(shareTimer)
+    shareTimer = setTimeout(() => { linkCopied.value = false }, 2000)
+    toast.add({
+      severity: 'success',
+      summary: 'Link copied',
+      detail: visibility.value === 'private' ? 'Only you can open this private link.' : url,
+      life: 3000
+    })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Could not copy the link', life: 4000 })
+  }
+}
+
 const copied = ref(false)
 let copyTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -545,6 +573,7 @@ async function forkGroup() {
 
 onBeforeUnmount(() => {
   if (copyTimer) clearTimeout(copyTimer)
+  if (shareTimer) clearTimeout(shareTimer)
 })
 
 useHead({
@@ -584,6 +613,16 @@ useHead({
   letter-spacing: -0.02em;
   line-height: 1.2;
   word-break: break-word;
+}
+
+.share-button {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
+
+  :deep(.p-button-label) {
+    white-space: nowrap;
+  }
 }
 
 .content-meta {

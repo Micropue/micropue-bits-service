@@ -304,6 +304,8 @@ export const DOC_CHAPTERS: DocChapter[] = [
     },
     blocks: {
       en: [
+        { type: 'h', text: 'Share' },
+        { type: 'p', text: 'Use Share on a snippet or group page to copy its direct link. Public and unlisted links open for anyone with the link; private links open only for the owner.' },
         { type: 'h', text: 'Copy' },
         { type: 'p', text: 'Use Copy on a snippet to put the code on your clipboard. Copies are counted at most once per hour per visitor and snippet.' },
         { type: 'h', text: 'Fork a snippet' },
@@ -313,6 +315,8 @@ export const DOC_CHAPTERS: DocChapter[] = [
         { type: 'note', text: 'You must be signed in with a username to fork.' }
       ],
       zh: [
+        { type: 'h', text: '分享' },
+        { type: 'p', text: '在代码段或分组页面点击 Share，即可复制该页面的直达链接。公开和 Unlisted 链接任何人都能打开；私有内容只有作者本人能打开。' },
         { type: 'h', text: '拷贝' },
         { type: 'p', text: '在代码段页面点击 Copy 把代码复制到剪贴板。同一访客对同一代码段每小时最多计一次拷贝。' },
         { type: 'h', text: 'Fork 代码段' },

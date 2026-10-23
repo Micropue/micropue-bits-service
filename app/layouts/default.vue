@@ -31,7 +31,10 @@
                             <span class="auth-name">{{ authUser.nickname }}</span>
                             <ArrowUpRight class="auth-arrow" aria-hidden="true" />
                         </template>
-                        <template v-else>Log In / Sign Up</template>
+                        <template v-else>
+                            <span class="auth-label-full">Log In / Sign Up</span>
+                            <span class="auth-label-short">Log In</span>
+                        </template>
                     </NuxtLink>
                 </Button>
             </div>
@@ -102,7 +105,9 @@ header {
     align-items: center;
 
     .header-brand {
+        flex: none;
         font-size: 2.4em;
+        white-space: nowrap;
     }
 
     nav {
@@ -183,6 +188,16 @@ header {
                 }
             }
 
+            .auth-button {
+                flex: none;
+                min-height: 36px;
+                white-space: nowrap;
+            }
+
+            .auth-label-short {
+                display: none;
+            }
+
             .auth-button--account {
                 display: inline-flex;
                 align-items: center;
@@ -206,6 +221,8 @@ header {
 
             .github-link {
                 width: fit-content;
+                min-height: 36px;
+                white-space: nowrap;
 
                 svg {
                     width: 1.5em !important;
@@ -230,7 +247,7 @@ header {
     }
 
     /* 窄屏：指令 / 文档入口只留图标，并做成正圆；账户入口只留头像与箭头 */
-    @media screen and (max-width: 700px) {
+    @media screen and (max-width: 820px) {
         .nav-actions .command-trigger-label,
         .nav-actions .docs-trigger-label {
             display: none;
@@ -249,9 +266,27 @@ header {
         }
     }
 
+    @media screen and (max-width: 360px) {
+        .header-brand {
+            font-size: 1.5em;
+        }
+    }
+
     @media screen and (max-width: 560px) {
-        .nav-actions .auth-name {
-            display: none;
+        nav .nav-actions {
+            gap: 0.5rem;
+
+            .auth-name {
+                display: none;
+            }
+
+            .auth-label-full {
+                display: none;
+            }
+
+            .auth-label-short {
+                display: inline;
+            }
         }
     }
 }

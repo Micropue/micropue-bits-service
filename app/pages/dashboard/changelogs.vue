@@ -176,6 +176,31 @@ useHead({
   display: flex;
   flex-direction: column;
   gap: 1rem;
+
+  // Dialog 会 teleport 到 body，控制台布局里 .console 作用域的 .dash-row 覆盖不到
+  .dash-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+  }
+
+  .dash-row-main {
+    min-width: 0;
+  }
+
+  .dash-row-label {
+    display: block;
+    font-size: 0.92rem;
+    font-weight: 500;
+  }
+
+  .dash-row-desc {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+    color: var(--p-text-muted-color);
+  }
 }
 
 .field {
