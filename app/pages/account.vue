@@ -57,18 +57,19 @@ if (data.value?.user) {
   await navigateTo('/sign')
 }
 
-// 旧的账户设置子页面统一迁移到个人主页导航
-const profileSectionRedirects: Record<string, string> = {
-  '/account/favorites': 'favorites',
-  '/account/activity': 'feedback',
-  '/account/requests': 'requests'
-}
-const section = profileSectionRedirects[route.path]
-if (section) {
+// 旧的账户设置子页面统一迁移到个人主页 Tab
+const legacyTab = route.path === '/account/favorites'
+  ? 'favorites'
+  : route.path === '/account/requests'
+    ? 'requests'
+    : route.path === '/account/activity'
+      ? (route.query.tab === 'reports' ? 'reports' : 'feedback')
+      : ''
+if (legacyTab) {
   const target = authUser.value?.usernameSet
-    ? `/${authUser.value.username}/${section}`
-    : '/account/profile'
-  await navigateTo({ path: target, query: route.query }, { replace: true })
+    ? { path: `/${authUser.value.username}`, query: { tab: legacyTab } }
+    : { path: '/account/profile', query: {} }
+  await navigateTo(target, { replace: true })
 }
 
 interface NavItem {

@@ -50,12 +50,21 @@
     <div class="profile-actions">
       <template v-if="profile.isOwner">
         <div class="action-grid">
-          <Button label="New snippet" size="small" fluid @click="navigateTo('/new')" />
-          <Button label="New group" size="small" severity="secondary" outlined fluid @click="openGroupCreate" />
+          <Button label="New snippet" size="small" fluid @click="navigateTo('/new')">
+            <template #icon><Plus /></template>
+          </Button>
+          <Button label="New group" size="small" severity="secondary" outlined fluid @click="openGroupCreate">
+            <template #icon><FolderPlus /></template>
+          </Button>
         </div>
         <div class="action-manage">
-          <Button label="Edit profile" size="small" text fluid @click="navigateTo('/account/profile')" />
-          <Button label="Links" size="small" text fluid @click="openLinks" />
+          <Button label="Edit profile" size="small" severity="secondary" outlined fluid
+            @click="navigateTo('/account/profile')">
+            <template #icon><UserEdit /></template>
+          </Button>
+          <Button label="Links" size="small" severity="secondary" outlined fluid @click="openLinks">
+            <template #icon><LinkIcon /></template>
+          </Button>
         </div>
       </template>
       <template v-else>
@@ -147,7 +156,10 @@
 </template>
 
 <script setup lang="ts">
+import FolderPlus from '@primeicons/vue/folder-plus'
 import LinkIcon from '@primeicons/vue/link'
+import Plus from '@primeicons/vue/plus'
+import UserEdit from '@primeicons/vue/user-edit'
 
 interface Profile {
   username: string
@@ -427,6 +439,23 @@ function removeFollow(person: FollowPerson) {
 .profile-actions { display:flex; flex-direction:column; gap:.45rem; margin-top:.5rem; padding-top:.75rem; border-top:1px solid var(--p-content-border-color); }
 .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
 .action-manage { display:grid; grid-template-columns:1fr 1fr; gap:.2rem; }
+
+.action-grid,
+.action-manage {
+  :deep(.p-button) {
+    padding-inline: .45rem;
+    white-space: nowrap;
+  }
+
+  :deep(.p-button-label) {
+    white-space: nowrap;
+  }
+
+  :deep(.p-button-icon) {
+    flex: none;
+    font-size: .85rem;
+  }
+}
 .dialog-hint { margin:0 0 .5rem; font-size:.8rem; color:var(--p-text-muted-color); }
 .dialog-form { display:flex; flex-direction:column; gap:.65rem; }
 .link-row { display:grid; grid-template-columns:10rem minmax(0,1fr) auto; gap:.5rem; align-items:center; }

@@ -5,17 +5,17 @@
       <User aria-hidden="true" />
       Profile
     </NuxtLink>
-    <NuxtLink :to="`/${username}/favorites`" class="profile-nav-link"
+    <NuxtLink :to="{ path: `/${username}`, query: { tab: 'favorites' } }" class="profile-nav-link"
       :class="{ 'is-active': active === 'favorites' }" :aria-current="active === 'favorites' ? 'page' : undefined">
       <Bookmark aria-hidden="true" />
       Favorites
     </NuxtLink>
-    <NuxtLink :to="`/${username}/feedback`" class="profile-nav-link"
+    <NuxtLink :to="{ path: `/${username}`, query: { tab: 'feedback' } }" class="profile-nav-link"
       :class="{ 'is-active': active === 'feedback' }" :aria-current="active === 'feedback' ? 'page' : undefined">
       <Flag aria-hidden="true" />
       Reports &amp; feedback
     </NuxtLink>
-    <NuxtLink :to="`/${username}/requests`" class="profile-nav-link"
+    <NuxtLink :to="{ path: `/${username}`, query: { tab: 'requests' } }" class="profile-nav-link"
       :class="{ 'is-active': active === 'requests' }" :aria-current="active === 'requests' ? 'page' : undefined">
       <Folder aria-hidden="true" />
       Requests

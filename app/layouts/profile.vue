@@ -26,9 +26,10 @@ const isOwner = computed(() =>
 )
 
 const active = computed<'profile' | 'favorites' | 'feedback' | 'requests'>(() => {
-  if (route.path.endsWith('/favorites')) return 'favorites'
-  if (route.path.endsWith('/feedback')) return 'feedback'
-  if (route.path.endsWith('/requests')) return 'requests'
+  const tab = String(route.query.tab ?? '')
+  if (tab === 'favorites') return 'favorites'
+  if (tab === 'feedback' || tab === 'reports') return 'feedback'
+  if (tab === 'requests') return 'requests'
   return 'profile'
 })
 

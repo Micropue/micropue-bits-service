@@ -59,10 +59,10 @@ const COMMANDS: CatalogCommandDef[] = [
   { name: 'me', aliases: ['profile'], kind: 'action', noun: '', to: '/me', description: 'Open your profile' },
   { name: 'followers', aliases: ['fans'], kind: 'action', noun: '', description: 'Open your followers' },
   { name: 'following', aliases: ['follows'], kind: 'action', noun: '', description: 'Open people you follow' },
-  { name: 'favorites', aliases: ['saved', 'bookmarks'], kind: 'action', noun: '', to: '/account/favorites', description: 'Open your favorites' },
-  { name: 'feedback', aliases: ['inbox'], kind: 'action', noun: '', to: '/account/activity?tab=feedback', description: 'Open feedback received' },
-  { name: 'reports', aliases: ['myreports'], kind: 'action', noun: '', to: '/account/activity?tab=reports', description: 'Open your reports' },
-  { name: 'requests', aliases: ['request'], kind: 'action', noun: '', to: '/account/requests', description: 'Open your catalog requests' },
+  { name: 'favorites', aliases: ['saved', 'bookmarks'], kind: 'action', noun: '', description: 'Open your favorites' },
+  { name: 'feedback', aliases: ['inbox'], kind: 'action', noun: '', description: 'Open feedback received' },
+  { name: 'reports', aliases: ['myreports'], kind: 'action', noun: '', description: 'Open your reports' },
+  { name: 'requests', aliases: ['request'], kind: 'action', noun: '', description: 'Open your catalog requests' },
   { name: 'changelog', aliases: ['updates'], kind: 'action', noun: '', to: '/changelog', description: 'Open the changelog' },
   { name: 'docs', aliases: ['help'], kind: 'action', noun: '', to: '/docs', description: 'Open documentation' },
   { name: 'account', aliases: ['settings'], kind: 'action', noun: '', to: '/account', description: 'Open account settings' },
@@ -256,11 +256,11 @@ export function useCatalogCommand(
         go(`/${user.value.username}?dialog=${next.name}`)
         return
       }
-      // 收藏 / 反馈 / 举报 / 目录申请：进入个人主页下的私有子页面
+      // 收藏 / 反馈 / 举报 / 目录申请：进入个人主页的对应 Tab
       const profileSection: Record<string, string> = {
         favorites: 'favorites',
-        feedback: 'feedback?tab=feedback',
-        reports: 'feedback?tab=reports',
+        feedback: 'feedback',
+        reports: 'reports',
         requests: 'requests'
       }
       if (profileSection[next.name]) {
@@ -273,7 +273,7 @@ export function useCatalogCommand(
           go('/account/profile')
           return
         }
-        go(`/${user.value.username}/${profileSection[next.name]}`)
+        go(`/${user.value.username}?tab=${profileSection[next.name]}`)
         return
       }
       if (next.to) go(next.to)

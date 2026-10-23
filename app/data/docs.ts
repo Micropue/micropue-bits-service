@@ -209,6 +209,13 @@ export const DOC_CHAPTERS: DocChapter[] = [
             ['/user', 'Public users'],
             ['/new', 'Create a snippet'],
             ['/me', 'Your profile'],
+            ['/followers', 'Open your followers'],
+            ['/following', 'Open people you follow'],
+            ['/favorites', 'Open your favorites tab'],
+            ['/feedback', 'Open feedback received'],
+            ['/reports', 'Open reports you submitted'],
+            ['/requests', 'Open your catalog requests'],
+            ['/changelog', 'Open the public changelog'],
             ['/go', 'Site pages']
           ]
         },
@@ -233,6 +240,13 @@ export const DOC_CHAPTERS: DocChapter[] = [
             ['/user', '公开用户'],
             ['/new', '新建代码段'],
             ['/me', '自己的主页'],
+            ['/followers', '打开粉丝列表'],
+            ['/following', '打开关注列表'],
+            ['/favorites', '打开收藏 Tab'],
+            ['/feedback', '打开收到的反馈'],
+            ['/reports', '打开我提交的举报'],
+            ['/requests', '打开目录申请'],
+            ['/changelog', '打开公开更新日志'],
             ['/go', '站点页面']
           ]
         },
@@ -257,6 +271,11 @@ export const DOC_CHAPTERS: DocChapter[] = [
         { type: 'p', text: 'Your profile lives at /{username}. It shows your avatar, nickname, bio, links, content counts and your public snippets and groups.' },
         { type: 'h', text: 'Owner view' },
         { type: 'p', text: 'When you are signed in, your profile also shows private and unlisted items with badges, plus New snippet, New group, Edit profile and Links actions. Search and Load more work on both lists.' },
+        { type: 'h', text: 'Profile tabs' },
+        { type: 'p', text: 'The profile has four tabs: Profile, Favorites, Reports & feedback and Requests. The URL stays at /{username}; switch with ?tab=favorites, ?tab=feedback, ?tab=reports or ?tab=requests. The left profile card stays in place while the right side changes.' },
+        { type: 'p', text: 'Favorites lists saved snippets and groups. Reports & feedback contains feedback received on your snippets and reports you submitted. Requests lists your catalog requests. These tabs are private to you and return a 404 for other visitors.' },
+        { type: 'h', text: 'Order and traffic' },
+        { type: 'p', text: 'Owners can pin up to three snippets and three groups; pinned items stay at the top. Use Reorder to drag items into place; the dialog loads 50 items at a time and keeps unloaded items in their existing order. Snippet and group cards show copies, forks and favorites.' },
         { type: 'h', text: 'Followers' },
         { type: 'p', text: 'Visitors can follow you. Click the followers or following number to open the list; the dialog supports search and load more. As the profile owner you can remove a follower or unfollow someone from these lists.' },
         { type: 'note', text: 'Visitors only see public content and community counts.' }
@@ -265,6 +284,11 @@ export const DOC_CHAPTERS: DocChapter[] = [
         { type: 'p', text: '个人主页地址为 /{username}，展示头像、昵称、简介、开放链接、内容统计，以及公开的代码段和分组。' },
         { type: 'h', text: '作者视图' },
         { type: 'p', text: '登录后，自己的主页还会显示私有 / 不可搜索内容及可见性标签，并提供 New snippet、New group、Edit profile、Links 操作；两个列表都支持搜索和 Load more。' },
+        { type: 'h', text: '个人主页 Tab' },
+        { type: 'p', text: '个人主页有四类内容：Profile、Favorites、Reports & feedback 和 Requests。地址仍然是 /{username}，通过 ?tab=favorites、?tab=feedback、?tab=reports 或 ?tab=requests 切换。切换时左侧个人信息保持不变，只更新右侧内容。' },
+        { type: 'p', text: 'Favorites 显示收藏的代码段和分组；Reports & feedback 显示收到的反馈与自己提交的举报；Requests 显示目录申请。这些 Tab 只有本人可以访问，其他用户会看到 404。' },
+        { type: 'h', text: '排序与流量' },
+        { type: 'p', text: '作者最多可以置顶 3 个代码段和 3 个分组，置顶内容始终排在前面。使用 Reorder 拖拽排序，弹窗每次加载 50 条，未加载的条目保持原顺序。代码段与分组卡片会显示 Copy、Fork 和收藏数据。' },
         { type: 'h', text: '关注与粉丝' },
         { type: 'p', text: '访客可以关注你。点击粉丝 / 关注数字打开列表弹窗，支持搜索和加载更多；作者本人可以在列表中移除粉丝或取消关注。' },
         { type: 'note', text: '访客只能看到公开内容和社区统计。' }
@@ -354,7 +378,7 @@ export const DOC_CHAPTERS: DocChapter[] = [
             'Dependencies: name, official website, type and applicable languages.'
           ]
         },
-        { type: 'p', text: 'An administrator reviews the request and completes the catalog fields. Approved entries appear in the catalog and selectors. Check the status in Account → Language & dependency requests.' },
+        { type: 'p', text: 'An administrator reviews the request and completes the catalog fields. Approved entries appear in the catalog and selectors. Check the status in your profile → Requests (/{username}?tab=requests).' },
         { type: 'note', text: 'Requests are rate-limited, and duplicate names are rejected.' }
       ],
       zh: [
@@ -366,8 +390,28 @@ export const DOC_CHAPTERS: DocChapter[] = [
             '依赖：名称、官方网站、类型和适用语言。'
           ]
         },
-        { type: 'p', text: '管理员审核后会补全目录字段；通过后条目会出现在目录与选择器中。可以在 Account → Language & dependency requests 查看状态。' },
+        { type: 'p', text: '管理员审核后会补全目录字段；通过后条目会出现在目录与选择器中。可以在个人主页 → Requests（/{username}?tab=requests）查看状态。' },
         { type: 'note', text: '申请有频率限制，重名条目会被拒绝。' }
+      ]
+    }
+  },
+  {
+    slug: 'changelog',
+    title: { en: 'Changelog', zh: '更新日志' },
+    summary: {
+      en: 'See what changed on Bits, newest first.',
+      zh: '按时间查看 Bits 的更新内容。'
+    },
+    blocks: {
+      en: [
+        { type: 'p', text: 'The public changelog lives at /changelog and is linked from the footer. It is a timeline of published product updates, newest first.' },
+        { type: 'p', text: 'Entries are written and published from the admin console. Drafts stay hidden until they are published; older updates load in batches of 20.' },
+        { type: 'note', text: 'The changelog is for product updates. Bugs and content issues should be reported through the snippet feedback or report tools.' }
+      ],
+      zh: [
+        { type: 'p', text: '公开更新日志位于 /changelog，页脚也有入口；页面以时间线展示已发布的产品更新，最新内容在前。' },
+        { type: 'p', text: '更新日志由控制台编辑和发布。草稿不会出现在公开页面；更早的更新每次加载 20 条。' },
+        { type: 'note', text: '更新日志用于产品更新；代码问题或内容问题请使用代码段反馈或举报功能。' }
       ]
     }
   },

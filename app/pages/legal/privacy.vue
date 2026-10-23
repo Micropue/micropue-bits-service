@@ -1,5 +1,5 @@
 <template>
-  <LegalDoc title="Privacy Policy" effective="October 15, 2026">
+  <LegalDoc title="Privacy Policy" effective="October 23, 2026">
     <h2>1. Who we are</h2>
     <p>
       BITS (<NuxtLink to="/">bits.micropue.com.cn</NuxtLink>) is a community for sharing, reusing and discovering code
@@ -61,7 +61,26 @@
       <li><strong>Withdraw</strong> — you can turn off two-factor authentication, unlink GitHub, remove passkeys or delete the account at any time.</li>
     </ul>
 
-    <h2>8. Security</h2>
+    <h2>8. Community rules and enforcement</h2>
+    <p>
+      BITS is an open-source code sharing community. Content and accounts must not be used for unlawful activity,
+      malware, spam, harassment, hate, impersonation, or copyright infringement. Reports and feedback are reviewed by
+      administrators, and we may take proportionate action when these rules are broken.
+    </p>
+    <ul>
+      <li>remove content, or restrict its visibility and searchability;</li>
+      <li>limit an account's ability to publish, comment, report, or use community features;</li>
+      <li>suspend or permanently terminate accounts for serious or repeated violations;</li>
+      <li>preserve the minimum report, moderation and account records needed to handle appeals, prevent abuse, and meet legal obligations.</li>
+    </ul>
+    <p>
+      Enforcement decisions are made by humans; we do not use automated systems to permanently remove content or
+      terminate accounts. If you believe a decision was made in error, contact
+      <a href="mailto:micropue@micropue.com.cn">micropue@micropue.com.cn</a> with the content or account concerned.
+      Repeated or serious violations may result in permanent removal from the community.
+    </p>
+
+    <h2>9. Security</h2>
     <p>
       Passwords are hashed with scrypt and a per-user salt, authenticator secrets are encrypted at rest, and your
       session is carried in an httpOnly cookie that is only sent over HTTPS in production. You can enable two-factor
@@ -69,20 +88,20 @@
       please use a strong password that you do not reuse elsewhere.
     </p>
 
-    <h2>9. Children</h2>
+    <h2>10. Children</h2>
     <p>
       BITS is not intended for children under 14. If you are under 14, please use BITS only with the consent and
       supervision of a parent or guardian. If we learn that an account was created by a child under 14 without such
       consent, we will remove it.
     </p>
 
-    <h2>10. Changes to this policy</h2>
+    <h2>11. Changes to this policy</h2>
     <p>
       We may update this policy as the service evolves. The effective date at the top will change, and significant
       changes will be announced on the site.
     </p>
 
-    <h2>11. Contact</h2>
+    <h2>12. Contact</h2>
     <p><a href="mailto:micropue@micropue.com.cn">micropue@micropue.com.cn</a></p>
   </LegalDoc>
 </template>

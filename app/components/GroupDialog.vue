@@ -5,6 +5,19 @@
       <label class="field" for="group-name">
         <span>Name</span>
         <InputText id="group-name" v-model="name" name="name" maxlength="60" autocomplete="off" fluid />
+        <small v-if="nameConflict" class="name-warning" role="status">
+          <ExclamationTriangle aria-hidden="true" />
+          <span class="name-warning-text">
+            <template v-if="group?.slug">
+              This name or URL is already used by another snippet or group
+              (<code>{{ nameConflict.existing?.slug }}</code>).
+            </template>
+            <template v-else>
+              This name or URL is already in use
+              (<code>{{ nameConflict.existing?.slug }}</code>). The URL will be adjusted when created.
+            </template>
+          </span>
+        </small>
       </label>
       <label class="field" for="group-intro">
         <span>Description <span class="optional">(optional)</span></span>
@@ -41,6 +54,8 @@
 </template>
 
 <script setup lang="ts">
+import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
+
 // 分组新建 / 编辑弹窗：个人主页与分组详情页共用同一套交互
 interface GroupLike {
   slug: string
@@ -71,6 +86,30 @@ const tags = ref<string[]>([])
 const tagInput = ref('')
 const saving = ref(false)
 const error = ref('')
+const nameConflict = ref<{ existing?: { slug: string } } | null>(null)
+let nameCheckSeq = 0
+
+async function checkName() {
+  const value = name.value.trim()
+  if (!value) {
+    nameConflict.value = null
+    return
+  }
+  const seq = ++nameCheckSeq
+  try {
+    const result = await $fetch<{ available: boolean, existing?: { slug: string } }>(
+      '/api/profile/name-availability',
+      { query: { kind: 'group', name: value, exclude: props.group?.slug ?? '' } }
+    )
+    if (seq !== nameCheckSeq) return
+    nameConflict.value = result.available ? null : result
+  } catch {
+    if (seq === nameCheckSeq) nameConflict.value = null
+  }
+}
+
+const nameCheck = debounce(() => { void checkName() }, 300)
+watch(name, () => { nameConflict.value = null; nameCheck.run() })
 
 watch(visible, open => {
   if (!open) return
@@ -82,6 +121,8 @@ watch(visible, open => {
   tagInput.value = ''
   error.value = ''
   saving.value = false
+  nameConflict.value = null
+  nameCheck.run()
 }, { immediate: true })
 
 const canAddTag = computed(() => {
@@ -207,5 +248,33 @@ async function save() {
   margin: 0;
   font-size: 0.82rem;
   color: var(--p-red-500, #ef4444);
+}
+
+.name-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid color-mix(in srgb, #d97706 42%, transparent);
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, #d97706 9%, transparent);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, #b45309 80%, var(--p-text-color));
+
+  svg {
+    flex: none;
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-top: 0.08rem;
+  }
+
+  code {
+    font-family: var(--font-code);
+  }
+}
+
+.name-warning-text {
+  min-width: 0;
 }
 </style>

@@ -63,8 +63,21 @@
         <div class="field">
           <label class="field-label" for="content-name">Name</label>
           <InputText id="content-name" v-model="name" name="name" maxlength="60" autocomplete="off" fluid
-            placeholder="Debounced ref" />
+            placeholder="e.g. Debounced fetch" />
           <small class="field-hint">URL name: <code>{{ slugPreview }}</code></small>
+          <small v-if="nameConflict" class="name-warning" role="status">
+            <ExclamationTriangle aria-hidden="true" />
+            <span class="name-warning-text">
+              <template v-if="slug">
+                This name or URL is already used by another snippet or group
+                (<code>{{ nameConflict.existing?.slug }}</code>).
+              </template>
+              <template v-else>
+                This name or URL is already in use
+                (<code>{{ nameConflict.existing?.slug }}</code>). The URL will be adjusted when created.
+              </template>
+            </span>
+          </small>
         </div>
 
         <div class="field">
@@ -127,6 +140,8 @@
 </template>
 
 <script setup lang="ts">
+import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
+
 // 代码段表单（新建第 3 步 / 编辑页共用）：语言、依赖、分组、名称、介绍、标签、可见性、代码
 defineOptions({ name: 'ContentForm' })
 
@@ -303,6 +318,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   languageSearch.cancel()
   dependencySearch.cancel()
+  nameCheck.cancel()
 })
 
 const dependencyGroups = computed(() => {
@@ -329,6 +345,37 @@ function slugify(value: string) {
 }
 
 const slugPreview = computed(() => props.slug || slugify(name.value) || 'snippet')
+
+interface NameConflict {
+  slug: string
+  reason: 'slug' | 'name'
+  existing?: { slug: string, name: string, kind: string, visibility: string }
+}
+
+const nameConflict = ref<NameConflict | null>(null)
+let nameCheckSeq = 0
+
+async function checkName() {
+  const value = name.value.trim()
+  if (!value) {
+    nameConflict.value = null
+    return
+  }
+  const seq = ++nameCheckSeq
+  try {
+    const result = await $fetch<{ available: boolean } & NameConflict>(
+      '/api/profile/name-availability',
+      { query: { kind: 'snippet', name: value, exclude: props.slug || '' } }
+    )
+    if (seq !== nameCheckSeq) return
+    nameConflict.value = result.available ? null : result
+  } catch {
+    if (seq === nameCheckSeq) nameConflict.value = null
+  }
+}
+
+const nameCheck = debounce(() => { void checkName() }, 300)
+watch(name, () => { nameConflict.value = null; nameCheck.run() })
 
 function hasTag(value: string) {
   return tags.value.some(tag => tag.toLowerCase() === value.toLowerCase())
@@ -425,6 +472,34 @@ function submit() {
 .field-hint {
   font-size: 0.78rem;
   color: var(--p-text-muted-color);
+}
+
+.name-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid color-mix(in srgb, #d97706 42%, transparent);
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, #d97706 9%, transparent);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, #b45309 80%, var(--p-text-color));
+
+  svg {
+    flex: none;
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-top: 0.08rem;
+  }
+
+  code {
+    font-family: var(--font-code);
+  }
+}
+
+.name-warning-text {
+  min-width: 0;
 }
 
 .optional {

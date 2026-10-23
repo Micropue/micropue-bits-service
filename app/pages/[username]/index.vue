@@ -1,5 +1,14 @@
 <template>
-  <div class="profile-content">
+  <template v-if="tab === 'favorites'">
+    <AccountFavoritesPanel />
+  </template>
+  <template v-else-if="tab === 'feedback' || tab === 'reports'">
+    <AccountFeedbackPanel />
+  </template>
+  <template v-else-if="tab === 'requests'">
+    <AccountRequestsPanel />
+  </template>
+  <div v-else class="profile-content">
         <section class="content-section" aria-labelledby="snippets-title">
           <header class="section-head">
             <h2 id="snippets-title" class="section-title">
@@ -131,11 +140,15 @@
 <script setup lang="ts">
 definePageMeta({
   layout: 'profile',
+  middleware: 'profile-tab',
   // 切换用户名时强制重新挂载，避免右侧列表沿用一个用户的数据
   key: route => route.path
 })
 
 import LinkIcon from '@primeicons/vue/link'
+import AccountFavoritesPanel from '../account/favorites.vue'
+import AccountFeedbackPanel from '../account/activity.vue'
+import AccountRequestsPanel from '../account/requests.vue'
 import FolderIcon from '@primeicons/vue/folder'
 import Bookmark from '@primeicons/vue/bookmark'
 import CodeBranch from '@primeicons/vue/code-branch'
@@ -211,6 +224,13 @@ const VISIBILITY_OPTIONS = [
 
 const route = useRoute()
 const username = String(route.params.username ?? '')
+type ProfileTab = 'profile' | 'favorites' | 'feedback' | 'reports' | 'requests'
+const tab = computed<ProfileTab>(() => {
+  const value = String(route.query.tab ?? '')
+  return value === 'favorites' || value === 'feedback' || value === 'reports' || value === 'requests'
+    ? value
+    : 'profile'
+})
 const { user: authUser } = useAuthUser()
 const toast = useToast()
 const confirm = useConfirm()

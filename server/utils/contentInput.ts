@@ -7,9 +7,6 @@ export const MAX_CODE_BYTES = 1024 * 1024
 export const MAX_TAGS = 5
 export const VISIBILITIES = ['public', 'unlisted', 'private'] as const
 
-// 个人主页私有子页面的静态路径，禁止内容 slug 占用
-const RESERVED_CONTENT_SLUGS = new Set(['favorites', 'feedback', 'requests'])
-
 export interface TagInput {
   key: string
   name: string
@@ -57,7 +54,6 @@ export async function nextContentSlug(
   const base = slugifyContentName(name) || 'item'
   for (let attempt = 0; attempt < 50; attempt++) {
     const candidate = attempt === 0 ? base : `${base.slice(0, 36)}-${attempt + 1}`
-    if (RESERVED_CONTENT_SLUGS.has(candidate)) continue
     const [[taken]] = await db.query(
       `SELECT
          (SELECT COUNT(*) FROM \`contents\` WHERE \`owner_uuid\` = ? AND \`slug\` = ?) +
