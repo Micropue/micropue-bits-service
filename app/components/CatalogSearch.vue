@@ -21,6 +21,10 @@
         <CatalogTile v-for="item in results" :key="item.to" :to="item.to" :name="item.name" :logo_url="item.logo_url"
           :note="item.note" />
       </div>
+
+      <NuxtLink v-if="total > results.length" :to="allResultsTo" class="status-link">
+        View all {{ total }} results →
+      </NuxtLink>
     </template>
 
     <!-- 未检索时展示页面自己的清单 -->
@@ -66,6 +70,7 @@ const MIN_INTERVAL_MS = 300
 
 const query = ref('')
 const results = ref<SearchResult[]>([])
+const total = ref(0)
 const loading = ref(false)
 
 const term = computed(() => query.value.trim())
@@ -73,8 +78,13 @@ const searching = computed(() => term.value.length > 0)
 const statusText = computed(() => {
   if (loading.value) return 'Searching…'
   if (!results.value.length) return 'No match'
-  return `${results.value.length} result${results.value.length > 1 ? 's' : ''}`
+  if (total.value > results.value.length) return `Showing ${results.value.length} of ${total.value} results`
+  return `${total.value} result${total.value === 1 ? '' : 's'}`
 })
+const allResultsTo = computed(() => ({
+  path: '/search',
+  query: { q: term.value, ...(props.scope ? { type: props.scope } : {}) }
+}))
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let controller: AbortController | null = null
@@ -92,7 +102,7 @@ async function run(current: string) {
   loading.value = true
 
   try {
-    const res = await $fetch<{ results: ApiResult[] }>('/api/search', {
+    const res = await $fetch<{ results: ApiResult[], total: number }>('/api/search', {
       params: { q: current, scope: props.scope },
       signal: controller.signal
     })
@@ -104,9 +114,11 @@ async function run(current: string) {
       // 语言页结果全是语言，不必再标注类型
       note: props.scope === 'languages' ? '' : (KIND_NOTES[item.kind] ?? item.kind)
     }))
+    total.value = res.total ?? results.value.length
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     results.value = []
+    total.value = 0
   } finally {
     if (current === term.value) loading.value = false
   }
@@ -118,6 +130,7 @@ watch(term, value => {
   if (!value) {
     controller?.abort()
     results.value = []
+    total.value = 0
     loading.value = false
     return
   }
@@ -164,6 +177,18 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 0.85rem;
   color: var(--p-text-muted-color);
+}
+
+.status-link {
+  align-self: flex-start;
+  font-size: 0.82rem;
+  color: var(--p-text-muted-color);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:hover {
+    color: var(--p-text-color);
+  }
 }
 
 .tiles {

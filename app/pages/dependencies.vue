@@ -6,6 +6,14 @@
     </header>
 
     <CatalogSearch placeholder="Search frameworks, libraries, tools and runtimes" scope="dependencies">
+      <nav class="filter-tabs" aria-label="Filter dependencies by type">
+        <button v-for="filter in FILTERS" :key="filter.value" type="button" class="filter-tab"
+          :class="{ 'is-active': activeKind === filter.value }" :aria-pressed="activeKind === filter.value"
+          @click="activeKind = filter.value">
+          {{ filter.label }}
+        </button>
+      </nav>
+
       <!-- 语言（按名称排序，可跳转到该语言介绍页） -->
       <section v-for="group in groups" :key="group.language.slug" class="language-group">
         <SectionRule :label="group.language.name" :to="`/language/${group.language.slug}`" variant="title" />
@@ -19,6 +27,8 @@
           </div>
         </div>
       </section>
+
+      <p v-if="!groups.length" class="filter-empty">No {{ activeKindLabel }} found.</p>
     </CatalogSearch>
   </div>
 </template>
@@ -44,6 +54,15 @@ const { data } = await useFetch<{ entries: EntryItem[] }>('/api/dependencies')
 const byName = (a: { name: string }, b: { name: string }) =>
   a.name.localeCompare(b.name, 'en', { sensitivity: 'base' })
 
+type KindFilter = 'all' | DependencyKind
+const FILTERS: { value: KindFilter, label: string }[] = [
+  { value: 'all', label: 'All' },
+  ...DEPENDENCY_KIND_ORDER.map(kind => ({ value: kind, label: DEPENDENCY_KIND_LABELS[kind].many }))
+]
+const activeKind = ref<KindFilter>('all')
+const activeKindLabel = computed(() =>
+  activeKind.value === 'all' ? 'dependencies' : DEPENDENCY_KIND_LABELS[activeKind.value].many.toLowerCase())
+
 // 语言 → 类型 → 条目（语言按名称排序；条目可适用多种语言，因此在多个语言下各出现一次）
 // 每个「语言 × 类型」由接口截断，超出上限的用 "+N more" 提示
 const groups = computed(() => {
@@ -64,6 +83,7 @@ const groups = computed(() => {
     .map(group => ({
       language: group.language,
       kinds: DEPENDENCY_KIND_ORDER
+        .filter(kind => activeKind.value === 'all' || kind === activeKind.value)
         .filter(kind => group.kinds.has(kind))
         .map(kind => {
           const items = [...group.kinds.get(kind)!].sort(byName)
@@ -76,6 +96,7 @@ const groups = computed(() => {
           }
         })
     }))
+    .filter(group => group.kinds.length > 0)
 })
 
 useHead({ title: 'Dependencies' })
@@ -121,6 +142,42 @@ useSeoMeta({ description: 'Frameworks, libraries, tools and runtimes on BITS, gr
   font-size: clamp(1.8rem, 4vw, 2.4rem);
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 0.2rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.filter-tab {
+  padding: 0.55rem 0.75rem 0.5rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  font: inherit;
+  font-size: 0.86rem;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--p-text-color);
+  }
+
+  &.is-active {
+    border-bottom-color: var(--p-primary-color);
+    color: var(--p-text-color);
+    font-weight: 600;
+  }
+}
+
+.filter-empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--p-text-muted-color);
 }
 
 .language-group {

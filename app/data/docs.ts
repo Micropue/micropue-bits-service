@@ -216,9 +216,11 @@ export const DOC_CHAPTERS: DocChapter[] = [
             ['/reports', 'Open reports you submitted'],
             ['/requests', 'Open your catalog requests'],
             ['/changelog', 'Open the public changelog'],
-            ['/go', 'Site pages']
+            ['/go', 'Site pages'],
+            ['/search', 'Search all public content (keywords allowed)']
           ]
         },
+        { type: 'p', text: 'The command box shows a quick first page of matches. Choose “View all results” or use /search with keywords to open the full search page with pagination.' },
         { type: 'h', text: 'Keywords' },
         { type: 'p', text: 'After /snippet or /group, separate keywords with spaces. All keywords must match; snippets are searched by title, description, tags, language and dependencies.' },
         { type: 'code', text: '/snippet vue primevue theme' },
@@ -247,9 +249,11 @@ export const DOC_CHAPTERS: DocChapter[] = [
             ['/reports', '打开我提交的举报'],
             ['/requests', '打开目录申请'],
             ['/changelog', '打开公开更新日志'],
-            ['/go', '站点页面']
+            ['/go', '站点页面'],
+            ['/search', '搜索全部公开内容（支持关键词）']
           ]
         },
+        { type: 'p', text: '指令框只显示第一页快速结果；选择“View all results”，或在 /search 后输入关键词，会打开带翻页的完整搜索页。' },
         { type: 'h', text: '关键词' },
         { type: 'p', text: '在 /snippet 或 /group 后面用空格分隔多个关键词，所有关键词都要命中；代码段会检索名称、介绍、标签、语言和依赖。' },
         { type: 'code', text: '/snippet vue primevue theme' },

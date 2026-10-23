@@ -12,7 +12,7 @@ export interface CatalogCommandDef {
   name: string
   aliases: string[]
   kind: 'language' | 'framework' | 'library' | 'tool' | 'runtime' | 'all' | 'pages' | 'action'
-    | 'users' | 'snippets' | 'groups'
+    | 'users' | 'snippets' | 'groups' | 'search'
   noun: string
   description: string
   /** 仅 action：选中后直接跳转（/me 由代码按当前账户解析） */
@@ -35,14 +35,20 @@ interface SitePage {
 
 const SITE_PAGES: SitePage[] = [
   { name: 'Home', to: '/', keywords: 'index start' },
+  { name: 'Search', to: '/search', keywords: 'find search query' },
+  { name: 'New snippet', to: '/new', keywords: 'create new snippet' },
   { name: 'Docs', to: '/docs', keywords: 'documentation help guide usage' },
   { name: 'Changelog', to: '/changelog', keywords: 'updates release notes what is new' },
   { name: 'Languages', to: '/languages', keywords: 'language catalog' },
   { name: 'Dependencies', to: '/dependencies', keywords: 'framework library tool runtime catalog' },
   { name: 'Submit an entry', to: '/request', keywords: 'request submit language dependency' },
   { name: 'Account', to: '/account', keywords: 'profile me settings' },
+  { name: 'Account profile', to: '/account/profile', keywords: 'profile username nickname avatar' },
   { name: 'Login security', to: '/account/security', keywords: 'security password passkey github devices two-factor' },
-  { name: 'Sign in', to: '/sign', keywords: 'login signup' }
+  { name: 'Sign in', to: '/sign', keywords: 'login signup' },
+  { name: 'Privacy policy', to: '/legal/privacy', keywords: 'legal privacy' },
+  { name: 'Terms of service', to: '/legal/terms', keywords: 'legal terms' },
+  { name: 'Cookie policy', to: '/legal/cookies', keywords: 'legal cookies' }
 ]
 
 const COMMANDS: CatalogCommandDef[] = [
@@ -67,7 +73,8 @@ const COMMANDS: CatalogCommandDef[] = [
   { name: 'docs', aliases: ['help'], kind: 'action', noun: '', to: '/docs', description: 'Open documentation' },
   { name: 'account', aliases: ['settings'], kind: 'action', noun: '', to: '/account', description: 'Open account settings' },
   { name: 'security', aliases: ['2fa', 'passkey'], kind: 'action', noun: '', to: '/account/security', description: 'Open login security' },
-  { name: 'go', aliases: ['page'], kind: 'pages', noun: 'pages', description: 'Jump to a page' }
+  { name: 'go', aliases: ['page'], kind: 'pages', noun: 'pages', description: 'Jump to a page' },
+  { name: 'search', aliases: ['find'], kind: 'search', noun: 'search', description: 'Search all public content' }
 ]
 
 const KIND_LABELS: Record<string, string> = {
@@ -80,7 +87,8 @@ const KIND_LABELS: Record<string, string> = {
   page: 'Page',
   user: 'User',
   snippet: 'Snippet',
-  group: 'Group'
+  group: 'Group',
+  more: 'All'
 }
 
 export function catalogKindLabel(kind: string) {
@@ -108,6 +116,20 @@ function matchPages(query: string): CatalogLookupItem[] {
   return SITE_PAGES
     .filter(page => !q || page.name.toLowerCase().includes(q) || page.keywords.includes(q))
     .map(page => ({ name: page.name, kind: 'page', to: page.to }))
+}
+
+// 命令面板只展示第一页；完整结果统一去 /search，保持面板轻量且支持键盘
+function allResultsUrl(kind: string, query: string): string {
+  const params = new URLSearchParams({ q: query })
+  if (kind === 'language') {
+    params.set('type', 'languages')
+  } else if (kind === 'users' || kind === 'snippets' || kind === 'groups') {
+    params.set('type', kind)
+  } else {
+    params.set('type', 'dependencies')
+    if (kind !== 'all') params.set('kind', kind)
+  }
+  return `/search?${params.toString()}`
 }
 
 interface CatalogCommandOptions {
@@ -156,14 +178,21 @@ export function useCatalogCommand(
       resultsLoading.value = false
       return
     }
+    if (current.kind === 'search') {
+      results.value = []
+      resultsLoading.value = false
+      return
+    }
     if (current.kind === 'users' || current.kind === 'snippets' || current.kind === 'groups') {
       const seq = ++lookupSeq
       resultsLoading.value = true
       lookupTimer = setTimeout(async () => {
         try {
           if (current.kind === 'users') {
-            const data = await $fetch<{ users: { username: string, nickname: string, avatarUrl: string | null }[] }>(
-              '/api/users/search', { query: { q: query } })
+            const data = await $fetch<{
+              users: { username: string, nickname: string, avatarUrl: string | null }[]
+              total: number
+            }>('/api/users/search', { query: { q: query } })
             if (seq === lookupSeq) {
               results.value = data.users.map(user => ({
                 name: user.nickname || user.username,
@@ -172,10 +201,19 @@ export function useCatalogCommand(
                 logo_url: user.avatarUrl,
                 subtitle: `@${user.username}`
               }))
+              if (query.trim() && data.total > data.users.length) {
+                results.value.push({
+                  name: `View all ${data.total} results`,
+                  to: allResultsUrl('users', query),
+                  kind: 'more',
+                  subtitle: 'Open the full search page'
+                })
+              }
             }
           } else if (current.kind === 'snippets') {
             const data = await $fetch<{
               snippets: { slug: string, name: string, author: { username: string }, logoUrl: string | null }[]
+              total: number
             }>('/api/snippets/search', { query: { q: query } })
             if (seq === lookupSeq) {
               results.value = data.snippets.map(snippet => ({
@@ -185,10 +223,19 @@ export function useCatalogCommand(
                 logo_url: snippet.logoUrl,
                 subtitle: `@${snippet.author.username}`
               }))
+              if (query.trim() && data.total > data.snippets.length) {
+                results.value.push({
+                  name: `View all ${data.total} results`,
+                  to: allResultsUrl('snippets', query),
+                  kind: 'more',
+                  subtitle: 'Open the full search page'
+                })
+              }
             }
           } else {
             const data = await $fetch<{
               groups: { slug: string, name: string, author: { username: string }, snippetCount: number }[]
+              total: number
             }>('/api/groups/search', { query: { q: query } })
             if (seq === lookupSeq) {
               results.value = data.groups.map(group => ({
@@ -197,6 +244,14 @@ export function useCatalogCommand(
                 kind: 'group',
                 subtitle: `@${group.author.username} · ${group.snippetCount}`
               }))
+              if (query.trim() && data.total > data.groups.length) {
+                results.value.push({
+                  name: `View all ${data.total} results`,
+                  to: allResultsUrl('groups', query),
+                  kind: 'more',
+                  subtitle: 'Open the full search page'
+                })
+              }
             }
           }
         } catch {
@@ -211,10 +266,20 @@ export function useCatalogCommand(
     resultsLoading.value = true
     lookupTimer = setTimeout(async () => {
       try {
-        const data = await $fetch<{ items: CatalogLookupItem[] }>('/api/catalog/lookup', {
+        const data = await $fetch<{ items: CatalogLookupItem[], total: number }>('/api/catalog/lookup', {
           query: { kind: current.kind, q: query }
         })
-        if (seq === lookupSeq) results.value = data.items
+        if (seq === lookupSeq) {
+          results.value = data.items
+          if (query.trim() && data.total > data.items.length) {
+            results.value.push({
+              name: `View all ${data.total} results`,
+              to: allResultsUrl(current.kind, query),
+              kind: 'more',
+              subtitle: 'Open the full search page'
+            })
+          }
+        }
       } catch {
         if (seq === lookupSeq) results.value = []
       } finally {
@@ -226,11 +291,19 @@ export function useCatalogCommand(
   const activeIndex = ref(0)
   const activeList = computed(() => (command.value ? results.value : commandMatches.value))
   watch([mode, text], () => { activeIndex.value = 0 })
+  watch(() => activeList.value.length, length => {
+    if (activeIndex.value >= length) activeIndex.value = Math.max(length - 1, 0)
+  })
   watch(activeIndex, index => {
     nextTick(() => document.getElementById(`${listId}-${index}`)?.scrollIntoView({ block: 'nearest' }))
   })
 
   const emptyText = computed(() => {
+    if (command.value?.kind === 'search') {
+      return text.value.trim()
+        ? `Press Enter to search for “${text.value.trim()}”`
+        : 'Type keywords and press Enter'
+    }
     const noun = command.value?.noun ?? 'entries'
     return `No ${noun} found${text.value.trim() ? ` for “${text.value.trim()}”` : ''}`
   })
@@ -335,6 +408,11 @@ export function useCatalogCommand(
 
   function choose() {
     if (command.value) {
+      if (command.value.kind === 'search') {
+        const q = text.value.trim()
+        go(q ? `/search?q=${encodeURIComponent(q)}` : '/search')
+        return
+      }
       const item = results.value[activeIndex.value]
       if (item) go(item.to)
       return

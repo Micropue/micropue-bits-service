@@ -68,6 +68,7 @@ const entries = computed(() => [
   { to: '/new', name: 'New snippet' },
   { to: profileLink.value, name: 'My profile' },
   { to: groupsLink.value, name: 'Groups' },
+  { to: '/search', name: 'Search' },
   { to: '/docs', name: 'Docs' },
   { to: '/changelog', name: 'Changelog' },
   { to: '/account', name: 'Account' },
