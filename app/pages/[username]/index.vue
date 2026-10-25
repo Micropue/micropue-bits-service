@@ -9,6 +9,8 @@
     <AccountRequestsPanel />
   </template>
   <div v-else class="profile-content">
+        <ContributionCalendar :username="username" />
+
         <section class="content-section" aria-labelledby="snippets-title">
           <header class="section-head">
             <h2 id="snippets-title" class="section-title">

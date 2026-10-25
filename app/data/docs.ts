@@ -273,6 +273,7 @@ export const DOC_CHAPTERS: DocChapter[] = [
     blocks: {
       en: [
         { type: 'p', text: 'Your profile lives at /{username}. It shows your avatar, nickname, bio, links, content counts and your public snippets and groups.' },
+        { type: 'p', text: 'The contribution calendar summarizes the last year of activity. Creating a snippet, creating a group and submitting feedback each add one contribution. Only daily counts are public; content titles and feedback details are not shown. Switch between 2D, 3D and Both views; your choice is remembered on this device. The summary also shows total, this week, best day, average, longest streak and current streak.' },
         { type: 'h', text: 'Owner view' },
         { type: 'p', text: 'When you are signed in, your profile also shows private and unlisted items with badges, plus New snippet, New group, Edit profile and Links actions. Search and Load more work on both lists.' },
         { type: 'h', text: 'Profile tabs' },
@@ -286,6 +287,7 @@ export const DOC_CHAPTERS: DocChapter[] = [
       ],
       zh: [
         { type: 'p', text: '个人主页地址为 /{username}，展示头像、昵称、简介、开放链接、内容统计，以及公开的代码段和分组。' },
+        { type: 'p', text: '贡献日历展示最近一年的活跃度。创建代码段、创建分组和提交反馈各计 1 次贡献；公开的只有每日数量，不展示内容标题或反馈内容。支持 2D、3D、Both 三种视图，并会记住当前设备上的选择；同时显示总数、本周、最佳单日、平均、最长连续和当前连续贡献。' },
         { type: 'h', text: '作者视图' },
         { type: 'p', text: '登录后，自己的主页还会显示私有 / 不可搜索内容及可见性标签，并提供 New snippet、New group、Edit profile、Links 操作；两个列表都支持搜索和 Load more。' },
         { type: 'h', text: '个人主页 Tab' },
