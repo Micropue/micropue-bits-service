@@ -64,13 +64,14 @@
   </div>
 
   <!-- 写邮件 -->
-  <Dialog v-model:visible="composerVisible" modal :draggable="false"
+  <Dialog v-model:visible="composerVisible" modal :draggable="false" :closable="!sending" :close-on-escape="!sending"
     :style="{ width: '58rem', maxWidth: '94vw' }" :header="editingSid ? t('email.editDraft') : t('email.compose')">
     <div class="compose">
       <div class="compose-from">
         <span class="compose-label">{{ t('email.from') }}</span>
         <span class="compose-from-value">{{ fromEmail || t('email.notConfigured') }}</span>
       </div>
+      <p class="compose-private-note">{{ t('email.privateNote') }}</p>
 
       <div v-for="field in RECIPIENT_FIELDS" :key="field" class="compose-recipient">
         <span class="compose-label">{{ t(`email.${field}`) }}</span>
@@ -78,9 +79,9 @@
           <span v-for="email in draft[field]" :key="email" class="recipient-chip">
             {{ email }}
             <button type="button" class="recipient-chip-remove" :aria-label="`Remove ${email}`"
-              @click="removeRecipient(field, email)">×</button>
+              :disabled="sending" @click="removeRecipient(field, email)">×</button>
           </span>
-          <button type="button" class="recipient-add" @click="openPicker(field)">
+          <button type="button" class="recipient-add" :disabled="sending" @click="openPicker(field)">
             + {{ t('email.addRecipients') }}
           </button>
         </div>
@@ -88,18 +89,32 @@
 
       <label class="compose-field" for="email-subject">
         <span class="compose-label">{{ t('email.subject') }}</span>
-        <InputText id="email-subject" v-model="draft.subject" maxlength="200" autocomplete="off" fluid />
+        <InputText id="email-subject" v-model="draft.subject" maxlength="200" autocomplete="off" :disabled="sending" fluid />
       </label>
 
       <div class="compose-body">
         <div class="compose-body-head">
           <span class="compose-label">{{ t('email.body') }}</span>
           <Button :label="preview ? t('email.write') : t('email.preview')" size="small" text severity="secondary"
-            @click="preview = !preview" />
+            :disabled="sending" @click="preview = !preview" />
         </div>
         <div v-if="preview" class="email-preview">{{ draft.body || t('email.emptyBody') }}</div>
-        <Textarea v-else v-model="draft.body" rows="12" maxlength="100000" auto-resize fluid
+        <Textarea v-else v-model="draft.body" rows="12" maxlength="100000" auto-resize :disabled="sending" fluid
           :placeholder="t('email.bodyPlaceholder')" />
+      </div>
+
+      <div v-if="sendProgress" class="send-progress" role="status" aria-live="polite">
+        <div class="send-progress-head">
+          <span>{{ t('email.sending', { done: sendProgress.sent + sendProgress.failed, total: sendProgress.total }) }}</span>
+          <span>{{ sendPercent }}%</span>
+        </div>
+        <ProgressBar :value="sendPercent" :show-value="false" />
+        <small v-if="sendProgress.current" class="send-progress-current">
+          {{ t('email.sendingTo', { email: sendProgress.current }) }}
+        </small>
+        <small v-if="sendProgress.failed" class="send-progress-failed">
+          {{ t('email.sendFailedCount', { count: sendProgress.failed }) }}
+        </small>
       </div>
 
       <p v-if="composerError" class="compose-error" role="alert">{{ composerError }}</p>
@@ -109,10 +124,12 @@
       <div class="compose-footer">
         <span class="compose-hint">{{ t('email.recipientLimit', { count: recipientCount }) }}</span>
         <div class="compose-footer-actions">
-          <Button :label="t('common.cancel')" severity="secondary" text @click="composerVisible = false" />
+          <Button :label="t('common.cancel')" severity="secondary" text :disabled="sending"
+            @click="composerVisible = false" />
           <Button :label="t('email.saveDraft')" severity="secondary" outlined :loading="savingDraft"
             :disabled="sending || !canSaveDraft" @click="submit('draft')" />
-          <Button :label="t('email.send')" :loading="sending" :disabled="savingDraft || !canSend" @click="submit('send')">
+          <Button :label="t('email.send')" :loading="sending"
+            :disabled="sending || savingDraft || !canSend" @click="submit('send')">
             <template #icon><Send /></template>
           </Button>
         </div>
@@ -249,6 +266,12 @@ const pickerField = ref<RecipientField>('to')
 const recipientCount = computed(() => draft.value.to.length + draft.value.cc.length + draft.value.bcc.length)
 const canSaveDraft = computed(() => !!(draft.value.subject.trim() || draft.value.body.trim()))
 const canSend = computed(() => !!(draft.value.to.length && draft.value.subject.trim() && draft.value.body.trim()))
+const sendProgress = ref<{ total: number, sent: number, failed: number, current: string } | null>(null)
+const sendPercent = computed(() => {
+  const progress = sendProgress.value
+  if (!progress?.total) return 0
+  return Math.round(((progress.sent + progress.failed) / progress.total) * 100)
+})
 
 const pickerTitle = computed(() => `${t('email.addRecipients')} · ${t(`email.${pickerField.value}`)}`)
 const pickerSelected = computed(() => draft.value[pickerField.value])
@@ -271,6 +294,7 @@ function openCompose() {
   draft.value = { subject: '', body: '', to: [], cc: [], bcc: [] }
   preview.value = false
   composerError.value = ''
+  sendProgress.value = null
   composerVisible.value = true
 }
 
@@ -287,6 +311,7 @@ async function openEdit(row: EmailRow) {
     }
     preview.value = false
     composerError.value = ''
+    sendProgress.value = null
     composerVisible.value = true
   } catch (err) {
     toast.add({ severity: 'error', summary: (err as { statusMessage?: string }).statusMessage ?? t('common.tryAgain'), life: 5000 })
@@ -306,22 +331,85 @@ function removeRecipient(field: RecipientField, email: string) {
   draft.value[field] = draft.value[field].filter(item => item !== email)
 }
 
+async function saveDraftRecord() {
+  const body = { ...draft.value, action: 'draft' }
+  const response = editingSid.value
+    ? await $fetch<{ email: EmailRow }>(`/api/dashboard/emails/${encodeURIComponent(editingSid.value)}`, { method: 'PATCH', body })
+    : await $fetch<{ email: EmailRow }>('/api/dashboard/emails', { method: 'POST', body })
+  editingSid.value = response.email.sid
+  return response.email
+}
+
+async function sendIndividually() {
+  const saved = await saveDraftRecord()
+  const recipients = [...new Set([...draft.value.to, ...draft.value.cc, ...draft.value.bcc])]
+  if (!recipients.length) throw new Error('No recipients')
+
+  sendProgress.value = { total: recipients.length, sent: 0, failed: 0, current: '' }
+  let failed = 0
+  let firstError = ''
+
+  for (const email of recipients) {
+    if (!sendProgress.value) break
+    sendProgress.value.current = email
+    try {
+      const result = await $fetch<{ ok: boolean, error?: string }>(
+        `/api/dashboard/emails/${encodeURIComponent(saved.sid)}/send`,
+        { method: 'POST', body: { email } }
+      )
+      if (result.ok) {
+        if (sendProgress.value) sendProgress.value.sent += 1
+      } else {
+        failed += 1
+        if (!firstError) firstError = result.error ?? ''
+        if (sendProgress.value) sendProgress.value.failed += 1
+      }
+    } catch (err) {
+      failed += 1
+      if (!firstError) firstError = (err as { statusMessage?: string }).statusMessage ?? ''
+      if (sendProgress.value) sendProgress.value.failed += 1
+    }
+  }
+
+  await $fetch<{ email: EmailRow }>(
+    `/api/dashboard/emails/${encodeURIComponent(saved.sid)}/complete`,
+    { method: 'POST', body: { failed, error: firstError } }
+  )
+  composerVisible.value = false
+  sendProgress.value = null
+  await refresh()
+
+  if (failed === recipients.length) {
+    toast.add({ severity: 'error', summary: t('toast.emailSendFailed'), detail: t('email.sendFailedCount', { count: failed }), life: 5000 })
+  } else if (failed) {
+    toast.add({ severity: 'warn', summary: t('toast.emailSentPartial', { count: failed }), life: 5000 })
+  } else {
+    toast.add({ severity: 'success', summary: t('toast.emailSent'), detail: `${recipients.length}`, life: 3000 })
+  }
+}
+
 async function submit(action: 'draft' | 'send') {
   if (sending.value || savingDraft.value) return
   if (action === 'send') sending.value = true
   else savingDraft.value = true
   composerError.value = ''
+
   try {
-    const body = { ...draft.value, action }
+    if (action === 'send') {
+      await sendIndividually()
+      return
+    }
+
+    const body = { ...draft.value, action: 'draft' }
     const response = editingSid.value
       ? await $fetch<{ email: EmailRow }>(`/api/dashboard/emails/${encodeURIComponent(editingSid.value)}`, { method: 'PATCH', body })
       : await $fetch<{ email: EmailRow }>('/api/dashboard/emails', { method: 'POST', body })
+    editingSid.value = response.email.sid
     composerVisible.value = false
     await refresh()
     toast.add({
       severity: 'success',
-      summary: action === 'send' ? t('toast.emailSent') : t('toast.emailDraftSaved'),
-      detail: action === 'send' ? `${response.email.recipientCount}` : undefined,
+      summary: t('toast.emailDraftSaved'),
       life: 3000
     })
   } catch (err) {
@@ -434,6 +522,46 @@ useHead({
   font-size: 0.85rem;
 }
 
+.compose-private-note {
+  margin: -0.25rem 0 0 5.15rem;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--p-text-muted-color);
+}
+
+.send-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--p-text-color) 3%, transparent);
+}
+
+.send-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.send-progress :deep(.p-progressbar) {
+  height: 0.4rem;
+}
+
+.send-progress-current,
+.send-progress-failed {
+  font-size: 0.72rem;
+  color: var(--p-text-muted-color);
+}
+
+.send-progress-failed {
+  color: var(--p-red-500, #ef4444);
+}
+
 .recipient-chips {
   display: flex;
   flex-wrap: wrap;
@@ -469,6 +597,11 @@ useHead({
   &:hover {
     opacity: 1;
   }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
 }
 
 .recipient-add {
@@ -486,6 +619,11 @@ useHead({
   &:hover {
     border-color: var(--p-primary-color);
     color: var(--p-primary-color);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 }
 
@@ -612,6 +750,10 @@ useHead({
 
   .compose-label {
     padding-top: 0;
+  }
+
+  .compose-private-note {
+    margin-left: 0;
   }
 
   .compose-footer {

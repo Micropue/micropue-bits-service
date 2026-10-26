@@ -32,8 +32,11 @@ export default defineEventHandler(async event => {
 
   const path = (event.path || '').split('?')[0] || ''
 
+  // 逐个收件人发送时会有多次请求；由 endpoint 内的收件人额度控制，避免被整批写接口额度提前截断
+  const isRecipientSend = method === 'POST' && /^\/api\/dashboard\/emails\/[^/]+\/send$/.test(path)
+
   // 管理端所有写接口加一层粗粒度保护；高风险动作在 endpoint 内还有更严格的限额
-  if (path.startsWith('/api/dashboard/') && method !== 'GET' && method !== 'HEAD') {
+  if (!isRecipientSend && path.startsWith('/api/dashboard/') && method !== 'GET' && method !== 'HEAD') {
     await enforceIpRateLimit(event, 'admin-write', 100, 3600)
     return
   }

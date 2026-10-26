@@ -97,6 +97,13 @@ const loaderDone = useState('loader-done', () => true)
 loaderDone.value = false
 
 useHead({ title: 'Make Your Code Shareable' })
+useSeoMeta({
+  description: 'BITS is a community for sharing, reusing and discovering code snippets.',
+  ogTitle: 'BITS — Make Your Code Shareable',
+  ogDescription: 'Share, reuse and discover code snippets with a public profile, groups and a searchable catalog.',
+  twitterTitle: 'BITS — Make Your Code Shareable',
+  twitterDescription: 'Share, reuse and discover code snippets with a public profile, groups and a searchable catalog.'
+})
 
 const command = ref<CatalogCommandDef | null>(null)
 const text = ref('')

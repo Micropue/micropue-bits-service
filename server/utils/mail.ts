@@ -31,11 +31,9 @@ function textToHtml(text: string) {
   `
 }
 
-// 控制台群发 / 抄送：正文按纯文本保存，发送时生成转义后的 HTML
+// 控制台邮件：一次只发给一个收件人，避免收件人互相看到地址
 export async function sendAdminEmail(options: {
-  to: string[]
-  cc: string[]
-  bcc: string[]
+  to: string
   subject: string
   text: string
 }) {
@@ -44,8 +42,6 @@ export async function sendAdminEmail(options: {
   return await transporter.sendMail({
     from,
     to: options.to,
-    cc: options.cc.length ? options.cc : undefined,
-    bcc: options.bcc.length ? options.bcc : undefined,
     subject: options.subject,
     text: options.text,
     html: textToHtml(options.text)

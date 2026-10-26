@@ -100,7 +100,13 @@ const groups = computed(() => {
 })
 
 useHead({ title: 'Dependencies' })
-useSeoMeta({ description: 'Frameworks, libraries, tools and runtimes on BITS, grouped by language.' })
+useSeoMeta({
+  description: 'Frameworks, libraries, tools and runtimes on BITS, grouped by language.',
+  ogTitle: 'Dependencies on BITS',
+  ogDescription: 'Browse frameworks, libraries, tools and runtimes on BITS, grouped by language.',
+  twitterTitle: 'Dependencies on BITS',
+  twitterDescription: 'Browse frameworks, libraries, tools and runtimes on BITS, grouped by language.'
+})
 </script>
 
 <style lang="scss" scoped>

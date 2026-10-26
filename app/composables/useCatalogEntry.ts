@@ -41,7 +41,13 @@ export const DEPENDENCY_KIND_ORDER: DependencyKind[] = ['framework', 'library', 
 // 必须在页面 setup 里同步调用（useHead 依赖 Nuxt 实例上下文）
 export function useCatalogHead(entry: Ref<CatalogEntryData | null>) {
   useHead({ title: computed(() => entry.value?.name ?? 'Not Found') })
-  useSeoMeta({ description: () => entry.value?.intro })
+  useSeoMeta({
+    description: () => entry.value?.intro,
+    ogTitle: () => entry.value?.name ?? 'Not Found',
+    ogDescription: () => entry.value?.intro,
+    twitterTitle: () => entry.value?.name ?? 'Not Found',
+    twitterDescription: () => entry.value?.intro
+  })
 }
 
 // /{kind}/{slug} 页面取数：目录里不存在、或类型与路径不符，一律按 404 处理

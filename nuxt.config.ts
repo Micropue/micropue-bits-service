@@ -67,6 +67,8 @@ const Noir = definePreset(Aura, {
     }
   }
 })
+const siteUrl = (process.env.NUXT_PUBLIC_SITE_URL || 'https://bits.micropue.com.cn').replace(/\/+$/, '')
+
 export default defineNuxtConfig({
   app: {
     head: {
@@ -76,18 +78,26 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover' },
         { name: 'description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' },
         { name: 'robots', content: 'index, follow' },
+        { name: 'author', content: 'MICROPUE' },
+        { name: 'application-name', content: 'BITS' },
         { name: 'theme-color', content: '#ffffff', media: '(prefers-color-scheme: light)' },
         { name: 'theme-color', content: '#18181b', media: '(prefers-color-scheme: dark)' },
         // Open Graph
         { property: 'og:type', content: 'website' },
         { property: 'og:site_name', content: 'BITS' },
-        { property: 'og:url', content: 'https://bits.micropue.com.cn' },
+        { property: 'og:locale', content: 'en_US' },
         { property: 'og:title', content: 'BITS — Make Your Code Shareable' },
         { property: 'og:description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' },
+        { property: 'og:image', content: `${siteUrl}/og-image.png` },
+        { property: 'og:image:width', content: '1200' },
+        { property: 'og:image:height', content: '630' },
+        { property: 'og:image:alt', content: 'BITS — Make Your Code Shareable' },
         // Twitter
-        { name: 'twitter:card', content: 'summary' },
+        { name: 'twitter:card', content: 'summary_large_image' },
         { name: 'twitter:title', content: 'BITS — Make Your Code Shareable' },
-        { name: 'twitter:description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' }
+        { name: 'twitter:description', content: 'BITS is a community for sharing, reusing and discovering code snippets.' },
+        { name: 'twitter:image', content: `${siteUrl}/og-image.png` },
+        { name: 'twitter:image:alt', content: 'BITS — Make Your Code Shareable' }
       ]
     }
   },

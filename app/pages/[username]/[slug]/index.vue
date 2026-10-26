@@ -586,6 +586,14 @@ useHead({
     }
   ]
 })
+
+useSeoMeta({
+  ogType: 'article',
+  ogTitle: () => (kind.value ? `${title.value} · @${author.value.username}` : 'Content'),
+  ogDescription: () => intro.value || 'A snippet shared on BITS.',
+  twitterTitle: () => (kind.value ? `${title.value} · @${author.value.username}` : 'Content'),
+  twitterDescription: () => intro.value || 'A snippet shared on BITS.'
+})
 </script>
 
 <style scoped lang="scss">

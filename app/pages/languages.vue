@@ -50,7 +50,13 @@ const groups = computed(() => {
 })
 
 useHead({ title: 'Languages' })
-useSeoMeta({ description: 'Every programming language on BITS, with logos and official links.' })
+useSeoMeta({
+  description: 'Every programming language on BITS, with logos and official links.',
+  ogTitle: 'Programming languages on BITS',
+  ogDescription: 'Browse every programming language on BITS, with logos and official links.',
+  twitterTitle: 'Programming languages on BITS',
+  twitterDescription: 'Browse every programming language on BITS, with logos and official links.'
+})
 </script>
 
 <style lang="scss" scoped>

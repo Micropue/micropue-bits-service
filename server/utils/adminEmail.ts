@@ -101,29 +101,46 @@ export async function fetchAdminEmail(sid: string) {
   return rows[0] ? publicAdminEmail(rows[0]) : null
 }
 
-// 调用 SMTP 并回写发送结果；失败也落库，便于控制台排查
+// 所有收件人（To / CC / BCC 合并）；发送时逐个投递，绝不把多个地址放进同一封邮件
+export function adminEmailRecipients(input: AdminEmailInput): string[] {
+  return [...new Set([...input.to, ...input.cc, ...input.bcc])]
+}
+
+// 兼容旧的 action=send 调用：逐个发送并回写汇总结果
 export async function deliverAdminEmail(sid: string, input: AdminEmailInput) {
-  try {
-    const info = await sendAdminEmail({
-      to: input.to,
-      cc: input.cc,
-      bcc: input.bcc,
-      subject: input.subject,
-      text: input.body
-    })
-    await useDb().execute(
-      `UPDATE \`admin_emails\`
-          SET \`status\` = 'sent', \`error\` = '', \`message_id\` = ?, \`sent_at\` = NOW()
-        WHERE \`sid\` = ?`,
-      [info.messageId ?? null, sid]
-    )
-    return { status: 'sent' as const, error: '' }
-  } catch (err) {
-    const message = (err instanceof Error ? err.message : String(err)).slice(0, 1000)
+  const recipients = adminEmailRecipients(input)
+  let firstMessageId: string | null = null
+  let failed = 0
+  let firstError = ''
+
+  for (const recipient of recipients) {
+    try {
+      const info = await sendAdminEmail({
+        to: recipient,
+        subject: input.subject,
+        text: input.body
+      })
+      if (!firstMessageId) firstMessageId = info.messageId ?? null
+    } catch (err) {
+      failed += 1
+      if (!firstError) firstError = (err instanceof Error ? err.message : String(err)).slice(0, 1000)
+    }
+  }
+
+  if (failed) {
+    const message = `${failed}/${recipients.length} recipient(s) failed${firstError ? `: ${firstError}` : ''}`.slice(0, 1000)
     await useDb().execute(
       "UPDATE `admin_emails` SET `status` = 'failed', `error` = ? WHERE `sid` = ?",
       [message, sid]
     )
     return { status: 'failed' as const, error: message }
   }
+
+  await useDb().execute(
+    `UPDATE \`admin_emails\`
+        SET \`status\` = 'sent', \`error\` = '', \`message_id\` = ?, \`sent_at\` = NOW()
+      WHERE \`sid\` = ?`,
+    [firstMessageId, sid]
+  )
+  return { status: 'sent' as const, error: '' }
 }

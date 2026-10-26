@@ -636,6 +636,17 @@ useHead({
   title: () => (profile.value ? `${profile.value.nickname} (@${profile.value.username})` : 'User'),
   meta: [{ name: 'description', content: () => profile.value?.bio || 'Public snippets shared on Bits.' }]
 })
+
+const siteUrl = String(useRuntimeConfig().public.siteUrl).replace(/\/+$/, '')
+useSeoMeta({
+  ogType: 'profile',
+  ogTitle: () => (profile.value ? `${profile.value.nickname} (@${profile.value.username})` : 'BITS profile'),
+  ogDescription: () => profile.value?.bio || 'Public snippets shared on BITS.',
+  ogImage: () => profile.value?.avatarUrl || `${siteUrl}/og-image.png`,
+  twitterTitle: () => (profile.value ? `${profile.value.nickname} (@${profile.value.username})` : 'BITS profile'),
+  twitterDescription: () => profile.value?.bio || 'Public snippets shared on BITS.',
+  twitterImage: () => profile.value?.avatarUrl || `${siteUrl}/og-image.png`
+})
 </script>
 
 <style scoped lang="scss">

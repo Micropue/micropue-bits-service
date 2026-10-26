@@ -62,6 +62,13 @@ useHead({
   title: 'Changelog · BITS',
   meta: [{ name: 'description', content: 'Product updates and release notes for BITS.' }]
 })
+useSeoMeta({
+  ogType: 'website',
+  ogTitle: 'BITS changelog',
+  ogDescription: 'Product updates and release notes for BITS.',
+  twitterTitle: 'BITS changelog',
+  twitterDescription: 'Product updates and release notes for BITS.'
+})
 </script>
 
 <style scoped lang="scss">

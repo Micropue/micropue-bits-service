@@ -146,6 +146,14 @@ useHead({
   ],
   htmlAttrs: { lang: computed(() => (locale.value === 'zh' ? 'zh-CN' : 'en')) }
 })
+
+useSeoMeta({
+  ogType: 'article',
+  ogTitle: () => `${chapter.value.title[locale.value]} · Docs`,
+  ogDescription: () => chapter.value.summary[locale.value],
+  twitterTitle: () => `${chapter.value.title[locale.value]} · Docs`,
+  twitterDescription: () => chapter.value.summary[locale.value]
+})
 </script>
 
 <style scoped lang="scss">
