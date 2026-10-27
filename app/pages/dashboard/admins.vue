@@ -23,6 +23,7 @@
             <span class="cell-title">
               {{ admin.email }}
               <StatusTag v-if="admin.uuid === selfUuid" :label="t('admins.you')" status="you" severity="secondary" />
+              <StatusTag v-if="admin.advanced" :label="t('admins.advanced')" status="verified" severity="contrast" />
             </span>
             <span class="cell-sub">{{ admin.name || t('admins.noName') }} · {{ methodSummary(admin) }}</span>
           </div>
@@ -47,8 +48,8 @@
           <div class="cell-actions">
             <Button :label="t('admins.edit')" severity="secondary" text size="small" :disabled="busy"
               @click="openEdit(admin)" />
-            <Button v-if="admin.uuid !== selfUuid" :label="t('sec.remove')" severity="danger" text size="small"
-              :disabled="busy" @click="remove(admin)" />
+            <Button v-if="advanced && admin.uuid !== selfUuid" :label="t('sec.remove')" severity="danger" text
+              size="small" :disabled="busy" @click="remove(admin)" />
           </div>
         </template>
       </Column>
@@ -72,7 +73,16 @@
           :placeholder="t('admins.field.namePlaceholder')" fluid />
       </label>
 
-      <div v-if="editing" class="field field--row">
+      <div v-if="advanced" class="field field--row">
+        <div>
+          <span class="field-label">{{ t('admins.field.advanced') }}</span>
+          <span class="field-hint">{{ t('admins.field.advancedHint') }}</span>
+        </div>
+        <ToggleSwitch v-model="draftAdvanced" :input-id="`advanced-${draft.uuid || 'new'}`"
+          :disabled="editing && draft.uuid === selfUuid" :aria-label="t('admins.field.advanced')" />
+      </div>
+
+      <div v-if="advanced && editing" class="field field--row">
         <div>
           <span class="field-label">{{ t('admins.field.disabled') }}</span>
           <span class="field-hint">{{ t('admins.field.disabledHint') }}</span>
@@ -96,8 +106,8 @@
 import Plus from '@primeicons/vue/plus'
 import type { AdminUser } from '~/composables/useAdminAuth'
 
-// 管理员列表与增删改：所有登录管理员权限相同，都可操作
-definePageMeta({ layout: 'dashboard', middleware: 'admin' })
+// 管理员列表与增删改：仅高级权限管理员可用
+definePageMeta({ layout: 'dashboard', middleware: ['admin', 'admin-advanced'] })
 
 interface AdminsResponse {
   admins: AdminUser[]
@@ -108,6 +118,7 @@ const { data, refresh } = await useFetch<AdminsResponse>('/api/dashboard/admins'
 const confirm = useConfirm()
 const toast = useToast()
 const { t, locale, restoreLocale } = useConsoleI18n()
+const { advanced, requireAdvanced } = useAdminAdvanced()
 
 onMounted(restoreLocale)
 
@@ -121,6 +132,7 @@ const dialogVisible = ref(false)
 const dialogError = ref('')
 const editing = ref(false)
 const draftDisabled = ref(false)
+const draftAdvanced = ref(false)
 const draft = ref({ uuid: '', email: '', name: '' })
 const draftEmailValid = computed(() => EMAIL_RE.test(draft.value.email.trim()))
 
@@ -153,6 +165,7 @@ function apiError(err: unknown, fallbackKey: string) {
 function openCreate() {
   draft.value = { uuid: '', email: '', name: '' }
   draftDisabled.value = false
+  draftAdvanced.value = false
   dialogError.value = ''
   editing.value = false
   dialogVisible.value = true
@@ -161,6 +174,7 @@ function openCreate() {
 function openEdit(admin: AdminUser) {
   draft.value = { uuid: admin.uuid, email: admin.email, name: admin.name }
   draftDisabled.value = admin.status !== 'normal'
+  draftAdvanced.value = !!admin.advanced
   dialogError.value = ''
   editing.value = true
   dialogVisible.value = true
@@ -168,25 +182,41 @@ function openEdit(admin: AdminUser) {
 
 async function submitDialog() {
   if (saving.value) return
-  saving.value = true
   dialogError.value = ''
+
+  if (!editing.value && !draftEmailValid.value) {
+    dialogError.value = t('auth.error.invalidEmail') + '.'
+    return
+  }
+
+  const target = editing.value ? admins.value.find(item => item.uuid === draft.value.uuid) : undefined
+  const nextStatus = draftDisabled.value ? 'disabled' : 'normal'
+  const disabling = !!target && target.status === 'normal' && nextStatus === 'disabled'
+  const advancedChanged = !!target && draftAdvanced.value !== !!target.advanced
+  const creatingAdvanced = !editing.value && advanced.value && draftAdvanced.value
+
+  // 禁用 / 创建或修改高级权限前先完成网关码验证；未授权时弹窗取消则中止
+  if (disabling || advancedChanged || creatingAdvanced) {
+    if (!(await requireAdvanced())) return
+  }
+
+  saving.value = true
   try {
     if (editing.value) {
-      await $fetch(`/api/dashboard/admins/${draft.value.uuid}`, {
-        method: 'PATCH',
-        body: {
-          name: draft.value.name,
-          status: draftDisabled.value ? 'disabled' : 'normal'
-        }
-      })
-    } else {
-      if (!draftEmailValid.value) {
-        dialogError.value = t('auth.error.invalidEmail') + '.'
-        return
+      const body: { name: string, status?: string, advanced?: boolean } = { name: draft.value.name }
+      if (advanced.value) {
+        if (target && nextStatus !== target.status) body.status = nextStatus
+        if (advancedChanged) body.advanced = draftAdvanced.value
       }
+      await $fetch(`/api/dashboard/admins/${draft.value.uuid}`, { method: 'PATCH', body })
+    } else {
       await $fetch('/api/dashboard/admins', {
         method: 'POST',
-        body: { email: draft.value.email.trim(), name: draft.value.name }
+        body: {
+          email: draft.value.email.trim(),
+          name: draft.value.name,
+          advanced: advanced.value && draftAdvanced.value
+        }
       })
     }
     dialogVisible.value = false
@@ -209,6 +239,7 @@ async function remove(admin: AdminUser) {
     acceptProps: { severity: 'danger' },
     rejectProps: { severity: 'secondary', text: true },
     accept: async () => {
+      if (!(await requireAdvanced())) return
       busy.value = true
       try {
         await $fetch(`/api/dashboard/admins/${admin.uuid}`, { method: 'DELETE' })
@@ -301,6 +332,15 @@ useHead({
     justify-content: space-between;
     gap: 1rem;
     font-weight: 400;
+
+    > div {
+      flex: 1;
+      min-width: 0;
+    }
+
+    :deep(.p-toggleswitch) {
+      flex: 0 0 auto;
+    }
   }
 }
 

@@ -361,7 +361,8 @@ const ADMIN_TABLES_SQL: string[] = [
     \`uuid\` CHAR(36) NOT NULL COMMENT '管理员UUID',
     \`email\` VARCHAR(254) NOT NULL COMMENT '登录邮箱（唯一，存小写）',
     \`name\` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '显示名称（留空则展示邮箱）',
-    \`permissions\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '权限点列表（逐人配置，无用户组）',
+    \`permissions\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '权限点列表；含 advanced = 高级权限管理员',
+    \`advanced_method\` ENUM('email','app','passkey') NOT NULL DEFAULT 'email' COMMENT '高级权限验证方式（在安全登录页选择）',
     \`totp_secret\` VARCHAR(255) NULL COMMENT 'AuthApp(TOTP)密钥密文（AES-256-GCM）；存在=已绑定',
     \`passkeys\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT 'Passkey 列表 [{id,publicKey,counter,...}]；非空=已绑定',
     \`status\` ENUM('normal','disabled') NOT NULL DEFAULT 'normal' COMMENT '状态（禁用后无法登录）',
@@ -424,8 +425,16 @@ const ADMIN_TABLES_SQL: string[] = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='控制台邮件表'`
 ]
 
-// admins 表增量列（旧表升级：AuthApp 密钥与 Passkey 列表）
+// admins 表增量列（旧表升级：权限、AuthApp 密钥与 Passkey 列表）
 const ADMIN_COLUMNS_SQL: [string, string][] = [
+  ['permissions', `
+    ALTER TABLE \`admins\`
+      ADD COLUMN \`permissions\` JSON NOT NULL DEFAULT (JSON_ARRAY())
+      COMMENT '权限点列表；含 advanced = 高级权限管理员' AFTER \`name\``],
+  ['advanced_method', `
+    ALTER TABLE \`admins\`
+      ADD COLUMN \`advanced_method\` ENUM('email','app','passkey') NOT NULL DEFAULT 'email'
+      COMMENT '高级权限验证方式（在安全登录页选择）' AFTER \`permissions\``],
   ['totp_secret', `
     ALTER TABLE \`admins\`
       ADD COLUMN \`totp_secret\` VARCHAR(255) NULL
@@ -619,9 +628,9 @@ export async function ensureAdmins(): Promise<number> {
     return 0
   }
 
-  const placeholders = emails.map(() => '(?, ?, ?)').join(', ')
+  const placeholders = emails.map(() => "(?, ?, ?, JSON_ARRAY('advanced'))").join(', ')
   await pool.query(
-    `INSERT INTO \`admins\` (\`uuid\`,\`email\`,\`name\`) VALUES ${placeholders}`,
+    `INSERT INTO \`admins\` (\`uuid\`,\`email\`,\`name\`,\`permissions\`) VALUES ${placeholders}`,
     emails.flatMap(email => [randomUUID(), email, ''])
   )
   return emails.length
@@ -781,6 +790,14 @@ export async function ensureSchema(): Promise<number> {
 
   await pool.query('DELETE FROM `admin_sessions` WHERE `expires_at` < NOW()')
   const addedAdmins = await ensureAdmins()
+
+  // 旧库升级兜底：历史上所有管理员都没有高级权限，统一保留原有能力，避免升级后无人能执行删除 / 禁用
+  const [advancedRows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS \`count\` FROM \`admins\` WHERE JSON_CONTAINS(\`permissions\`, '"advanced"')`
+  )
+  if (Number(advancedRows[0]?.count ?? 0) === 0) {
+    await pool.query("UPDATE `admins` SET `permissions` = JSON_ARRAY('advanced')")
+  }
 
   // 兜底告警：表里有管理员但没有正常状态的，控制台实际上没人能登录（需要手工改状态）
   const [available] = await pool.query<RowDataPacket[]>(

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import type { H3Event } from 'h3'
 import type { RowDataPacket } from 'mysql2/promise'
+import { ADMIN_ADVANCED_METHODS, type AdminAdvancedMethod } from '#shared/utils/admin'
 import { useDb } from './db'
 import { getClientIp } from './clientIp'
 import { normalizePasskeys, type StoredPasskey } from './webauthn'
@@ -21,14 +22,22 @@ export interface AdminUser {
   totp_secret: string | null
   // 已绑定的 Passkey 列表
   passkeys: StoredPasskey[]
+  // 高级权限：可执行删除 / 禁用等操作，操作前需网关码验证
+  advanced: boolean
+  // 高级权限验证方式（安全登录页选择）
+  advanced_method: AdminAdvancedMethod
   status: string
   last_login_at: string | null
   created_at: string | null
 }
 
-const ADMIN_COLUMNS = '`uuid`, `email`, `name`, `totp_secret`, `passkeys`, `status`, `last_login_at`, `created_at`'
+const ADMIN_COLUMNS = '`uuid`, `email`, `name`, `totp_secret`, `passkeys`, `permissions`, `advanced_method`, `status`, `last_login_at`, `created_at`'
 
-type AdminRow = RowDataPacket & Omit<AdminUser, 'passkeys'> & { passkeys: unknown }
+type AdminRow = RowDataPacket & Omit<AdminUser, 'passkeys' | 'advanced' | 'advanced_method'> & {
+  passkeys: unknown
+  permissions: unknown
+  advanced_method: string
+}
 
 function jwtKey() {
   const secret = process.env.JWT_SECRET
@@ -36,10 +45,39 @@ function jwtKey() {
   return new TextEncoder().encode(secret)
 }
 
+function normalizeAdvancedMethod(value: unknown): AdminAdvancedMethod {
+  return ADMIN_ADVANCED_METHODS.includes(value as AdminAdvancedMethod)
+    ? value as AdminAdvancedMethod
+    : 'email'
+}
+
+// 选中的方式不可用（解绑 AuthApp / 删除最后一把 Passkey）时回落到邮箱码
+export function effectiveAdvancedMethod(admin: AdminUser): AdminAdvancedMethod {
+  if (admin.advanced_method === 'app' && !admin.totp_secret) return 'email'
+  if (admin.advanced_method === 'passkey' && !admin.passkeys.length) return 'email'
+  return admin.advanced_method
+}
+
 function toAdmin(row: AdminRow): AdminUser {
+  let permissions: unknown = row.permissions
+  if (typeof permissions === 'string') {
+    try {
+      permissions = JSON.parse(permissions)
+    } catch {
+      permissions = []
+    }
+  }
   return {
-    ...row,
-    passkeys: normalizePasskeys(row.passkeys)
+    uuid: row.uuid,
+    email: row.email,
+    name: row.name,
+    totp_secret: row.totp_secret,
+    passkeys: normalizePasskeys(row.passkeys),
+    advanced: Array.isArray(permissions) && permissions.includes('advanced'),
+    advanced_method: normalizeAdvancedMethod(row.advanced_method),
+    status: row.status,
+    last_login_at: row.last_login_at,
+    created_at: row.created_at
   }
 }
 
@@ -51,6 +89,10 @@ export async function saveAdminPasskeys(uuid: string, passkeys: StoredPasskey[])
 
 export async function setAdminTotpSecret(uuid: string, encrypted: string | null) {
   await useDb().execute('UPDATE `admins` SET `totp_secret` = ? WHERE `uuid` = ?', [encrypted, uuid])
+}
+
+export async function setAdminAdvancedMethod(uuid: string, method: AdminAdvancedMethod) {
+  await useDb().execute('UPDATE `admins` SET `advanced_method` = ? WHERE `uuid` = ?', [method, uuid])
 }
 
 // ---------- 敏感操作（绑定/解绑登录凭据）身份确认授权 ----------
@@ -86,6 +128,8 @@ export interface PublicAdmin {
   created_at: string | null
   appBound: boolean
   passkeyCount: number
+  advanced: boolean
+  advancedMethod: AdminAdvancedMethod
 }
 
 export function publicAdmin(admin: AdminUser): PublicAdmin {
@@ -97,7 +141,9 @@ export function publicAdmin(admin: AdminUser): PublicAdmin {
     last_login_at: admin.last_login_at,
     created_at: admin.created_at,
     appBound: !!admin.totp_secret,
-    passkeyCount: admin.passkeys.length
+    passkeyCount: admin.passkeys.length,
+    advanced: admin.advanced,
+    advancedMethod: effectiveAdvancedMethod(admin)
   }
 }
 
@@ -195,6 +241,20 @@ export async function assertNotLastAdmin(target: AdminUser) {
   )
   if (Number(rows[0]?.count ?? 0) === 0) {
     throw createError({ statusCode: 409, statusMessage: 'At least one active administrator must remain' })
+  }
+}
+
+// 至少要留下一个正常状态的高级权限管理员，避免没人能执行删除 / 禁用
+export async function assertNotLastAdvancedAdmin(target: AdminUser) {
+  if (!target.advanced || target.status !== 'normal') return
+  const [rows] = await useDb().query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS \`count\` FROM \`admins\`
+      WHERE \`status\` = 'normal' AND \`uuid\` <> ?
+        AND JSON_CONTAINS(\`permissions\`, '"advanced"')`,
+    [target.uuid]
+  )
+  if (Number(rows[0]?.count ?? 0) === 0) {
+    throw createError({ statusCode: 409, statusMessage: 'At least one active advanced administrator must remain' })
   }
 }
 

@@ -53,7 +53,7 @@
       <template #cell-actions="{ row }">
         <div class="c-cell-actions">
           <Button :label="t('content.view')" severity="secondary" text size="small" @click="openDetail(row)" />
-          <Button v-if="row.status === 'active'" :label="t('snippets.delete')" severity="danger" text size="small"
+          <Button v-if="advanced && row.status === 'active'" :label="t('snippets.delete')" severity="danger" text size="small"
             @click="askDelete(row)" />
           <Button v-else :label="t('snippets.restore')" severity="secondary" text size="small"
             @click="askRestore(row)" />
@@ -203,6 +203,7 @@ interface SnippetDetail {
 const LIST_LIMIT = 500
 
 const { t, locale, restoreLocale } = useConsoleI18n()
+const { advanced, requireAdvanced } = useAdminAdvanced()
 const toast = useToast()
 const confirm = useConfirm()
 
@@ -339,6 +340,7 @@ function askDelete(row: SnippetRow) {
     acceptLabel: t('snippets.delete'),
     severity: 'danger',
     action: async () => {
+      if (!(await requireAdvanced())) return
       await $fetch(`/api/dashboard/snippets/${row.sid}`, { method: 'PATCH', body: { deleted: true } })
       await refresh()
       if (detail.value?.sid === row.sid) detail.value.status = 'deleted'

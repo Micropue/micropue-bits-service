@@ -1,4 +1,4 @@
-import type { AdminAuthMethodKey } from '#shared/utils/admin'
+import type { AdminAdvancedMethod, AdminAuthMethodKey } from '#shared/utils/admin'
 
 // Bits System Console 前端会话状态：登录管理员 + 认证方式开关（均由服务端接口提供）
 // 规范详见 docs-internal/Bits System Console 开发设计规范.md
@@ -21,6 +21,10 @@ export interface AdminUser {
   // 已绑定的登录凭据（服务端只回传状态，不回传密钥/公钥）
   appBound?: boolean
   passkeyCount?: number
+  // 高级权限：显示删除 / 禁用按钮，执行前需网关码验证
+  advanced?: boolean
+  // 高级权限验证方式（安全登录页选择）
+  advancedMethod?: AdminAdvancedMethod
 }
 
 export type AdminAuthMethods = Record<AdminAuthMethodKey, boolean>
@@ -32,11 +36,16 @@ export function useAdminAuth() {
   const request = useRequestFetch()
 
   async function fetchSession(): Promise<AdminUser | null> {
+    const expiresAt = useState<number>('admin-advanced-expires-at', () => 0)
     try {
-      const res = await request<{ admin: AdminUser | null }>('/api/dashboard/auth/me')
+      const res = await request<{ admin: AdminUser | null, advancedGrantSeconds?: number }>('/api/dashboard/auth/me')
       user.value = res.admin
+      expiresAt.value = res.admin && res.advancedGrantSeconds
+        ? Date.now() + res.advancedGrantSeconds * 1000
+        : 0
     } catch {
       user.value = null
+      expiresAt.value = 0
     }
     return user.value
   }
@@ -48,8 +57,10 @@ export function useAdminAuth() {
   }
 
   async function signOut() {
+    const expiresAt = useState<number>('admin-advanced-expires-at', () => 0)
     await request('/api/dashboard/auth/logout', { method: 'POST' })
     user.value = null
+    expiresAt.value = 0
   }
 
   return { user, methods, fetchSession, fetchMethods, signOut }

@@ -6,6 +6,7 @@ export default defineEventHandler(async event => {
   await assertConsoleVerify(admin)
 
   await setAdminTotpSecret(admin.uuid, null)
+  if (admin.advanced_method === 'app') await setAdminAdvancedMethod(admin.uuid, 'email')
   await useRedis().del(AUTH_KEYS.consoleTotpSetup(admin.uuid))
   await useRedis().del(AUTH_KEYS.consoleTotpStep(admin.uuid))
   return { bound: false }

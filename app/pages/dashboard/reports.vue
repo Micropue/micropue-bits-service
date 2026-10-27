@@ -104,7 +104,7 @@
 
     <template #footer>
       <div class="report-footer">
-        <Button :label="t('reports.delete')" severity="danger" text :loading="deleting" :disabled="saving"
+        <Button v-if="advanced" :label="t('reports.delete')" severity="danger" text :loading="deleting" :disabled="saving"
           @click="askDelete" />
         <div class="report-footer-actions">
           <Button :label="t('common.cancel')" severity="secondary" text @click="detailVisible = false" />
@@ -123,6 +123,7 @@ definePageMeta({ layout: 'dashboard', middleware: 'admin' })
 import { REPORT_STATUSES, type ReportStatus } from '#shared/utils/moderation'
 
 const { t, restoreLocale, locale } = useConsoleI18n()
+const { advanced, requireAdvanced } = useAdminAdvanced()
 const toast = useToast()
 const confirm = useConfirm()
 onMounted(restoreLocale)
@@ -247,6 +248,7 @@ function askDelete() {
     acceptProps: { severity: 'danger' },
     rejectProps: { severity: 'secondary', text: true },
     accept: async () => {
+      if (!(await requireAdvanced())) return
       deleting.value = true
       try {
         await $fetch(`/api/dashboard/reports/${encodeURIComponent(sid)}`, { method: 'DELETE' })

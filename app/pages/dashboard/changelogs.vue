@@ -28,7 +28,7 @@
       <template #cell-actions="{ row }">
         <div class="c-cell-actions">
           <Button :label="t('content.edit')" severity="secondary" text size="small" @click="openEdit(row)" />
-          <Button :label="t('common.delete')" severity="danger" text size="small" @click="askDelete(row)" />
+          <Button v-if="advanced" :label="t('common.delete')" severity="danger" text size="small" @click="askDelete(row)" />
         </div>
       </template>
     </ConsoleDataTable>
@@ -68,6 +68,7 @@
 definePageMeta({ layout: 'dashboard', middleware: 'admin' })
 
 const { t, restoreLocale } = useConsoleI18n()
+const { advanced, requireAdvanced } = useAdminAdvanced()
 const toast = useToast()
 const confirm = useConfirm()
 onMounted(restoreLocale)
@@ -152,6 +153,7 @@ function askDelete(row: Entry) {
     acceptProps: { severity: 'danger' },
     rejectProps: { severity: 'secondary', text: true },
     accept: async () => {
+      if (!(await requireAdvanced())) return
       try {
         await $fetch(`/api/dashboard/changelogs/${encodeURIComponent(row.sid)}`, { method: 'DELETE' })
         await refresh()

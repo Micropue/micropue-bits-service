@@ -51,6 +51,20 @@
               :disabled="busy || passkeys.length >= (data?.maxPasskeys ?? 5)" @click="addPasskey" />
           </div>
         </div>
+
+        <!-- 高级权限验证方式 -->
+        <div class="dash-row">
+          <div class="dash-row-main">
+            <span class="dash-row-label">{{ t('sec.advancedMethod.label') }}</span>
+            <span class="dash-row-desc">{{ t('sec.advancedMethod.desc') }}</span>
+          </div>
+          <div class="sec-actions">
+            <SelectButton :model-value="data?.advancedMethod ?? 'email'" :options="advancedMethodOptions"
+              option-label="label" option-value="value" size="small" :allow-empty="false"
+              :disabled="busy || savingMethod || advancedMethodOptions.length < 2"
+              :aria-label="t('sec.advancedMethod.label')" @update:model-value="saveAdvancedMethod" />
+          </div>
+        </div>
       </div>
 
       <!-- 已绑定的 Passkey 列表 -->
@@ -140,12 +154,14 @@ interface SecurityData {
   methods: AdminAuthMethods
   email: string
   verified: boolean
+  advancedMethod: 'email' | 'app' | 'passkey'
   app: { bound: boolean, issuer: string, account: string }
   passkeys: SecurityPasskey[]
   maxPasskeys: number
 }
 
 const { data, refresh } = await useFetch<SecurityData>('/api/dashboard/security')
+const { user, fetchSession } = useAdminAuth()
 const confirm = useConfirm()
 const toast = useToast()
 const { t, locale, restoreLocale } = useConsoleI18n()
@@ -157,6 +173,16 @@ const passkeys = computed(() => data.value?.passkeys ?? [])
 const app = computed(() => data.value?.app ?? { bound: false, issuer: 'BITS', account: '' })
 const offMethods = computed(() =>
   ADMIN_AUTH_METHODS.filter(method => !data.value?.methods[method.key]).map(method => t(method.labelKey)))
+
+const savingMethod = ref(false)
+const advancedMethodOptions = computed(() => {
+  const options: { label: string, value: 'email' | 'app' | 'passkey' }[] = [
+    { label: t('advanced.method.email'), value: 'email' }
+  ]
+  if (app.value.bound) options.push({ label: t('advanced.method.app'), value: 'app' })
+  if (passkeys.value.length) options.push({ label: t('advanced.method.passkey'), value: 'passkey' })
+  return options
+})
 
 const busy = ref(false)
 
@@ -173,6 +199,25 @@ function errorDetail(err: unknown, fallback: string) {
     return retry >= 60 ? t('common.tooManyInMin', { minutes: Math.ceil(retry / 60) }) : t('common.tooMany')
   }
   return t(fallback)
+}
+
+async function saveAdvancedMethod(value: 'email' | 'app' | 'passkey') {
+  if (savingMethod.value || value === data.value?.advancedMethod) return
+  savingMethod.value = true
+  try {
+    const res = await $fetch<{ method: 'email' | 'app' | 'passkey' }>(
+      '/api/dashboard/security/advanced-method',
+      { method: 'PATCH', body: { method: value } }
+    )
+    if (user.value) user.value.advancedMethod = res.method
+    await refresh()
+    notify('success', t('toast.advancedMethodSaved'))
+  } catch (err) {
+    notify('error', t('toast.advancedMethodSaveFailed'), errorDetail(err, 'common.tryAgain'))
+    await refresh()
+  } finally {
+    savingMethod.value = false
+  }
 }
 
 // 身份确认弹窗
@@ -291,6 +336,7 @@ async function activateApp() {
     appDialog.value = false
     resetAppDialog()
     await refresh()
+    await fetchSession()
     notify('success', t('toast.paired'), t('toast.pairedDetail'))
   } catch (err) {
     notify('error', t('toast.pairFailed'), errorDetail(err, 'toast.incorrectCode'))
@@ -317,6 +363,7 @@ async function doRemoveApp() {
   try {
     await $fetch('/api/dashboard/security/totp/disable', { method: 'POST' })
     await refresh()
+    await fetchSession()
     notify('success', t('toast.appRemoved'))
   } catch (err) {
     notify('error', t('toast.appRemoveFailed'), errorDetail(err, 'common.tryAgain'))
@@ -343,6 +390,7 @@ function addPasskey() {
       }
       await $fetch('/api/dashboard/security/passkey/verify', { method: 'POST', body: { response } })
       await refresh()
+      await fetchSession()
       notify('success', t('toast.passkeyAdded'), t('toast.passkeyAddedDetail'))
     } catch (err) {
       notify('error', t('toast.passkeyFailed'), errorDetail(err, 'common.tryAgain'))
@@ -370,6 +418,7 @@ async function doRemovePasskey(passkey: SecurityPasskey) {
   try {
     await $fetch('/api/dashboard/security/passkey/delete', { method: 'POST', body: { id: passkey.id } })
     await refresh()
+    await fetchSession()
     notify('success', t('toast.passkeyRemoved'))
   } catch (err) {
     notify('error', t('toast.passkeyRemoveFailed'), errorDetail(err, 'common.tryAgain'))

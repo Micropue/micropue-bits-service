@@ -54,6 +54,11 @@
         <h1 class="console-title">{{ title }}</h1>
 
         <div class="console-actions">
+          <span v-if="grantSeconds > 0" class="console-grant" role="status"
+            :title="t('advanced.activeHint')" :aria-label="t('advanced.countdown', { time: grantLabel })">
+            <Shield aria-hidden="true" />
+            <span>{{ grantLabel }}</span>
+          </span>
           <SelectButton :model-value="locale" :options="CONSOLE_LOCALE_OPTIONS" option-label="label"
             option-value="value" size="small" :allow-empty="false" :aria-label="t('locale.label')"
             @update:model-value="setLocale" />
@@ -87,6 +92,7 @@
     </Popover>
 
     <Toast />
+    <AdminAdvancedDialog />
   </div>
 </template>
 
@@ -112,6 +118,7 @@ import Users from '@primeicons/vue/users'
 // 窄屏（≤900px）侧栏变抽屉 + 遮罩；桌面端可整体收起；顶栏含中英文切换
 const route = useRoute()
 const { user, signOut } = useAdminAuth()
+const { expiresAt, advanced } = useAdminAdvanced()
 const { locale, t, setLocale, restoreLocale } = useConsoleI18n()
 const displayName = computed(() => adminDisplayName(user.value))
 
@@ -120,9 +127,10 @@ interface NavItem {
   to?: string
   icon?: unknown
   children?: { labelKey: string, to: string }[]
+  advancedOnly?: boolean
 }
 
-const navGroups: { labelKey: string, items: NavItem[] }[] = [
+const baseNavGroups: { labelKey: string, items: NavItem[] }[] = [
   {
     labelKey: 'nav.overview',
     items: [
@@ -170,11 +178,17 @@ const navGroups: { labelKey: string, items: NavItem[] }[] = [
     items: [
       { labelKey: 'nav.accounts', to: '/dashboard/users', icon: Users },
       { labelKey: 'nav.email', to: '/dashboard/emails', icon: Envelope },
-      { labelKey: 'nav.administrators', to: '/dashboard/admins', icon: Shield },
+      { labelKey: 'nav.administrators', to: '/dashboard/admins', icon: Shield, advancedOnly: true },
       { labelKey: 'nav.settings', to: '/dashboard/settings', icon: Cog }
     ]
   }
 ]
+
+// 普通管理员看不到「管理员」入口（页面与接口同样会拒绝）
+const navGroups = computed(() => baseNavGroups.map(group => ({
+  ...group,
+  items: group.items.filter(item => !item.advancedOnly || advanced.value)
+})))
 
 // 二级菜单展开状态：默认收起，进入子路由时自动展开；手动点击可覆盖（collapsed 优先）
 const expanded = ref<string[]>([])
@@ -244,17 +258,34 @@ function syncNarrow() {
 
 onMounted(() => {
   restoreLocale()
+  now.value = Date.now()
+  grantTimer = setInterval(() => { now.value = Date.now() }, 1000)
   media = window.matchMedia('(max-width: 900px)')
   media.addEventListener('change', syncNarrow)
   syncNarrow()
 })
 
-onBeforeUnmount(() => media?.removeEventListener('change', syncNarrow))
+onBeforeUnmount(() => {
+  media?.removeEventListener('change', syncNarrow)
+  if (grantTimer) clearInterval(grantTimer)
+})
 
 // 切页后收起抽屉，避免遮罩挡住新页面
 watch(() => route.fullPath, () => { drawerOpen.value = false })
 
 const initial = computed(() => (displayName.value[0] ?? 'A').toUpperCase())
+
+// 高级权限倒计时：用绝对过期时间计算，标签页后台被节流也不会走慢
+const now = ref(0)
+const grantSeconds = computed(() => {
+  if (!now.value || user.value?.advanced !== true) return 0
+  return Math.max(0, Math.ceil((expiresAt.value - now.value) / 1000))
+})
+const grantLabel = computed(() => {
+  const total = grantSeconds.value
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+})
+let grantTimer: ReturnType<typeof setInterval> | null = null
 
 const menuRef = ref<{ toggle: (event: Event) => void } | null>(null)
 function toggleMenu(event: Event) {
@@ -547,6 +578,25 @@ async function onSignOut() {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .console-grant {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid color-mix(in srgb, var(--p-primary-color) 30%, var(--dash-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--p-primary-color) 8%, transparent);
+    color: var(--p-primary-color);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+
+    svg {
+      width: 0.9em;
+      height: 0.9em;
+    }
   }
 
   .console-icon-button {

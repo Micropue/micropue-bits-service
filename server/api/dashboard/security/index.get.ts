@@ -10,6 +10,8 @@ export default defineEventHandler(async event => {
     email: admin.email,
     // 身份确认授权是否仍然有效（绑定/解绑前需要）
     verified: await hasConsoleVerify(admin.uuid),
+    // 高级权限验证方式（安全登录页选择）
+    advancedMethod: effectiveAdvancedMethod(admin),
     app: {
       bound: !!admin.totp_secret,
       issuer: totpIssuer(),

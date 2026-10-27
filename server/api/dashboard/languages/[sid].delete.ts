@@ -1,6 +1,7 @@
 // 删除编程语言：被代码段引用时拒绝；仅被依赖关联时级联清理关联
 export default defineEventHandler(async event => {
-  await requireAdmin(event)
+  const admin = await requireAdmin(event)
+  await assertAdvancedAccess(admin)
   const sid = String(getRouterParam(event, 'sid') ?? '')
   const current = await fetchLanguageRow(sid)
   if (!current) throw createError({ statusCode: 404, statusMessage: 'Language not found' })

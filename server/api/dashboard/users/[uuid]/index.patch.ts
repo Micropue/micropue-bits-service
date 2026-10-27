@@ -15,6 +15,8 @@ export default defineEventHandler(async event => {
   const user = await fetchUserRow(uuid)
   if (!user) throw createError({ statusCode: 404, statusMessage: 'User not found' })
 
+  if (status === 'disabled') await assertAdvancedAccess(admin)
+
   const reason = String(body?.reason ?? '').trim().slice(0, 255)
   const db = useDb()
   if (status === 'disabled') {

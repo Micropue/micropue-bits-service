@@ -11,6 +11,9 @@ export default defineEventHandler(async event => {
   const next = admin.passkeys.filter(passkey => passkey.id !== id)
   if (next.length !== admin.passkeys.length) {
     await saveAdminPasskeys(admin.uuid, next)
+    if (!next.length && admin.advanced_method === 'passkey') {
+      await setAdminAdvancedMethod(admin.uuid, 'email')
+    }
   }
   return { count: next.length }
 })

@@ -57,7 +57,7 @@
           <Button v-if="row.status === 'draft' || row.status === 'failed'" :label="t('email.edit')" severity="secondary"
             text size="small" @click="openEdit(row)" />
           <Button :label="t('email.view')" severity="secondary" text size="small" @click="openDetail(row)" />
-          <Button :label="t('email.delete')" severity="danger" text size="small" @click="askDelete(row)" />
+          <Button v-if="advanced" :label="t('email.delete')" severity="danger" text size="small" @click="askDelete(row)" />
         </div>
       </template>
     </ConsoleDataTable>
@@ -186,6 +186,7 @@ import Send from '@primeicons/vue/send'
 definePageMeta({ layout: 'dashboard', middleware: 'admin' })
 
 const { t, restoreLocale, locale } = useConsoleI18n()
+const { advanced, requireAdvanced } = useAdminAdvanced()
 const toast = useToast()
 const confirm = useConfirm()
 onMounted(restoreLocale)
@@ -442,6 +443,7 @@ function askDelete(row: EmailRow) {
     acceptProps: { severity: 'danger' },
     rejectProps: { severity: 'secondary', text: true },
     accept: async () => {
+      if (!(await requireAdvanced())) return
       try {
         await $fetch(`/api/dashboard/emails/${encodeURIComponent(row.sid)}`, { method: 'DELETE' })
         await refresh()

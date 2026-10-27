@@ -49,13 +49,13 @@
         <div class="cell-actions">
           <Button :label="t('admins.edit')" severity="secondary" text size="small" :disabled="busy"
             @click="openEdit(row)" />
-          <Button :label="t('sec.remove')" severity="danger" text size="small" :disabled="busy"
+          <Button v-if="advanced" :label="t('sec.remove')" severity="danger" text size="small" :disabled="busy"
             @click="askRemoveMany([row])" />
         </div>
       </template>
 
       <template #bulk="{ selection: rows }">
-        <Button :label="t('table.removeSelected')" severity="danger" outlined size="small" :disabled="busy"
+        <Button v-if="advanced" :label="t('table.removeSelected')" severity="danger" outlined size="small" :disabled="busy"
           @click="askRemoveMany(rows)" />
       </template>
     </ConsoleDataTable>
@@ -144,6 +144,7 @@ interface DependencyRow {
 }
 
 const { t, restoreLocale } = useConsoleI18n()
+const { advanced, requireAdvanced } = useAdminAdvanced()
 const toast = useToast()
 const confirm = useConfirm()
 
@@ -276,6 +277,7 @@ function askRemoveMany(rows: DependencyRow[]) {
     acceptProps: { severity: 'danger' },
     rejectProps: { severity: 'secondary', text: true },
     accept: async () => {
+      if (!(await requireAdvanced())) return
       busy.value = true
       let done = 0
       let failure = ''

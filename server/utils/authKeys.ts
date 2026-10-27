@@ -73,5 +73,12 @@ export const AUTH_KEYS = {
   // WebAuthn 注册 challenge（绑定 Passkey）
   consoleWebauthnReg: (uuid: string) => `console:webauthn:reg:${uuid}`,
   // WebAuthn 登录 challenge（不指定用户，随机 challengeId）
-  consoleWebauthnAuth: (challengeId: string) => `console:webauthn:auth:${challengeId}`
+  consoleWebauthnAuth: (challengeId: string) => `console:webauthn:auth:${challengeId}`,
+  // 高级权限网关码：码哈希与错码次数、重发冷却、验证通过后的 10 分钟授权
+  consoleAdvancedCode: (uuid: string) => `console:advanced:code:${uuid}`,
+  consoleAdvancedCooldown: (uuid: string) => `console:advanced:cooldown:${uuid}`,
+  consoleAdvancedFail: (uuid: string) => `console:advanced:fail:${uuid}`,
+  consoleAdvancedGrant: (uuid: string) => `console:advanced:grant:${uuid}`,
+  // 高级权限 Passkey 验证 challenge（按管理员）
+  consoleAdvancedWebauthn: (uuid: string) => `console:advanced:webauthn:${uuid}`
 }

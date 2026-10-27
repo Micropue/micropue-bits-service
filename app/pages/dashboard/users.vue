@@ -31,9 +31,10 @@
       <template #cell-actions="{ row }">
         <div class="cell-actions">
           <Button :label="t('users.view')" severity="secondary" text size="small" @click="openDetail(row)" />
-          <Button v-if="row.status === 'normal'" :label="t('users.disable')" severity="danger" text size="small"
+          <Button v-if="advanced && row.status === 'normal'" :label="t('users.disable')" severity="danger" text size="small"
             @click="openDisable(row)" />
-          <Button v-else :label="t('users.enable')" severity="secondary" text size="small" @click="enableUser(row)" />
+          <Button v-else-if="row.status !== 'normal'" :label="t('users.enable')" severity="secondary" text size="small"
+            @click="enableUser(row)" />
         </div>
       </template>
     </ConsoleDataTable>
@@ -159,7 +160,7 @@
     </div>
     <template #footer>
       <Button :label="t('common.cancel')" severity="secondary" text @click="disableVisible = false" />
-      <Button :label="t('users.disable')" severity="danger" :loading="saving" @click="disableUser" />
+      <Button v-if="advanced" :label="t('users.disable')" severity="danger" :loading="saving" @click="disableUser" />
     </template>
   </Dialog>
 
@@ -210,6 +211,7 @@ type TableRow = UserRow & { account: string, security: string }
 const LIST_LIMIT = 500
 
 const { t, locale, restoreLocale } = useConsoleI18n()
+const { advanced, requireAdvanced } = useAdminAdvanced()
 const toast = useToast()
 const confirm = useConfirm()
 
@@ -356,6 +358,7 @@ function openDisable(row: UserRow) {
 
 async function disableUser() {
   if (saving.value || !disableTarget.value) return
+  if (!(await requireAdvanced())) return
   saving.value = true
   try {
     await $fetch(`/api/dashboard/users/${disableTarget.value.uuid}`, {
