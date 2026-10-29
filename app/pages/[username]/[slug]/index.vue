@@ -13,6 +13,10 @@
             severity="secondary" outlined @click="shareContent">
             <template #icon><ShareAlt /></template>
           </Button>
+          <Button v-if="kind === 'snippet'" as="a" :href="rawHref" target="_blank" rel="noopener noreferrer"
+            class="raw-button" label="Raw" size="small" severity="secondary" outlined>
+            <template #icon><Code /></template>
+          </Button>
         </div>
         <p class="content-meta">
           <template v-if="kind === 'snippet'">
@@ -240,6 +244,7 @@
 <script setup lang="ts">
 import ArrowUpRight from '@primeicons/vue/arrow-up-right'
 import Bookmark from '@primeicons/vue/bookmark'
+import Code from '@primeicons/vue/code'
 import CodeBranch from '@primeicons/vue/code-branch'
 import Comment from '@primeicons/vue/comment'
 import Copy from '@primeicons/vue/copy'
@@ -337,6 +342,8 @@ const intro = computed(() => snippet.value?.intro ?? group.value?.intro ?? '')
 const tags = computed(() => snippet.value?.tags ?? group.value?.tags ?? [])
 const visibility = computed(() => snippet.value?.visibility ?? group.value?.visibility ?? 'public')
 const isOwner = computed(() => snippet.value?.isOwner ?? group.value?.isOwner ?? false)
+const rawHref = computed(() =>
+  `/${encodeURIComponent(author.value.username)}/${encodeURIComponent(snippet.value?.slug ?? slug)}/raw`)
 
 const tokens = computed(() => tokenizeCode(snippet.value?.code ?? ''))
 const copyCount = ref(0)
@@ -626,6 +633,15 @@ useSeoMeta({
 .share-button {
   flex: none;
   margin-left: auto;
+  white-space: nowrap;
+
+  :deep(.p-button-label) {
+    white-space: nowrap;
+  }
+}
+
+.raw-button {
+  flex: none;
   white-space: nowrap;
 
   :deep(.p-button-label) {
