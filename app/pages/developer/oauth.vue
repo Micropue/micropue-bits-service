@@ -74,6 +74,8 @@
               <td class="col-date">{{ formatDate(service.createdAt) }}</td>
               <td class="col-actions">
                 <Button label="Edit" size="small" severity="secondary" text @click="openEdit(service)" />
+                <Button label="Delete" size="small" severity="danger" text
+                  @click="askDelete(service)" />
               </td>
             </tr>
           </tbody>
@@ -88,6 +90,9 @@
   </div>
 
   <ConfirmDialog />
+
+  <DeveloperDeleteDialog v-model="deleteOpen" :loading="deleting" title="Delete OAuth service"
+    :message="deleteMessage" @confirm="confirmDelete" />
 
   <Dialog v-model:visible="dialogVisible" modal :draggable="false" :style="{ width: '38rem', maxWidth: '94vw' }"
     :header="dialogHeader">
@@ -214,6 +219,12 @@ const MAX_REDIRECT_URIS = 10
 const URL_RE = /^https?:\/\/[^\s]+$/i
 const toast = useToast()
 const confirm = useConfirm()
+const deleteOpen = ref(false)
+const deleting = ref(false)
+const deleteTarget = ref<OAuthService | null>(null)
+const deleteMessage = computed(() => deleteTarget.value
+  ? `Delete the OAuth service for ${deleteTarget.value.name}? All tokens will be revoked. The App itself is kept.`
+  : '')
 
 const { data, refresh, pending } = await useFetch<{ services: OAuthService[] }>('/api/developer/oauth')
 const { data: appData, refresh: refreshApps } = await useFetch<{ apps: DeveloperApp[] }>('/api/developer/oauth/available-apps')
@@ -375,6 +386,39 @@ function askResetSecret() {
       }
     }
   })
+}
+
+function askDelete(service: OAuthService) {
+  if (deleting.value) return
+  deleteTarget.value = service
+  deleteOpen.value = true
+}
+
+async function confirmDelete(phrase: string) {
+  const service = deleteTarget.value
+  if (!service || deleting.value) return
+  deleting.value = true
+  try {
+    await $fetch(`/api/developer/oauth/${encodeURIComponent(service.appSid)}`, {
+      method: 'DELETE',
+      body: { phrase }
+    })
+    deleteOpen.value = false
+    deleteTarget.value = null
+    if (editingAppSid.value === service.appSid) dialogVisible.value = false
+    brokenIcons.delete(service.appSid)
+    await Promise.all([refresh(), refreshApps()])
+    toast.add({ severity: 'success', summary: 'OAuth service deleted', life: 3000 })
+  } catch (err) {
+    toast.add({
+      severity: 'error',
+      summary: 'Could not delete OAuth service',
+      detail: (err as { statusMessage?: string }).statusMessage,
+      life: 5000
+    })
+  } finally {
+    deleting.value = false
+  }
 }
 
 useHead({ title: 'OAuth' })

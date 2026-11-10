@@ -58,6 +58,8 @@
               <td class="col-date">{{ formatDate(app.createdAt) }}</td>
               <td class="col-actions">
                 <Button label="Edit" size="small" severity="secondary" text @click="openEdit(app)" />
+                <Button label="Delete" size="small" severity="danger" text
+                  @click="askDelete(app)" />
               </td>
             </tr>
           </tbody>
@@ -106,6 +108,9 @@
       <Button :label="submitLabel" :loading="saving" :disabled="!valid || saving" @click="submit" />
     </template>
   </Dialog>
+
+  <DeveloperDeleteDialog v-model="deleteOpen" :loading="deleting" title="Delete app"
+    :message="deleteMessage" @confirm="confirmDelete" />
 </template>
 
 <script setup lang="ts">
@@ -132,6 +137,12 @@ interface AppForm {
 const PAGE_SIZE = 20
 const page = ref(1)
 const toast = useToast()
+const deleteOpen = ref(false)
+const deleting = ref(false)
+const deleteTarget = ref<DeveloperApp | null>(null)
+const deleteMessage = computed(() => deleteTarget.value
+  ? `Delete ${deleteTarget.value.name} and its OAuth service and tokens? This cannot be undone.`
+  : '')
 
 const { data, refresh, pending } = await useFetch<{ apps: DeveloperApp[], total: number }>('/api/developer/apps', {
   query: computed(() => ({ limit: PAGE_SIZE, offset: (page.value - 1) * PAGE_SIZE }))
@@ -232,6 +243,39 @@ async function submit() {
       (editing ? 'Could not save changes.' : 'Could not create the app.')
   } finally {
     saving.value = false
+  }
+}
+
+function askDelete(app: DeveloperApp) {
+  if (deleting.value) return
+  deleteTarget.value = app
+  deleteOpen.value = true
+}
+
+async function confirmDelete(phrase: string) {
+  const app = deleteTarget.value
+  if (!app || deleting.value) return
+  deleting.value = true
+  try {
+    await $fetch(`/api/developer/apps/${encodeURIComponent(app.sid)}`, {
+      method: 'DELETE',
+      body: { phrase }
+    })
+    deleteOpen.value = false
+    deleteTarget.value = null
+    brokenIcons.delete(app.sid)
+    if (apps.value.length === 1 && page.value > 1) page.value -= 1
+    await refresh()
+    toast.add({ severity: 'success', summary: 'App deleted', life: 3000 })
+  } catch (err) {
+    toast.add({
+      severity: 'error',
+      summary: 'Could not delete app',
+      detail: (err as { statusMessage?: string }).statusMessage,
+      life: 5000
+    })
+  } finally {
+    deleting.value = false
   }
 }
 

@@ -95,11 +95,14 @@ export async function updateOAuthServiceStatus(appSid: string, status: string): 
   return result.affectedRows > 0
 }
 
-export async function deleteDeveloperApp(sid: string): Promise<boolean> {
+export async function deleteDeveloperApp(sid: string, ownerUuid?: string): Promise<boolean> {
   const conn = await useDb().getConnection()
   try {
     await conn.beginTransaction()
-    const [app] = await conn.query<RowDataPacket[]>('SELECT `sid` FROM `developer_apps` WHERE `sid` = ? LIMIT 1', [sid])
+    const [app] = await conn.query<RowDataPacket[]>(
+      `SELECT \`sid\` FROM \`developer_apps\` WHERE \`sid\` = ?${ownerUuid ? ' AND `user_uuid` = ?' : ''} LIMIT 1`,
+      ownerUuid ? [sid, ownerUuid] : [sid]
+    )
     if (!app[0]) {
       await conn.rollback()
       return false
@@ -117,13 +120,13 @@ export async function deleteDeveloperApp(sid: string): Promise<boolean> {
   }
 }
 
-export async function deleteOAuthService(appSid: string): Promise<boolean> {
+export async function deleteOAuthService(appSid: string, ownerUuid?: string): Promise<boolean> {
   const conn = await useDb().getConnection()
   try {
     await conn.beginTransaction()
     const [service] = await conn.query<RowDataPacket[]>(
-      'SELECT `app_sid` FROM `developer_oauth_services` WHERE `app_sid` = ? LIMIT 1',
-      [appSid]
+      `SELECT \`app_sid\` FROM \`developer_oauth_services\` WHERE \`app_sid\` = ?${ownerUuid ? ' AND `user_uuid` = ?' : ''} LIMIT 1`,
+      ownerUuid ? [appSid, ownerUuid] : [appSid]
     )
     if (!service[0]) {
       await conn.rollback()

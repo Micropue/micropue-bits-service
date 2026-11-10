@@ -53,7 +53,9 @@
     </ConsoleDataTable>
   </div>
 
-  <ConfirmDialog />
+  <DeveloperDeleteDialog v-model="deleteOpen" :loading="busy.startsWith('delete-service-')"
+    :title="t('common.delete')" :message="deleteMessage" :confirm-label="t('common.delete')"
+    :cancel-label="t('common.cancel')" @confirm="confirmDelete" />
 </template>
 
 <script setup lang="ts">
@@ -79,8 +81,12 @@ interface AdminOAuthService {
 const { t, restoreLocale } = useConsoleI18n()
 const { advanced, requireAdvanced } = useAdminAdvanced()
 const toast = useToast()
-const confirm = useConfirm()
 const busy = ref('')
+const deleteOpen = ref(false)
+const deleteTarget = ref<AdminOAuthService | null>(null)
+const deleteMessage = computed(() => deleteTarget.value
+  ? t('developer.confirm.deleteOAuth', { name: deleteTarget.value.name })
+  : '')
 const brokenIcons = reactive(new Set<string>())
 
 onMounted(restoreLocale)
@@ -175,29 +181,31 @@ async function setServiceStatus(service: AdminOAuthService, status: 'active' | '
   }
 }
 
-function askDelete(service: AdminOAuthService) {
+async function askDelete(service: AdminOAuthService) {
   if (busy.value) return
-  confirm.require({
-    header: t('common.delete'),
-    message: t('developer.confirm.deleteOAuth', { name: service.name }),
-    acceptLabel: t('common.delete'),
-    rejectLabel: t('common.cancel'),
-    acceptProps: { severity: 'danger' },
-    rejectProps: { severity: 'secondary', text: true },
-    accept: async () => {
-      if (!(await requireAdvanced())) return
-      busy.value = `delete-service-${service.appSid}`
-      try {
-        await $fetch(`/api/dashboard/developer/oauth/${encodeURIComponent(service.appSid)}`, { method: 'DELETE' })
-        await refresh()
-        notify('success', 'OAuth service deleted')
-      } catch (err) {
-        notify('error', 'Could not delete OAuth service', (err as { statusMessage?: string }).statusMessage)
-      } finally {
-        busy.value = ''
-      }
-    }
-  })
+  if (!(await requireAdvanced())) return
+  deleteTarget.value = service
+  deleteOpen.value = true
+}
+
+async function confirmDelete(phrase: string) {
+  const service = deleteTarget.value
+  if (!service || busy.value) return
+  busy.value = `delete-service-${service.appSid}`
+  try {
+    await $fetch(`/api/dashboard/developer/oauth/${encodeURIComponent(service.appSid)}`, {
+      method: 'DELETE',
+      body: { phrase }
+    })
+    deleteOpen.value = false
+    deleteTarget.value = null
+    await refresh()
+    notify('success', 'OAuth service deleted')
+  } catch (err) {
+    notify('error', 'Could not delete OAuth service', (err as { statusMessage?: string }).statusMessage)
+  } finally {
+    busy.value = ''
+  }
 }
 
 useHead({

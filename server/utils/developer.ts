@@ -1,8 +1,20 @@
 import type { H3Event } from 'h3'
 import type { RowDataPacket } from 'mysql2/promise'
+import { DEVELOPER_DELETE_PHRASE, isDeveloperDeletePhrase } from '#shared/utils/developer'
 import { getAuthUser, type AuthUser } from './auth'
 import { useDb } from './db'
 import { shortId } from './id'
+
+// 高风险删除：必须原样输入确认短语，前端另有输入框
+export function assertDeveloperDeletePhrase(body: Record<string, unknown> | null | undefined) {
+  if (!isDeveloperDeletePhrase(body?.phrase)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `Type ${DEVELOPER_DELETE_PHRASE} to confirm deletion`,
+      data: { field: 'phrase' }
+    })
+  }
+}
 
 // 开发者中心：账号必须已设置用户名、密码并开启 2FA
 export async function requireDeveloperUser(event: H3Event): Promise<AuthUser> {

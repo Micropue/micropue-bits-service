@@ -4,6 +4,9 @@ export default defineEventHandler(async event => {
   await enforceUserRateLimit(event, admin.uuid, 'admin:developer:oauth-delete', 20, 3600)
   await assertAdvancedAccess(admin)
 
+  const body = await readBody<Record<string, unknown>>(event).catch(() => null)
+  assertDeveloperDeletePhrase(body)
+
   const appSid = String(getRouterParam(event, 'appSid') ?? '')
   const ok = await deleteOAuthService(appSid)
   if (!ok) throw createError({ statusCode: 404, statusMessage: 'OAuth service not found' })

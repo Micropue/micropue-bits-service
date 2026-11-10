@@ -8,13 +8,17 @@
           <span>{{ item.label }}</span>
         </NuxtLink>
 
-        <NuxtLink to="/developer/docs" class="nav-item">
+        <button type="button" class="nav-item nav-toggle" :class="{ 'is-open': docsOpen }"
+          :aria-expanded="docsOpen" @click="docsOpen = !docsOpen">
           <Book aria-hidden="true" />
           <span>Docs</span>
-        </NuxtLink>
-        <div class="developer-subnav">
-          <NuxtLink to="/developer/docs/apps" class="nav-subitem">Apps</NuxtLink>
-          <NuxtLink to="/developer/docs/oauth" class="nav-subitem">OAuth</NuxtLink>
+          <ChevronDown class="nav-chevron" aria-hidden="true" />
+        </button>
+        <div class="developer-subnav" :class="{ 'is-open': docsOpen }" :inert="!docsOpen">
+          <div class="developer-subnav-inner">
+            <NuxtLink to="/developer/docs/apps" class="nav-subitem">Apps</NuxtLink>
+            <NuxtLink to="/developer/docs/oauth" class="nav-subitem">OAuth</NuxtLink>
+          </div>
         </div>
       </nav>
     </aside>
@@ -32,8 +36,15 @@ import type { AuthUser } from '~/composables/useAuthUser'
 import Box from '@primeicons/vue/box'
 import Key from '@primeicons/vue/key'
 import Book from '@primeicons/vue/book'
+import ChevronDown from '@primeicons/vue/chevron-down'
 
 // 开发者入口要求账号已设置用户名、密码并开启 2FA
+const route = useRoute()
+const docsOpen = ref(route.path.startsWith('/developer/docs'))
+watch(() => route.path, path => {
+  if (path.startsWith('/developer/docs')) docsOpen.value = true
+})
+
 const { data } = await useFetch<{ user: AuthUser }>('/api/auth/me')
 const current = data.value?.user
 if (!current) {
@@ -92,10 +103,22 @@ useHead({
 }
 
 .developer-subnav {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s ease;
+}
+
+.developer-subnav.is-open {
+  grid-template-rows: 1fr;
+}
+
+.developer-subnav-inner {
   display: flex;
+  min-height: 0;
   flex-direction: column;
   gap: 0.1rem;
-  padding: 0.1rem 0 0.25rem 1.1rem;
+  overflow: hidden;
+  padding-left: 1.1rem;
 }
 
 .developer .nav-subitem {
@@ -116,6 +139,18 @@ useHead({
     color: var(--p-text-color);
     font-weight: 500;
   }
+}
+
+.developer .nav-toggle .nav-chevron {
+  width: 0.85em;
+  height: 0.85em;
+  margin-left: auto;
+  opacity: 0.6;
+  transition: transform 0.18s ease;
+}
+
+.developer .nav-toggle.is-open .nav-chevron {
+  transform: rotate(180deg);
 }
 
 .developer .nav-item {

@@ -66,7 +66,9 @@
     </ConsoleDataTable>
   </div>
 
-  <ConfirmDialog />
+  <DeveloperDeleteDialog v-model="deleteOpen" :loading="busy.startsWith('delete-app-')"
+    :title="t('common.delete')" :message="deleteMessage" :confirm-label="t('common.delete')"
+    :cancel-label="t('common.cancel')" @confirm="confirmDelete" />
 </template>
 
 <script setup lang="ts">
@@ -90,8 +92,12 @@ interface AdminDeveloperApp {
 const { t, restoreLocale } = useConsoleI18n()
 const { advanced, requireAdvanced } = useAdminAdvanced()
 const toast = useToast()
-const confirm = useConfirm()
 const busy = ref('')
+const deleteOpen = ref(false)
+const deleteTarget = ref<AdminDeveloperApp | null>(null)
+const deleteMessage = computed(() => deleteTarget.value
+  ? t('developer.confirm.deleteApp', { name: deleteTarget.value.name })
+  : '')
 const brokenIcons = reactive(new Set<string>())
 
 onMounted(restoreLocale)
@@ -176,29 +182,31 @@ async function setAppStatus(app: AdminDeveloperApp, status: 'active' | 'suspende
   }
 }
 
-function askDelete(app: AdminDeveloperApp) {
+async function askDelete(app: AdminDeveloperApp) {
   if (busy.value) return
-  confirm.require({
-    header: t('common.delete'),
-    message: t('developer.confirm.deleteApp', { name: app.name }),
-    acceptLabel: t('common.delete'),
-    rejectLabel: t('common.cancel'),
-    acceptProps: { severity: 'danger' },
-    rejectProps: { severity: 'secondary', text: true },
-    accept: async () => {
-      if (!(await requireAdvanced())) return
-      busy.value = `delete-app-${app.sid}`
-      try {
-        await $fetch(`/api/dashboard/developer/apps/${encodeURIComponent(app.sid)}`, { method: 'DELETE' })
-        await refresh()
-        notify('success', 'Developer App deleted')
-      } catch (err) {
-        notify('error', 'Could not delete app', (err as { statusMessage?: string }).statusMessage)
-      } finally {
-        busy.value = ''
-      }
-    }
-  })
+  if (!(await requireAdvanced())) return
+  deleteTarget.value = app
+  deleteOpen.value = true
+}
+
+async function confirmDelete(phrase: string) {
+  const app = deleteTarget.value
+  if (!app || busy.value) return
+  busy.value = `delete-app-${app.sid}`
+  try {
+    await $fetch(`/api/dashboard/developer/apps/${encodeURIComponent(app.sid)}`, {
+      method: 'DELETE',
+      body: { phrase }
+    })
+    deleteOpen.value = false
+    deleteTarget.value = null
+    await refresh()
+    notify('success', 'Developer App deleted')
+  } catch (err) {
+    notify('error', 'Could not delete app', (err as { statusMessage?: string }).statusMessage)
+  } finally {
+    busy.value = ''
+  }
 }
 
 useHead({

@@ -4,6 +4,9 @@ export default defineEventHandler(async event => {
   await enforceUserRateLimit(event, admin.uuid, 'admin:developer:app-delete', 20, 3600)
   await assertAdvancedAccess(admin)
 
+  const body = await readBody<Record<string, unknown>>(event).catch(() => null)
+  assertDeveloperDeletePhrase(body)
+
   const sid = String(getRouterParam(event, 'sid') ?? '')
   const ok = await deleteDeveloperApp(sid)
   if (!ok) throw createError({ statusCode: 404, statusMessage: 'Application not found' })
