@@ -4,6 +4,7 @@ import type { Ref } from 'vue'
 // /language(/lang) · /framework(/fw) · /lib(/library) · /tool(/tools) · /runtime(/rt, /runtimes)
 // /dep(/dependency, /deps —— 跨全部依赖类型) · /user, /snippet, /group —— 公开内容搜索
 // /new(/create —— 新建代码段) · /me —— 自己的主页 · /go(/page —— 站点页面)
+// /developer(/dev, /oauth —— 开发者入口)
 // /followers · /following · /favorites · /feedback · /reports · /requests · /changelog —— 账户快捷入口
 // 选中指令后：彩色指令标记 + 参数输入；参数为空时退格一次删除整条指令
 // 关键字搜索属于后续能力（普通搜索页尚未建设），这里先不混入普通文本查询
@@ -43,6 +44,7 @@ const SITE_PAGES: SitePage[] = [
   { name: 'Dependencies', to: '/dependencies', keywords: 'framework library tool runtime catalog' },
   { name: 'Submit an entry', to: '/request', keywords: 'request submit language dependency' },
   { name: 'Account', to: '/account', keywords: 'profile me settings' },
+  { name: 'Developer', to: '/developer', keywords: 'developer oauth apps applications api' },
   { name: 'Account profile', to: '/account/profile', keywords: 'profile username nickname avatar' },
   { name: 'Login security', to: '/account/security', keywords: 'security password passkey github devices two-factor' },
   { name: 'Sign in', to: '/sign', keywords: 'login signup' },
@@ -72,6 +74,7 @@ const COMMANDS: CatalogCommandDef[] = [
   { name: 'changelog', aliases: ['updates'], kind: 'action', noun: '', to: '/changelog', description: 'Open the changelog' },
   { name: 'docs', aliases: ['help'], kind: 'action', noun: '', to: '/docs', description: 'Open documentation' },
   { name: 'account', aliases: ['settings'], kind: 'action', noun: '', to: '/account', description: 'Open account settings' },
+  { name: 'developer', aliases: ['dev', 'oauth'], kind: 'action', noun: '', to: '/developer', description: 'Open the developer portal' },
   { name: 'security', aliases: ['2fa', 'passkey'], kind: 'action', noun: '', to: '/account/security', description: 'Open login security' },
   { name: 'go', aliases: ['page'], kind: 'pages', noun: 'pages', description: 'Jump to a page' },
   { name: 'search', aliases: ['find'], kind: 'search', noun: 'search', description: 'Search all public content' }

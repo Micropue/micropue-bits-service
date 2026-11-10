@@ -67,10 +67,10 @@
             </Button>
           </div>
           <div class="action-manage">
-            <Button label="Edit profile" size="small" severity="secondary" outlined fluid
+            <Button label="Account" size="small" severity="secondary" outlined fluid
               @click="navigateTo('/account/profile')">
               <template #icon>
-                <UserEdit />
+                <Cog />
               </template>
             </Button>
             <Button label="Links" size="small" severity="secondary" outlined fluid @click="openLinks">
@@ -172,7 +172,7 @@
 import FolderPlus from '@primeicons/vue/folder-plus'
 import LinkIcon from '@primeicons/vue/link'
 import Plus from '@primeicons/vue/plus'
-import UserEdit from '@primeicons/vue/user-edit'
+import Cog from '@primeicons/vue/cog'
 
 interface Profile {
   username: string

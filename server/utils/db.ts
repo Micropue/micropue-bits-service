@@ -1,5 +1,6 @@
 import mysql, { type RowDataPacket } from 'mysql2/promise'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { decryptSecret } from './crypto'
 import { shortId } from './id'
 import { LANGUAGE_SEED } from './languages'
 import { DEPENDENCY_SEED } from './dependencies'
@@ -353,6 +354,102 @@ const CONTENT_TABLES_SQL: string[] = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='目录条目申请表'`
 ]
 
+// 开发者中心（Bits OAuth）数据表（幂等建表）
+const DEVELOPER_TABLES_SQL: string[] = [
+  `CREATE TABLE IF NOT EXISTS \`schema_migrations\` (
+    \`name\` VARCHAR(100) NOT NULL COMMENT '迁移标识',
+    \`applied_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '执行时间',
+    PRIMARY KEY (\`name\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='一次性数据迁移记录'`,
+
+  `CREATE TABLE IF NOT EXISTS \`developer_apps\` (
+    \`sid\` ${SID} NOT NULL COMMENT '应用短UUID（即 OAuth client_id）',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '所有者账户UUID',
+    \`name\` VARCHAR(80) NOT NULL COMMENT 'Application name',
+    \`homepage_url\` VARCHAR(512) NOT NULL COMMENT 'Homepage URL',
+    \`icon_url\` VARCHAR(512) NULL COMMENT 'Optional icon URL',
+    \`description\` VARCHAR(500) NOT NULL COMMENT 'Application description',
+    \`status\` ENUM('active','suspended') NOT NULL DEFAULT 'active' COMMENT '状态（管理员可封禁）',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (\`sid\`),
+    KEY \`idx_developer_apps_user\` (\`user_uuid\`,\`created_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开发者应用表'`,
+
+  // OAuth 服务注册：每个 App 最多注册一个 OAuth 服务，client_id = app_sid
+  `CREATE TABLE IF NOT EXISTS \`developer_oauth_services\` (
+    \`app_sid\` ${SID} NOT NULL COMMENT '关联的开发者 App（也是 OAuth client_id）',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '所有者账户UUID',
+    \`client_secret_hash\` CHAR(64) NULL COMMENT 'OAuth client secret SHA-256',
+    \`client_secret_enc\` VARCHAR(255) NULL COMMENT '旧版 OAuth client secret（迁移用，已废弃）',
+    \`redirect_uris\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT 'Redirect URIs（最多 10 个）',
+    \`allow_wildcard\` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '允许通配符匹配',
+    \`device_flow\` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '启用设备流',
+    \`expire_user_tokens\` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '用户访问令牌过期并签发 refresh_token',
+    \`status\` ENUM('active','suspended') NOT NULL DEFAULT 'active' COMMENT '状态（管理员可封禁）',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (\`app_sid\`),
+    KEY \`idx_developer_oauth_services_user\` (\`user_uuid\`,\`created_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开发者 OAuth 服务注册表'`,
+
+  // OAuth access / refresh tokens：只存 SHA-256 哈希，原文只在签发时返回一次
+  `CREATE TABLE IF NOT EXISTS \`oauth_tokens\` (
+    \`sid\` ${SID} NOT NULL COMMENT '令牌记录短UUID',
+    \`app_sid\` ${SID} NOT NULL COMMENT '应用短UUID（client_id）',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '授权用户UUID',
+    \`family_id\` ${SID} NOT NULL COMMENT '令牌家族（refresh 轮换复用检测）',
+    \`token_hash\` CHAR(64) NOT NULL COMMENT '令牌 SHA-256（hex）',
+    \`kind\` ENUM('access','refresh') NOT NULL COMMENT '令牌类型',
+    \`scope\` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '授权范围',
+    \`expires_at\` DATETIME NULL COMMENT '过期时间（NULL=不过期）',
+    \`revoked_at\` DATETIME NULL COMMENT '撤销时间',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_oauth_tokens_hash\` (\`token_hash\`),
+    KEY \`idx_oauth_tokens_app\` (\`app_sid\`),
+    KEY \`idx_oauth_tokens_user\` (\`user_uuid\`),
+    KEY \`idx_oauth_tokens_family\` (\`family_id\`),
+    KEY \`idx_oauth_tokens_expires\` (\`expires_at\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='OAuth 访问令牌表'`
+]
+
+// developer_apps 表增量列（旧表升级）
+const DEVELOPER_COLUMNS_SQL: [string, string][] = [
+  ['icon_url', `
+    ALTER TABLE \`developer_apps\`
+      ADD COLUMN \`icon_url\` VARCHAR(512) NULL
+      COMMENT 'Optional icon URL' AFTER \`homepage_url\``],
+  ['status', `
+    ALTER TABLE \`developer_apps\`
+      ADD COLUMN \`status\` ENUM('active','suspended') NOT NULL DEFAULT 'active'
+      COMMENT '状态（管理员可封禁）' AFTER \`description\``],
+  ['updated_at', `
+    ALTER TABLE \`developer_apps\`
+      ADD COLUMN \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      COMMENT '更新时间' AFTER \`created_at\``]
+]
+
+// developer_oauth_services 表增量列（旧表升级）
+const DEVELOPER_OAUTH_SERVICE_COLUMNS_SQL: [string, string][] = [
+  ['client_secret_hash', `
+    ALTER TABLE \`developer_oauth_services\`
+      ADD COLUMN \`client_secret_hash\` CHAR(64) NULL
+      COMMENT 'OAuth client secret SHA-256' AFTER \`user_uuid\``],
+  ['status', `
+    ALTER TABLE \`developer_oauth_services\`
+      ADD COLUMN \`status\` ENUM('active','suspended') NOT NULL DEFAULT 'active'
+      COMMENT '状态（管理员可封禁）' AFTER \`expire_user_tokens\``]
+]
+
+// oauth_tokens 表增量列（旧表升级）
+const OAUTH_TOKEN_COLUMNS_SQL: [string, string][] = [
+  ['family_id', `
+    ALTER TABLE \`oauth_tokens\`
+      ADD COLUMN \`family_id\` ${SID} NULL
+      COMMENT '令牌家族（refresh 轮换复用检测）' AFTER \`user_uuid\``]
+]
+
 // 后台系统（Bits System Console）数据表（幂等建表）
 // 与前台 users 表完全独立：管理员不属于前台用户体系，登录邮箱也不要求是注册用户
 // 规范详见 docs-internal/Bits System Console 开发设计规范.md
@@ -636,6 +733,15 @@ export async function ensureAdmins(): Promise<number> {
   return emails.length
 }
 
+// 清理过期/撤销超过 7 天的 OAuth 令牌；启动时与定时任务共用
+export async function cleanupOAuthTokens() {
+  await pool.query(
+    `DELETE FROM \`oauth_tokens\`
+      WHERE (\`expires_at\` IS NOT NULL AND \`expires_at\` < DATE_SUB(NOW(), INTERVAL 7 DAY))
+         OR (\`revoked_at\` IS NOT NULL AND \`revoked_at\` < DATE_SUB(NOW(), INTERVAL 7 DAY))`
+  )
+}
+
 // 幂等：首次启动检测到表不存在时自动创建；已存在则检查迁移；最后补齐语言与依赖（框架）基础数据
 // 返回本次补齐的基础数据条数
 export async function ensureSchema(): Promise<number> {
@@ -709,6 +815,125 @@ export async function ensureSchema(): Promise<number> {
 
   // 内容管理系统数据表（幂等建表）
   for (const sql of CONTENT_TABLES_SQL) await pool.query(sql)
+
+  // 开发者中心数据表（幂等建表）
+  for (const sql of DEVELOPER_TABLES_SQL) await pool.query(sql)
+
+  const hasColumn = async (table: string, column: string) => {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [table, column]
+    )
+    return Number(rows[0]?.count ?? 0) > 0
+  }
+  const hasIndex = async (table: string, index: string) => {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS count FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+      [table, index]
+    )
+    return Number(rows[0]?.count ?? 0) > 0
+  }
+  const migrationApplied = async (name: string) => {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT 1 FROM `schema_migrations` WHERE `name` = ? LIMIT 1',
+      [name]
+    )
+    return rows.length > 0
+  }
+  const markMigration = async (name: string) => {
+    await pool.query('INSERT IGNORE INTO `schema_migrations` (`name`) VALUES (?)', [name])
+  }
+
+  // App / OAuth 服务 / token 表增量列（旧表升级）
+  for (const [col, sql] of DEVELOPER_COLUMNS_SQL) {
+    if (!(await hasColumn('developer_apps', col))) await pool.query(sql)
+  }
+  for (const [col, sql] of DEVELOPER_OAUTH_SERVICE_COLUMNS_SQL) {
+    if (!(await hasColumn('developer_oauth_services', col))) await pool.query(sql)
+  }
+  for (const [col, sql] of OAUTH_TOKEN_COLUMNS_SQL) {
+    if (!(await hasColumn('oauth_tokens', col))) await pool.query(sql)
+  }
+
+  // 旧版把 OAuth 配置直接挂在 App 上：一次性迁移到 OAuth 服务表，然后删除旧列
+  const legacyAppColumns = ['client_secret_enc', 'redirect_uris', 'allow_wildcard', 'device_flow', 'expire_user_tokens']
+  const legacyReady = (await Promise.all(legacyAppColumns.map(col => hasColumn('developer_apps', col)))).every(Boolean)
+  if (!(await migrationApplied('developer_apps_oauth_split_v1'))) {
+    if (legacyReady) {
+      await pool.query(
+        `INSERT IGNORE INTO \`developer_oauth_services\`
+          (\`app_sid\`, \`user_uuid\`, \`client_secret_enc\`, \`redirect_uris\`, \`allow_wildcard\`,
+           \`device_flow\`, \`expire_user_tokens\`, \`created_at\`, \`updated_at\`)
+         SELECT \`sid\`, \`user_uuid\`, \`client_secret_enc\`, \`redirect_uris\`, \`allow_wildcard\`,
+                \`device_flow\`, \`expire_user_tokens\`, \`created_at\`, \`updated_at\`
+           FROM \`developer_apps\`
+          WHERE \`client_secret_enc\` IS NOT NULL OR JSON_LENGTH(\`redirect_uris\`) > 0`
+      )
+      // 已有 OAuth 服务行若缺 redirect URI / 旧 secret，用旧 App 字段补齐
+      await pool.query(
+        `UPDATE \`developer_oauth_services\` s
+           JOIN \`developer_apps\` a ON a.\`sid\` = s.\`app_sid\`
+            SET s.\`redirect_uris\` = IF(JSON_LENGTH(s.\`redirect_uris\`) = 0, a.\`redirect_uris\`, s.\`redirect_uris\`),
+                s.\`client_secret_enc\` = COALESCE(s.\`client_secret_enc\`, a.\`client_secret_enc\`)
+          WHERE JSON_LENGTH(s.\`redirect_uris\`) = 0 OR s.\`client_secret_enc\` IS NULL`
+      )
+      for (const col of legacyAppColumns) {
+        if (await hasColumn('developer_apps', col)) {
+          await pool.query(`ALTER TABLE \`developer_apps\` DROP COLUMN \`${col}\``)
+        }
+      }
+    }
+    await markMigration('developer_apps_oauth_split_v1')
+  }
+
+  // 旧 client secret（AES 密文）一次性转为 SHA-256；之后只保留 hash
+  if (await hasColumn('developer_oauth_services', 'client_secret_enc')) {
+    const [secretRows] = await pool.query<RowDataPacket[]>(
+      `SELECT \`app_sid\`, \`client_secret_enc\` FROM \`developer_oauth_services\`
+        WHERE \`client_secret_hash\` IS NULL AND \`client_secret_enc\` IS NOT NULL`
+    )
+    for (const row of secretRows) {
+      try {
+        const secret = decryptSecret(String(row.client_secret_enc))
+        const hash = createHash('sha256').update(secret).digest('hex')
+        await pool.query(
+          'UPDATE `developer_oauth_services` SET `client_secret_hash` = ?, `client_secret_enc` = NULL WHERE `app_sid` = ? AND `client_secret_hash` IS NULL',
+          [hash, row.app_sid]
+        )
+      } catch (err) {
+        console.warn('[db] OAuth client secret 迁移失败，用户可通过重置密钥恢复：', row.app_sid, err instanceof Error ? err.message : err)
+      }
+    }
+    const [left] = await pool.query<RowDataPacket[]>(
+      'SELECT COUNT(*) AS `count` FROM `developer_oauth_services` WHERE `client_secret_enc` IS NOT NULL AND `client_secret_hash` IS NULL'
+    )
+    if (Number(left[0]?.count ?? 0) === 0) {
+      await pool.query('ALTER TABLE `developer_oauth_services` DROP COLUMN `client_secret_enc`')
+    }
+  }
+
+  // token family：旧 token 行用自身 sid 作为初始家族
+  if (await hasColumn('oauth_tokens', 'family_id')) {
+    await pool.query('UPDATE `oauth_tokens` SET `family_id` = `sid` WHERE `family_id` IS NULL OR `family_id` = \'\'')
+    const [familyCol] = await pool.query<RowDataPacket[]>(
+      `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'oauth_tokens' AND COLUMN_NAME = 'family_id'`
+    )
+    if (familyCol[0]?.IS_NULLABLE === 'YES') {
+      await pool.query('ALTER TABLE `oauth_tokens` MODIFY `family_id` CHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL')
+    }
+  }
+  if (!(await hasIndex('oauth_tokens', 'idx_oauth_tokens_family'))) {
+    await pool.query('ALTER TABLE `oauth_tokens` ADD KEY `idx_oauth_tokens_family` (`family_id`)')
+  }
+  if (!(await hasIndex('oauth_tokens', 'idx_oauth_tokens_expires'))) {
+    await pool.query('ALTER TABLE `oauth_tokens` ADD KEY `idx_oauth_tokens_expires` (`expires_at`)')
+  }
+
+  // 清理 7 天前过期 / 已撤销的令牌，保留最近记录便于复用检测与排查
+  await cleanupOAuthTokens()
 
   // 旧表补举报人索引（个人中心「我提交的举报」）
   const [reportReporterIdx] = await pool.query<RowDataPacket[]>(

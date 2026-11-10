@@ -80,5 +80,14 @@ export const AUTH_KEYS = {
   consoleAdvancedFail: (uuid: string) => `console:advanced:fail:${uuid}`,
   consoleAdvancedGrant: (uuid: string) => `console:advanced:grant:${uuid}`,
   // 高级权限 Passkey 验证 challenge（按管理员）
-  consoleAdvancedWebauthn: (uuid: string) => `console:advanced:webauthn:${uuid}`
+  consoleAdvancedWebauthn: (uuid: string) => `console:advanced:webauthn:${uuid}`,
+
+  // ---------- Bits OAuth ----------
+  // 授权码（按 SHA-256 哈希存，10 分钟有效）
+  oauthCode: (hash: string) => `oauth:code:${hash}`,
+  // 授权确认页的一次性 token
+  oauthConsent: (token: string) => `oauth:consent:${token}`,
+  // 设备流：device_code → 会话；user_code → device_code
+  oauthDevice: (deviceCode: string) => `oauth:device:${deviceCode}`,
+  oauthDeviceUser: (userCode: string) => `oauth:device:user:${userCode}`
 }

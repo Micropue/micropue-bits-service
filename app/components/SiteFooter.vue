@@ -72,6 +72,7 @@ const entries = computed(() => [
   { to: '/docs', name: 'Docs' },
   { to: '/changelog', name: 'Changelog' },
   { to: '/account', name: 'Account' },
+  { to: '/developer', name: 'Developer' },
   { to: '/languages', name: 'Languages' },
   { to: '/dependencies', name: 'Dependencies' },
   { to: '/request', name: 'Submit an entry' }

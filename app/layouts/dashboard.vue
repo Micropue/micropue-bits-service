@@ -98,6 +98,7 @@
 
 <script setup lang="ts">
 import Bars from '@primeicons/vue/bars'
+import Box from '@primeicons/vue/box'
 import ChevronDown from '@primeicons/vue/chevron-down'
 import ChevronLeft from '@primeicons/vue/chevron-left'
 import Code from '@primeicons/vue/code'
@@ -108,6 +109,7 @@ import Envelope from '@primeicons/vue/envelope'
 import Flag from '@primeicons/vue/flag'
 import Folder from '@primeicons/vue/folder'
 import Home from '@primeicons/vue/home'
+import Key from '@primeicons/vue/key'
 import Lock from '@primeicons/vue/lock'
 import Megaphone from '@primeicons/vue/megaphone'
 import Shield from '@primeicons/vue/shield'
@@ -181,6 +183,13 @@ const baseNavGroups: { labelKey: string, items: NavItem[] }[] = [
       { labelKey: 'nav.administrators', to: '/dashboard/admins', icon: Shield, advancedOnly: true },
       { labelKey: 'nav.settings', to: '/dashboard/settings', icon: Cog }
     ]
+  },
+  {
+    labelKey: 'nav.developer',
+    items: [
+      { labelKey: 'nav.developerApps', to: '/dashboard/developer/apps', icon: Box },
+      { labelKey: 'nav.developerOAuth', to: '/dashboard/developer/oauth', icon: Key }
+    ]
   }
 ]
 
@@ -225,6 +234,8 @@ const titleKeys: Record<string, string> = {
   '/dashboard/reports': 'title.reports',
   '/dashboard/changelogs': 'title.changelog',
   '/dashboard/emails': 'title.email',
+  '/dashboard/developer/apps': 'title.developerApps',
+  '/dashboard/developer/oauth': 'title.developerOAuth',
   '/dashboard/auth': 'title.signIn'
 }
 const title = computed(() => {

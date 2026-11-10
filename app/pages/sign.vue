@@ -190,6 +190,16 @@ const hasPassword = computed(() => authUser.value?.hasPassword ?? false)
 const route = useRoute()
 const githubError = ref('')
 
+// 登录成功后回到 ?redirect= 指定的站内页面（OAuth 授权 / 设备流会用到）
+const redirectTarget = computed(() => {
+  const value = String(route.query.redirect ?? '')
+  return value.startsWith('/') && !value.startsWith('//') ? value : '/account'
+})
+
+function navigateAfterAuth() {
+  return navigateTo(redirectTarget.value)
+}
+
 // 两步验证（第二因子）状态
 const twoFaTicket = ref('')
 const twoFaMethods = ref<string[]>([])
@@ -235,7 +245,7 @@ async function twoFaAppVerify() {
       body: { ticket: twoFaTicket.value, code: twoFaCode.value }
     })
     await refreshAuth()
-    await navigateTo('/account')
+    await navigateAfterAuth()
   } catch (err) {
     twoFaError.value = twoFaErr(err)
   } finally {
@@ -253,7 +263,7 @@ async function twoFaRecoveryVerify() {
       body: { ticket: twoFaTicket.value, code: recoveryCode.value }
     })
     await refreshAuth()
-    await navigateTo('/account')
+    await navigateAfterAuth()
   } catch (err) {
     twoFaError.value = twoFaErr(err)
   } finally {
@@ -287,7 +297,7 @@ async function twoFaPasskey() {
       body: { ticket: twoFaTicket.value, challengeId, response: assertion }
     })
     await refreshAuth()
-    await navigateTo('/account')
+    await navigateAfterAuth()
   } catch (err) {
     twoFaError.value = twoFaErr(err)
   } finally {
@@ -356,7 +366,7 @@ async function passkeySignIn() {
       body: { challengeId, response: assertion }
     })
     await refreshAuth()
-    await navigateTo('/account')
+    await navigateAfterAuth()
   } catch (err) {
     const status = (err as { statusCode?: number })?.statusCode
     if (status === 404) passkeyError.value = 'No account is linked to this passkey.'
@@ -466,7 +476,7 @@ async function verifyCode() {
     } else if (res.requires2fa) {
       enterTwoFactor(res.ticket ?? '', res.methods ?? [], res.email)
     } else {
-      await navigateTo('/account')
+      await navigateAfterAuth()
     }
   } catch (err) {
     const e = err as { statusCode?: number; data?: { data?: { attemptsLeft?: number; retryAfterSeconds?: number } } }
@@ -534,14 +544,14 @@ function backToEmail() {
 }
 
 async function finishInit() {
-  await navigateTo('/account')
+  await navigateAfterAuth()
 }
 
 // 已登录（含刷新场景）直接进入账户页，并同步导航栏登录态
 const { data: session } = await useFetch<{ user: AuthUser }>('/api/auth/me')
 if (session.value?.user) {
   authUser.value = session.value.user
-  await navigateTo('/account')
+  await navigateAfterAuth()
 }
 </script>
 

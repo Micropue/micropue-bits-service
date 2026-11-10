@@ -18,6 +18,20 @@
           </NuxtLink>
         </template>
       </nav>
+
+      <!-- 开发者入口：固定在所有账户设置页面的最下方 -->
+      <nav class="settings-nav settings-nav--developer" aria-label="Developer">
+        <NuxtLink v-if="developerReady" to="/developer" class="nav-item">
+          <Code aria-hidden="true" />
+          <span>Developer</span>
+          <ArrowUpRight class="nav-out" aria-hidden="true" />
+        </NuxtLink>
+        <button v-else type="button" class="nav-item" @click="showDeveloperHint">
+          <Code aria-hidden="true" />
+          <span>Developer</span>
+          <ExclamationTriangle class="nav-warn" aria-label="Setup required" />
+        </button>
+      </nav>
     </aside>
 
     <div class="settings-content">
@@ -32,6 +46,7 @@
 import type { AuthUser } from '~/composables/useAuthUser'
 import User from '@primeicons/vue/user'
 import Shield from '@primeicons/vue/shield'
+import Code from '@primeicons/vue/code'
 import ExclamationTriangle from '@primeicons/vue/exclamation-triangle'
 import ArrowUpRight from '@primeicons/vue/arrow-up-right'
 
@@ -46,6 +61,23 @@ function showUsernameHint() {
     summary: 'Set a username first',
     detail: 'Your public profile needs a username. Set one in Account → Profile.',
     life: 4500
+  })
+}
+
+const developerReady = computed(() =>
+  usernameSet.value && !!authUser.value?.hasPassword && !!authUser.value?.twoFactorEnabled)
+
+function showDeveloperHint() {
+  const missing: string[] = []
+  if (!usernameSet.value) missing.push('a username')
+  if (!authUser.value?.hasPassword) missing.push('a password')
+  if (!authUser.value?.twoFactorEnabled) missing.push('two-factor authentication')
+
+  toast.add({
+    severity: 'warn',
+    summary: 'Complete account setup first',
+    detail: `Set up ${missing.join(', ')} before opening Developer.`,
+    life: 5500
   })
 }
 
@@ -140,6 +172,12 @@ const sections = computed<NavItem[]>(() => [
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
+  }
+
+  .settings-nav--developer {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
   }
 
   .nav-item {
