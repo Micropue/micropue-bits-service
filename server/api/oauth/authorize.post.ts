@@ -9,12 +9,30 @@ export default defineEventHandler(async event => {
 
   const body = await readBody<{ consentToken?: string, decision?: string }>(event)
   const consentToken = String(body?.consentToken ?? '')
-  const session = await consumeOAuthConsent(consentToken)
-  if (!session) throw createError({ statusCode: 410, statusMessage: 'Authorization session expired' })
-  if (session.userUuid !== user.uuid) {
+  if (!consentToken || consentToken.length > 256) {
+    throw createError({ statusCode: 410, statusMessage: 'Authorization session expired' })
+  }
+
+  const stored = await readOAuthConsent(consentToken)
+  if (!stored) throw createError({ statusCode: 410, statusMessage: 'Authorization session expired' })
+  if (stored.session.userUuid !== user.uuid) {
     throw createError({ statusCode: 403, statusMessage: 'This authorization request belongs to another account' })
   }
 
+  // 应用可能已被删除、暂停或改掉 redirect URI，完成授权前重新校验当前配置
+  const app = await fetchOAuthApp(stored.session.appSid)
+  if (!app) throw createError({ statusCode: 410, statusMessage: 'This application is no longer available' })
+  if (!isSecureOAuthRedirectUri(stored.session.redirectUri) ||
+    !redirectUriAllowed(appRedirectUris(app), !!app.allow_wildcard, stored.session.redirectUri)) {
+    throw createError({ statusCode: 410, statusMessage: 'The redirect URI is no longer registered' })
+  }
+
+  // 校验通过后再原子消费，避免同一 token 被并发使用
+  if (!(await consumeOAuthConsent(consentToken, stored.raw))) {
+    throw createError({ statusCode: 410, statusMessage: 'Authorization session expired' })
+  }
+
+  const session = stored.session
   if (body?.decision !== 'allow') {
     return {
       redirect: appendOAuthParams(session.redirectUri, {

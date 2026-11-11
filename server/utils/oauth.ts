@@ -132,7 +132,9 @@ export function hashToken(token: string): string {
 }
 
 export function parseOAuthScope(raw: unknown): string {
-  const values = String(raw ?? '').split(/[\s,]+/).map(value => value.trim()).filter(Boolean)
+  const input = String(raw ?? '')
+  if (input.length > 512) throw createError({ statusCode: 400, statusMessage: 'The requested scope is too long' })
+  const values = input.split(/[\s,]+/).map(value => value.trim()).filter(Boolean)
   const scopes = values.length ? [...new Set(values)] : [DEFAULT_SCOPE]
   for (const scope of scopes) {
     if (!OAUTH_SCOPES[scope]) throw createError({ statusCode: 400, statusMessage: `Unknown scope: ${scope}` })
@@ -233,12 +235,44 @@ export function readOAuthServiceInput(body: Record<string, unknown>): OAuthServi
 }
 
 export function redirectUriAllowed(redirectUris: string[], allowWildcard: boolean, uri: string): boolean {
+  // 完全匹配优先；通配符必须按 URL 结构逐段比较，不能把整串 URL 当正则
   if (redirectUris.includes(uri)) return true
   if (!allowWildcard) return false
+
+  let target: URL
+  try {
+    target = new URL(uri)
+  } catch {
+    return false
+  }
+  if (target.protocol !== 'https:' || target.username || target.password || target.hash) return false
+
   return redirectUris.some(pattern => {
     if (!pattern.includes('*')) return pattern === uri
-    const regex = new RegExp(`^${pattern.split('*').map(escapeRegExp).join('.*')}$`)
-    return regex.test(uri)
+
+    let rule: URL
+    try {
+      rule = new URL(pattern)
+    } catch {
+      return false
+    }
+    if (rule.protocol !== 'https:' || rule.username || rule.password || rule.hash) return false
+    if (rule.search.includes('*') || target.search !== rule.search) return false
+    if (target.port !== rule.port) return false
+
+    const ruleHost = rule.hostname.toLowerCase()
+    const targetHost = target.hostname.toLowerCase()
+    if (ruleHost.includes('*')) {
+      if (!ruleHost.startsWith('*.') || ruleHost.slice(2).includes('*')) return false
+      const base = ruleHost.slice(2)
+      if (!base || !targetHost.endsWith(`.${base}`)) return false
+    } else if (targetHost !== ruleHost) {
+      return false
+    }
+
+    if (!rule.pathname.includes('*')) return target.pathname === rule.pathname
+    const regex = new RegExp(`^${rule.pathname.split('*').map(escapeRegExp).join('.*')}$`)
+    return regex.test(target.pathname)
   })
 }
 
@@ -392,6 +426,7 @@ export async function fetchOAuthApp(clientId: string): Promise<OAuthAppRow | nul
        JOIN \`developer_apps\` a ON a.\`sid\` = s.\`app_sid\`
        JOIN \`users\` u ON u.\`uuid\` = a.\`user_uuid\`
       WHERE s.\`app_sid\` = ? AND s.\`status\` = 'active' AND a.\`status\` = 'active'
+        AND u.\`status\` = 'normal'
       LIMIT 1`,
     [clientId]
   )
@@ -520,10 +555,12 @@ export async function findAccessToken(token: string) {
        JOIN \`users\` u ON u.\`uuid\` = t.\`user_uuid\`
        JOIN \`developer_oauth_services\` s ON s.\`app_sid\` = t.\`app_sid\`
        JOIN \`developer_apps\` a ON a.\`sid\` = s.\`app_sid\`
+       JOIN \`users\` owner ON owner.\`uuid\` = a.\`user_uuid\`
       WHERE t.\`token_hash\` = ? AND t.\`kind\` = 'access'
         AND t.\`revoked_at\` IS NULL
         AND (t.\`expires_at\` IS NULL OR t.\`expires_at\` > NOW())
         AND u.\`status\` = 'normal'
+        AND owner.\`status\` = 'normal'
         AND s.\`status\` = 'active' AND a.\`status\` = 'active'
       LIMIT 1`,
     [hashToken(token)]
@@ -593,36 +630,50 @@ export async function storeOAuthCode(code: string, session: OAuthCodeSession) {
   await useRedis().set(AUTH_KEYS.oauthCode(hashToken(code)), JSON.stringify(session), 'EX', 300)
 }
 
-export async function readOAuthCode(code: string): Promise<OAuthCodeSession | null> {
+export async function readOAuthCode(code: string) {
   const raw = await useRedis().get(AUTH_KEYS.oauthCode(hashToken(code)))
   if (!raw) return null
   try {
-    return JSON.parse(raw) as OAuthCodeSession
+    return { raw, session: JSON.parse(raw) as OAuthCodeSession }
   } catch {
     return null
   }
 }
 
-export async function deleteOAuthCode(code: string): Promise<boolean> {
-  const deleted = await useRedis().del(AUTH_KEYS.oauthCode(hashToken(code)))
-  return deleted === 1
+async function deleteRedisValueIfMatches(key: string, expected: string): Promise<boolean> {
+  const result = await useRedis().eval(
+    `if redis.call('GET', KEYS[1]) == ARGV[1] then
+       redis.call('DEL', KEYS[1])
+       return 1
+     end
+     return 0`,
+    1,
+    key,
+    expected
+  )
+  return result === 1
+}
+
+export async function consumeOAuthCode(code: string, raw: string): Promise<boolean> {
+  return await deleteRedisValueIfMatches(AUTH_KEYS.oauthCode(hashToken(code)), raw)
 }
 
 export async function storeOAuthConsent(token: string, session: OAuthCodeSession & { state?: string }) {
   await useRedis().set(AUTH_KEYS.oauthConsent(token), JSON.stringify(session), 'EX', 600)
 }
 
-export async function consumeOAuthConsent(token: string) {
-  const redis = useRedis()
-  const key = AUTH_KEYS.oauthConsent(token)
-  const raw = await redis.get(key)
+export async function readOAuthConsent(token: string) {
+  const raw = await useRedis().get(AUTH_KEYS.oauthConsent(token))
   if (!raw) return null
-  await redis.del(key)
   try {
-    return JSON.parse(raw) as OAuthCodeSession & { state?: string }
+    return { raw, session: JSON.parse(raw) as OAuthCodeSession & { state?: string } }
   } catch {
     return null
   }
+}
+
+export async function consumeOAuthConsent(token: string, raw: string): Promise<boolean> {
+  return await deleteRedisValueIfMatches(AUTH_KEYS.oauthConsent(token), raw)
 }
 
 export async function storeDeviceSession(deviceCode: string, userCode: string, session: OAuthDeviceSession) {
@@ -632,14 +683,18 @@ export async function storeDeviceSession(deviceCode: string, userCode: string, s
   await redis.set(AUTH_KEYS.oauthDeviceUser(userCode), deviceCode, 'EX', 900)
 }
 
-export async function getDeviceSessionByCode(deviceCode: string): Promise<OAuthDeviceSession | null> {
+export async function readDeviceSession(deviceCode: string) {
   const raw = await useRedis().get(AUTH_KEYS.oauthDevice(deviceCode))
   if (!raw) return null
   try {
-    return JSON.parse(raw) as OAuthDeviceSession
+    return { raw, session: JSON.parse(raw) as OAuthDeviceSession }
   } catch {
     return null
   }
+}
+
+export async function getDeviceSessionByCode(deviceCode: string): Promise<OAuthDeviceSession | null> {
+  return (await readDeviceSession(deviceCode))?.session ?? null
 }
 
 export async function getDeviceSessionByUserCode(userCode: string) {
@@ -652,6 +707,25 @@ export async function getDeviceSessionByUserCode(userCode: string) {
 
 export async function updateDeviceSession(deviceCode: string, session: OAuthDeviceSession) {
   await useRedis().set(AUTH_KEYS.oauthDevice(deviceCode), JSON.stringify(session), 'EX', 900)
+}
+
+export async function consumeDeviceSession(
+  deviceCode: string,
+  raw: string,
+  userCode: string
+): Promise<boolean> {
+  const result = await useRedis().eval(
+    `if redis.call('GET', KEYS[1]) == ARGV[1] then
+       redis.call('DEL', KEYS[1], KEYS[2])
+       return 1
+     end
+     return 0`,
+    2,
+    AUTH_KEYS.oauthDevice(deviceCode),
+    AUTH_KEYS.oauthDeviceUser(userCode),
+    raw
+  )
+  return result === 1
 }
 
 export async function deleteDeviceSession(deviceCode: string) {

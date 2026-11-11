@@ -18,6 +18,10 @@ export default defineEventHandler(async event => {
   if (found.session.status !== 'pending') {
     throw createError({ statusCode: 409, statusMessage: 'This code has already been handled' })
   }
+  const app = await fetchOAuthApp(found.session.appSid)
+  if (!app || !app.device_flow) {
+    throw createError({ statusCode: 410, statusMessage: 'This application is no longer available' })
+  }
 
   if (body?.decision === 'allow') {
     await updateDeviceSession(found.deviceCode, {

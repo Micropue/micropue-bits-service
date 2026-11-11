@@ -23,10 +23,15 @@ export default defineEventHandler(async event => {
     const code = String(body.code ?? '')
     const redirectUri = String(body.redirect_uri ?? '')
     const verifier = String(body.code_verifier ?? '')
-    const session = await readOAuthCode(code)
-    if (!session || session.appSid !== app.sid || session.redirectUri !== redirectUri) {
+    const stored = await readOAuthCode(code)
+    const session = stored?.session
+    if (!stored || !session || session.appSid !== app.sid || session.redirectUri !== redirectUri) {
       setResponseStatus(event, 400)
       return { error: 'invalid_grant', error_description: 'Invalid or expired authorization code' }
+    }
+    if (!redirectUriAllowed(appRedirectUris(app), !!app.allow_wildcard, session.redirectUri)) {
+      setResponseStatus(event, 400)
+      return { error: 'invalid_grant', error_description: 'redirect_uri is no longer registered' }
     }
     if (session.codeChallenge) {
       if (!verifier || !verifyPkce(session.codeChallenge, session.codeChallengeMethod ?? 'plain', verifier)) {
@@ -39,7 +44,7 @@ export default defineEventHandler(async event => {
       setResponseStatus(event, 400)
       return { error: 'invalid_grant', error_description: 'The authorizing account is unavailable' }
     }
-    if (!(await deleteOAuthCode(code))) {
+    if (!(await consumeOAuthCode(code, stored.raw))) {
       setResponseStatus(event, 400)
       return { error: 'invalid_grant', error_description: 'Invalid or expired authorization code' }
     }
@@ -67,10 +72,15 @@ export default defineEventHandler(async event => {
 
   if (grantType === 'urn:ietf:params:oauth:grant-type:device_code') {
     const deviceCode = String(body.device_code ?? '')
-    const session = await getDeviceSessionByCode(deviceCode)
-    if (!session || session.appSid !== app.sid) {
+    const stored = await readDeviceSession(deviceCode)
+    const session = stored?.session
+    if (!stored || !session || session.appSid !== app.sid) {
       setResponseStatus(event, 400)
       return { error: 'invalid_grant', error_description: 'Invalid or expired device code' }
+    }
+    if (!app.device_flow) {
+      setResponseStatus(event, 400)
+      return { error: 'invalid_grant', error_description: 'Device flow is no longer enabled for this application' }
     }
     if (session.status === 'pending') {
       setResponseStatus(event, 400)
@@ -87,7 +97,10 @@ export default defineEventHandler(async event => {
       setResponseStatus(event, 400)
       return { error: 'access_denied', error_description: 'The authorizing account is unavailable' }
     }
-    await deleteDeviceSession(deviceCode)
+    if (!(await consumeDeviceSession(deviceCode, stored.raw, session.userCode))) {
+      setResponseStatus(event, 400)
+      return { error: 'invalid_grant', error_description: 'Invalid or expired device code' }
+    }
     return await issueOAuthTokens(app, session.userUuid, session.scope)
   }
 

@@ -8,15 +8,22 @@ export default defineEventHandler(async event => {
   await enforceUserRateLimit(event, user.uuid, 'oauth:authorize', 30, 600)
 
   const query = getQuery(event)
-  const clientId = String(query.client_id ?? '').trim()
-  const redirectUri = String(query.redirect_uri ?? '').trim()
-  const responseType = String(query.response_type ?? '').trim()
-  const state = query.state === undefined ? undefined : String(query.state)
-  const codeChallenge = query.code_challenge ? String(query.code_challenge) : undefined
-  const codeChallengeMethod = query.code_challenge_method ? String(query.code_challenge_method) : 'plain'
+  // 重复参数会产生数组，直接视为无效，避免解析歧义
+  const rawQuery = (value: unknown) => (Array.isArray(value) ? '' : String(value ?? ''))
+  const queryValue = (value: unknown) => rawQuery(value).trim()
 
-  if (!clientId || !redirectUri) {
+  const clientId = queryValue(query.client_id)
+  const redirectUri = queryValue(query.redirect_uri)
+  const responseType = queryValue(query.response_type)
+  const state = rawQuery(query.state) || undefined
+  const codeChallenge = queryValue(query.code_challenge) || undefined
+  const codeChallengeMethod = queryValue(query.code_challenge_method) || 'plain'
+
+  if (!clientId || clientId.length > 64 || !redirectUri || redirectUri.length > 1024) {
     throw createError({ statusCode: 400, statusMessage: 'client_id and redirect_uri are required' })
+  }
+  if (state && state.length > 512) {
+    throw createError({ statusCode: 400, statusMessage: 'state is too long' })
   }
 
   const app = await fetchOAuthApp(clientId)
@@ -38,13 +45,21 @@ export default defineEventHandler(async event => {
   if (responseType !== 'code') {
     return redirectError('unsupported_response_type', 'Only response_type=code is supported')
   }
+  if (codeChallenge && (codeChallenge.length < 43 || codeChallenge.length > 128 ||
+    !/^[A-Za-z0-9\-._~]+$/.test(codeChallenge))) {
+    return redirectError('invalid_request', 'Invalid code_challenge')
+  }
   if (codeChallenge && codeChallengeMethod !== 'S256' && codeChallengeMethod !== 'plain') {
     return redirectError('invalid_request', 'Unsupported code_challenge_method')
   }
 
+  const requestedScope = queryValue(query.scope)
+  if (requestedScope.length > 512) {
+    return redirectError('invalid_scope', 'The requested scope is too long')
+  }
   let scope: string
   try {
-    scope = parseOAuthScope(query.scope)
+    scope = parseOAuthScope(requestedScope)
   } catch {
     return redirectError('invalid_scope', 'The requested scope is not supported')
   }

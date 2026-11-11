@@ -1,5 +1,5 @@
 <template>
-  <NuxtLayout>
+  <NuxtLayout name="default">
     <div class="error-page">
       <p class="error-code">{{ error?.statusCode ?? 500 }}</p>
       <h1 class="error-message">{{ error?.statusMessage || 'Something went wrong' }}</h1>
