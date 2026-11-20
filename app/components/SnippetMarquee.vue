@@ -9,7 +9,8 @@
             <header class="card-head">
               <span class="card-title">{{ card.title }}</span>
               <span class="card-lang">
-                <img v-if="card.logo" class="lang-logo" :src="card.logo" alt="" width="13" height="13"
+                <img v-if="card.logo" class="lang-logo" :src="card.logo" :alt="`${card.language} logo`" width="13"
+                  height="13"
                   loading="lazy" decoding="async">
                 {{ card.language }}
               </span>

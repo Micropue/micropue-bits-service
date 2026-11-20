@@ -17,7 +17,8 @@
         role="option" :aria-selected="index === activeIndex" class="command-item"
         :class="{ 'is-active': index === activeIndex }" @mouseenter="emit('update:activeIndex', index)"
         @click.stop="emit('pickItem', item.to)">
-        <img v-if="item.logo_url" class="command-logo" :src="item.logo_url" alt="" width="18" height="18"
+        <img v-if="item.logo_url" class="command-logo" :src="item.logo_url" :alt="`${item.name} logo`" width="18"
+          height="18"
           loading="lazy" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'">
         <span class="command-name">{{ item.name }}</span>
         <span v-if="item.subtitle" class="command-sub">{{ item.subtitle }}</span>

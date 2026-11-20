@@ -1,0 +1,135 @@
+# BITS
+
+> BITS is a community for sharing, reusing and discovering small code snippets, with public profiles, groups, a language and dependency catalog, and a searchable command box.
+
+## Product definition
+
+BITS is a full-stack web product for sharing small, reusable code examples. It is designed around snippets rather than full repositories. Users can publish code with a primary language, optional dependencies, tags and a description, organise snippets into groups, and expose them through a public profile.
+
+The public side of the product combines topic catalogs, search, author profiles and direct content links. Signed-in users can create, edit, copy, fork, favourite and delete their own content. Developers can create applications and register OAuth services through the developer platform.
+
+Chinese summary: BITS 是一个分享、复用和发现小型代码片段的社区，提供公开主页、代码分组、语言与依赖目录、搜索和开发者 OAuth 集成。
+
+## Primary objects
+
+- Snippet: a code example with one primary language, optional dependencies, up to five tags, a title, description, visibility and a code body.
+- Group: a folder that organises related snippets. A snippet belongs to at most one group.
+- Language: a public catalog entry used as the snippet's primary technology.
+- Dependency: a framework, library, tool or runtime associated with one or more languages and selected snippets.
+- User profile: the author's public page at `/{username}`, with avatar, nickname, bio, links, activity and visible content.
+- Developer application: public identity information shown on an OAuth consent screen.
+- OAuth service: credentials and configuration attached to one developer application.
+
+## How content works
+
+- New snippets are created through a three-step flow: choose a language, select optional dependencies, then enter details and code.
+- A snippet URL is generated from its display name. If the slug already exists for that account, a numeric suffix such as `-2` or `-3` is appended.
+- The slug is fixed after creation. Titles, descriptions, language, dependencies, tags, group, visibility and code can be edited.
+- Deleting content hides it immediately. Deletion is soft, and site administrators can restore content.
+- A copy is counted at most once per visitor, snippet and hour.
+- A public snippet can be forked into a private copy that belongs to the current user and retains a source link.
+- A public group can be forked with its public snippets. Private snippets from the original group are not copied.
+
+## Visibility and access
+
+| Visibility | Who can open it | Search and indexing |
+| --- | --- | --- |
+| Public | Everyone | Listed on profiles, catalog pages and public search |
+| Unlisted | Anyone with the direct link | Excluded from search and marked noindex |
+| Private | Only the owner | Never exposed on public pages |
+
+Public and unlisted content require the author to set a username first. Visitors without permission receive a 404 rather than a separate access-denied page. A snippet uses its own visibility; a group page uses the group visibility and only lists snippets the visitor may open.
+
+## Discovery and navigation
+
+- `/languages` and `/dependencies` provide catalog entry points.
+- `/language/{slug}` lists a language, related public snippets and relevant groups.
+- `/{kind}/{slug}` lists dependencies where `kind` is `framework`, `library`, `tool` or `runtime`.
+- `/search` returns public snippets and groups with pagination.
+- Pressing `/` outside an input opens the command box. Supported commands include `/language`, `/framework`, `/lib`, `/tool`, `/runtime`, `/dep`, `/snippet`, `/group`, `/user`, `/new`, `/me`, `/favorites`, `/reports`, `/requests`, `/changelog`, `/go` and `/search`.
+- Search separates multiple keywords with spaces. All keywords must match. Snippets are searched by title, description, tags, language and dependency names.
+
+## Profiles and community
+
+- A public profile lives at `/{username}` and displays avatar, nickname, bio, open links, content counts and public snippets and groups.
+- The owner sees private and unlisted content plus additional management actions.
+- Owner-only profile tabs cover favourites, reports and feedback, and catalog requests. These tabs are not public.
+- Visitors can follow authors. The profile owner can manage followers and following from the follower dialogs.
+- Owners can pin snippets and groups and reorder content.
+- The contribution calendar publicly shows daily activity counts, not private content titles or feedback text.
+
+## Documentation
+
+- [Documentation home](https://bits.micropue.com.cn/docs): Bilingual English and Chinese user documentation with chapter navigation.
+- [Getting started](https://bits.micropue.com.cn/docs/getting-started): What BITS is, what users can do, account setup and the username requirement for publishing.
+- [Creating snippets](https://bits.micropue.com.cn/docs/snippets): The three-step editor, dependency filtering, URL generation, tags, groups and visibility choices.
+- [Editing and deleting](https://bits.micropue.com.cn/docs/editing): Editable fields, fixed slugs, confirmation, immediate link invalidation and soft-delete restoration.
+- [Groups](https://bits.micropue.com.cn/docs/groups): Creating groups, assigning snippets, group pages, URL collisions and deletion behaviour.
+- [Search and the command box](https://bits.micropue.com.cn/docs/search): Commands, keyword semantics, full search and catalog result pages.
+- [Your profile](https://bits.micropue.com.cn/docs/profile): Visitor view, owner view, private tabs, contribution calendar, ordering and followers.
+- [Copy and fork](https://bits.micropue.com.cn/docs/copy-fork): Share links, copy counting, snippet forking and group forking rules.
+- [Visibility and privacy](https://bits.micropue.com.cn/docs/visibility): Public, unlisted and private access, noindex behaviour and 404 enforcement.
+- [Language and dependency requests](https://bits.micropue.com.cn/docs/requests): Required fields, moderation, status tracking and rate limits.
+- [Changelog documentation](https://bits.micropue.com.cn/docs/changelog): Public product updates, draft visibility and pagination.
+- [FAQ](https://bits.micropue.com.cn/docs/faq): Publishing blockers, generated URL suffixes, missing pages, fixed URLs, deletion and restoration.
+
+## Developer platform
+
+- [Developer platform](https://bits.micropue.com.cn/developer): Entry point for applications and OAuth services.
+- [Apps documentation](https://bits.micropue.com.cn/developer/docs/apps): Application name, homepage, optional icon and description; one OAuth service per application.
+- [OAuth documentation](https://bits.micropue.com.cn/developer/docs/oauth): Endpoints, client authentication, scopes, authorization code flow, PKCE, refresh rotation, device flow, userinfo and revocation.
+
+### OAuth endpoints
+
+- `GET /oauth/authorize`
+- `POST /oauth/token`
+- `GET /oauth/userinfo`
+- `POST /oauth/revoke`
+- `POST /oauth/device/code`
+- `GET /oauth/device`
+
+### OAuth facts
+
+- Supported scopes: `read:user` and `read:email`.
+- PKCE methods: `S256` and `plain`.
+- Authorization codes are short-lived and single-use.
+- Refresh tokens rotate; reuse of an old refresh token revokes the token family.
+- The userinfo response includes `sub`, `username`, `nickname`, `avatar_url` and `profile`; `email` is included when authorised.
+- Access tokens can expire, while an OAuth service can also be configured for a non-expiring token.
+
+## Public routes
+
+- `https://bits.micropue.com.cn/`: Homepage and command entry point.
+- `https://bits.micropue.com.cn/languages`: Language catalog.
+- `https://bits.micropue.com.cn/dependencies`: Dependency catalog.
+- `https://bits.micropue.com.cn/search`: Public content search.
+- `https://bits.micropue.com.cn/changelog`: Published product updates.
+- `https://bits.micropue.com.cn/request`: Catalog request form for signed-in users.
+- `https://bits.micropue.com.cn/developer`: Developer platform overview.
+- `https://bits.micropue.com.cn/developer/docs/apps`: Application documentation.
+- `https://bits.micropue.com.cn/developer/docs/oauth`: OAuth documentation.
+- `https://bits.micropue.com.cn/sitemap.xml`: Public page discovery.
+
+## Legal
+
+- [Legal terms](https://bits.micropue.com.cn/legal/terms): Account, acceptable-use, content, ownership and liability terms.
+- [Privacy policy](https://bits.micropue.com.cn/legal/privacy): Data collection, use, protection and user choices.
+- [Cookies policy](https://bits.micropue.com.cn/legal/cookies): The sign-in cookie and its management.
+
+## Crawling guidance
+
+- Use public content pages, documentation, catalogs and the sitemap.
+- Do not treat private, deleted, account, developer-management or dashboard pages as public content.
+- Unlisted content is reachable by direct link but should not be treated as search-indexed content.
+- Prefer canonical URLs from the sitemap and use the displayed author username and content slug when citing a snippet.
+
+## Site facts
+
+- Canonical site: https://bits.micropue.com.cn
+- Product category: code snippet sharing and discovery community
+- Supported developer protocol: OAuth 2.0
+- Public catalog kinds: language, framework, library, tool and runtime
+- Source repository: https://github.com/Micropue/micropue-bits-service
+- Sitemap: https://bits.micropue.com.cn/sitemap.xml
+- Short AI reference: https://bits.micropue.com.cn/llms.txt
+- Last updated: 2026-11-20

@@ -27,7 +27,8 @@
                         v-bind="slotProps.a11yAttrs">
                         <!-- 已登录：GitHub 头像 + 昵称 + 右上箭头（提示可进入账户页） -->
                         <template v-if="authUser">
-                            <UserAvatar :src="authUser.githubAvatarUrl" :size="22" />
+                            <UserAvatar :src="authUser.githubAvatarUrl" :size="22"
+                                :alt="`${authUser.nickname} avatar`" />
                             <span class="auth-name">{{ authUser.nickname }}</span>
                             <ArrowUpRight class="auth-arrow" aria-hidden="true" />
                         </template>

@@ -1,6 +1,8 @@
 <template>
-  <span class="user-avatar" :style="{ width: `${size}px`, height: `${size}px` }" aria-hidden="true">
-    <img v-if="src && !failed" :src="src" alt="" loading="lazy" referrerpolicy="no-referrer" @error="failed = true">
+  <span class="user-avatar" :style="{ width: `${size}px`, height: `${size}px` }"
+    :aria-hidden="alt ? undefined : 'true'">
+    <img v-if="src && !failed" :src="src" :alt="alt ?? ''" loading="lazy" referrerpolicy="no-referrer"
+      @error="failed = true">
     <Question v-else class="user-avatar-fallback" />
   </span>
 </template>
@@ -10,7 +12,11 @@ import Question from '@primeicons/vue/question'
 
 // 全站统一头像：取 GitHub 头像；未绑定或加载失败时显示问号占位
 // 规范见 docs-internal/项目综合设计.md「账户设置 / 头像」
-const props = withDefaults(defineProps<{ src?: string | null, size?: number }>(), { src: null, size: 24 })
+const props = withDefaults(defineProps<{ src?: string | null, size?: number, alt?: string | null }>(), {
+  src: null,
+  size: 24,
+  alt: null
+})
 
 const failed = ref(false)
 watch(() => props.src, () => { failed.value = false })

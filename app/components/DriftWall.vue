@@ -356,7 +356,9 @@ const cssVars = computed<CSSProperties>(
             :class="['dw-tile', activeId === tile.id ? 'is-active' : '']" :data-tile-id="tile.id"
             :data-col="colData.column" @focus="activate(tile.id, colData.column)" @blur="release">
             <span class="dw-tile-inner">
-              <img :src="tile.item.image" :alt="tile.item.title ?? ''" loading="lazy" decoding="async"
+              <img :src="tile.item.image"
+                :alt="tile.item.title ? `Code gallery image: ${tile.item.title}` : 'Code gallery image'"
+                loading="lazy" decoding="async"
                 :draggable="false" class="dw-tile-img" @load="markSettled(tile.item.image)"
                 @error="markSettled(tile.item.image)" />
               <span class="dw-tile-overlay" aria-hidden="true" />

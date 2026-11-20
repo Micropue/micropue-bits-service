@@ -1,0 +1,49 @@
+# BITS
+
+> BITS is a community for sharing, reusing and discovering small code snippets, with public profiles, groups, a language and dependency catalog, and a searchable command box.
+
+## Core pages
+
+- [BITS homepage](https://bits.micropue.com.cn/): Introduces the snippet-sharing community and provides search, example snippets, catalog shortcuts and site-wide navigation.
+- [Languages](https://bits.micropue.com.cn/languages): Public catalog of programming languages, with links to language detail pages and snippets that use each language.
+- [Dependencies](https://bits.micropue.com.cn/dependencies): Public catalog of frameworks, libraries, tools and runtimes used by shared snippets.
+- [Search](https://bits.micropue.com.cn/search): Searches public snippets and groups by title, description, language, tags and dependencies.
+- [Changelog](https://bits.micropue.com.cn/changelog): Newest-first timeline of published BITS product updates, new features and fixes.
+- [Request a catalog entry](https://bits.micropue.com.cn/request): Signed-in form for requesting a missing programming language or dependency.
+- [Extended AI reference](https://bits.micropue.com.cn/llms-full.txt): Detailed description of BITS features, content rules, documentation, public routes and developer integration.
+
+## Documentation
+
+- [BITS documentation](https://bits.micropue.com.cn/docs): Bilingual English and Chinese user documentation covering accounts, snippets, groups, discovery and privacy.
+- [Getting started](https://bits.micropue.com.cn/docs/getting-started): Explains what BITS is, what users can do and how to configure a username and public profile.
+- [Creating snippets](https://bits.micropue.com.cn/docs/snippets): Describes the three-step editor, snippet fields, generated URLs, tags, dependencies and visibility.
+- [Editing and deleting](https://bits.micropue.com.cn/docs/editing): Explains editable fields, fixed URL slugs, soft deletion and administrator restoration.
+- [Groups](https://bits.micropue.com.cn/docs/groups): Covers creating groups, assigning snippets and how group pages and deletion behave.
+- [Search and the command box](https://bits.micropue.com.cn/docs/search): Documents slash commands, keyword matching and catalog-aware search.
+- [Your profile](https://bits.micropue.com.cn/docs/profile): Explains profile content, owner-only actions, private tabs, ordering, contribution activity and followers.
+- [Copy and fork](https://bits.micropue.com.cn/docs/copy-fork): Covers share links, copy counts, snippet forks and group forks while preserving source attribution.
+- [Visibility and privacy](https://bits.micropue.com.cn/docs/visibility): Defines public, unlisted and private access, search visibility and 404 behavior for unauthorised visitors.
+- [Language and dependency requests](https://bits.micropue.com.cn/docs/requests): Explains catalog requests, moderation, status tracking and duplicate-name limits.
+- [Changelog documentation](https://bits.micropue.com.cn/docs/changelog): Describes the public release timeline and how published updates are loaded.
+- [FAQ](https://bits.micropue.com.cn/docs/faq): Answers common questions about publishing, URL suffixes, 404 responses, deleting and restoring content.
+
+## Developer platform
+
+- [Developer platform](https://bits.micropue.com.cn/developer): Entry point for BITS applications and OAuth integrations.
+- [Apps documentation](https://bits.micropue.com.cn/developer/docs/apps): Explains application identity fields and how an app is connected to one OAuth service.
+- [OAuth documentation](https://bits.micropue.com.cn/developer/docs/oauth): Documents authorization code flow, PKCE, refresh tokens, device flow, scopes, userinfo and revocation.
+
+## Product definition
+
+BITS is a lightweight code-sharing product. Its primary objects are reusable snippets and folders called groups. A snippet has one primary language, optional dependencies and tags, a title, description, code body and visibility setting. Public profiles and catalog pages connect snippets to authors, technologies and discovery paths. BITS is oriented toward small, reusable examples rather than full repository hosting.
+
+## Key facts
+
+- Canonical site: https://bits.micropue.com.cn
+- Content visibility: public, unlisted and private; private content and unauthorised access return 404.
+- Public discovery: language and dependency catalog pages, public profiles, search and the slash command box.
+- Accounts: email-code, GitHub and passkey sign-in are supported; a username is required before publishing public or unlisted content.
+- URLs: profiles use `/{username}`; content uses `/{username}/{slug}`; slugs remain fixed after creation.
+- Developer access: OAuth 2.0 with `read:user` and `read:email` scopes.
+- Sitemap: https://bits.micropue.com.cn/sitemap.xml
+- Last updated: 2026-11-20
