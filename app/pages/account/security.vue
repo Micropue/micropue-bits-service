@@ -116,25 +116,15 @@
 
   <section class="group">
     <h3 class="group-title">Authorized applications</h3>
-    <div v-if="oauthApps.length" class="card">
-      <div v-for="app in oauthApps" :key="app.appSid" class="row">
-        <div class="row-main">
-          <span class="row-label">{{ app.name }}</span>
-          <span class="row-desc">
-            Authorized {{ formatDate(app.authorizedAt) }} · {{ app.scopes.map(scopeLabel).join(', ') }}
-          </span>
-        </div>
-        <div class="row-control">
-          <Button label="Revoke" severity="danger" outlined size="small" :loading="revokingApp === app.appSid"
-            @click="askRevokeOAuth(app)" />
-        </div>
-      </div>
-    </div>
-    <div v-else class="card">
+    <div class="card">
       <div class="row">
         <div class="row-main">
-          <span class="row-label">No authorized applications</span>
-          <span class="row-desc">OAuth applications you authorize will appear here.</span>
+          <span class="row-label">Authorized applications</span>
+          <span class="row-desc">Review and revoke access for apps connected to your account.</span>
+        </div>
+        <div class="row-control value-action">
+          <span class="row-value">{{ oauthAppCount }} application{{ oauthAppCount === 1 ? '' : 's' }}</span>
+          <Button label="Manage" severity="secondary" outlined size="small" @click="oauthAppsOpen = true" />
         </div>
       </div>
     </div>
@@ -175,6 +165,9 @@
 
   <!-- 登录设备 -->
   <DevicesDialog v-model="devicesOpen" @changed="loadDeviceCount" />
+
+  <!-- 已授权 OAuth 应用 -->
+  <AuthorizedAppsDialog v-model="oauthAppsOpen" @changed="oauthAppCount = $event" />
 
   <!-- Passkey 管理 -->
   <Dialog v-model:visible="passkeysOpen" modal :draggable="false" header="Passkeys" :style="{ width: '32rem' }">
@@ -224,68 +217,20 @@ const githubLogin = computed(() => authUser.value?.githubLogin ?? '')
 const githubAvatarUrl = computed(() => authUser.value?.githubAvatarUrl ?? '')
 const totpEnabled = computed(() => authUser.value?.totpEnabled ?? false)
 const twoFactorEnabled = computed(() => authUser.value?.twoFactorEnabled ?? false)
-const confirm = useConfirm()
-const toast = useToast()
 
-interface OAuthAuthorization {
-  appSid: string
-  name: string
-  iconUrl: string | null
-  scopes: string[]
-  authorizedAt: string
-}
-
-const oauthApps = ref<OAuthAuthorization[]>([])
-const revokingApp = ref('')
-
-async function loadOAuthApps() {
+const oauthAppsOpen = ref(false)
+const oauthAppCount = ref(0)
+async function loadOAuthAppCount() {
   try {
-    const res = await $fetch<{ applications: OAuthAuthorization[] }>('/api/account/oauth/authorizations')
-    oauthApps.value = res.applications
+    const res = await $fetch<{ total: number }>('/api/account/oauth/authorizations', {
+      query: { page: 1 }
+    })
+    oauthAppCount.value = res.total
   } catch {
-    oauthApps.value = []
+    // 未登录或失败时忽略
   }
 }
-onMounted(loadOAuthApps)
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('en', { dateStyle: 'medium' })
-}
-
-function scopeLabel(value: string) {
-  if (value === 'read:user') return 'basic profile'
-  if (value === 'read:email') return 'email address'
-  return value
-}
-
-function askRevokeOAuth(app: OAuthAuthorization) {
-  if (revokingApp.value) return
-  confirm.require({
-    header: 'Revoke application access',
-    message: `${app.name} will no longer be able to access your account.`,
-    acceptLabel: 'Revoke',
-    rejectLabel: 'Cancel',
-    acceptProps: { severity: 'danger' },
-    rejectProps: { severity: 'secondary', text: true },
-    accept: async () => {
-      revokingApp.value = app.appSid
-      try {
-        await $fetch(`/api/account/oauth/authorizations/${encodeURIComponent(app.appSid)}`, { method: 'DELETE' })
-        await loadOAuthApps()
-        toast.add({ severity: 'success', summary: 'Application access revoked', life: 3000 })
-      } catch (err) {
-        toast.add({
-          severity: 'error',
-          summary: 'Could not revoke access',
-          detail: (err as { statusMessage?: string }).statusMessage,
-          life: 5000
-        })
-      } finally {
-        revokingApp.value = ''
-      }
-    }
-  })
-}
+onMounted(loadOAuthAppCount)
 
 // GitHub 绑定结果提示（由 OAuth 回调带 ?github_* 查询参数返回）
 const route = useRoute()

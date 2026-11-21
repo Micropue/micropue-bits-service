@@ -584,7 +584,33 @@ export interface UserOAuthAuthorization {
   authorizedAt: string
 }
 
-export async function listUserAuthorizations(userUuid: string): Promise<UserOAuthAuthorization[]> {
+export interface UserOAuthAuthorizationsPage {
+  applications: UserOAuthAuthorization[]
+  total: number
+  page: number
+  pageSize: number
+  pageCount: number
+  hasMore: boolean
+}
+
+export async function listUserAuthorizations(
+  userUuid: string,
+  requestedPage = 1
+): Promise<UserOAuthAuthorizationsPage> {
+  const pageSize = 10
+  const [countRows] = await useDb().query<RowDataPacket[]>(
+    `SELECT COUNT(DISTINCT t.\`app_sid\`) AS \`total\`
+       FROM \`oauth_tokens\` t
+       JOIN \`developer_oauth_services\` s ON s.\`app_sid\` = t.\`app_sid\`
+       JOIN \`developer_apps\` a ON a.\`sid\` = s.\`app_sid\`
+      WHERE t.\`user_uuid\` = ? AND t.\`revoked_at\` IS NULL
+        AND (t.\`expires_at\` IS NULL OR t.\`expires_at\` > NOW())`,
+    [userUuid]
+  )
+  const total = Number(countRows[0]?.total ?? 0)
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(Math.max(1, Math.trunc(requestedPage) || 1), pageCount)
+  const offset = (page - 1) * pageSize
   const [rows] = await useDb().query<RowDataPacket[]>(
     `SELECT t.\`app_sid\`, a.\`name\`, a.\`icon_url\`, MIN(t.\`created_at\`) AS \`authorized_at\`,
             GROUP_CONCAT(DISTINCT t.\`scope\`) AS \`scopes\`
@@ -594,16 +620,25 @@ export async function listUserAuthorizations(userUuid: string): Promise<UserOAut
       WHERE t.\`user_uuid\` = ? AND t.\`revoked_at\` IS NULL
         AND (t.\`expires_at\` IS NULL OR t.\`expires_at\` > NOW())
       GROUP BY t.\`app_sid\`, a.\`name\`, a.\`icon_url\`
-      ORDER BY \`authorized_at\` DESC`,
-    [userUuid]
+      ORDER BY \`authorized_at\` DESC, t.\`app_sid\` ASC
+      LIMIT ? OFFSET ?`,
+    [userUuid, pageSize, offset]
   )
-  return rows.map(row => ({
+  const applications = rows.map(row => ({
     appSid: String(row.app_sid),
     name: String(row.name),
     iconUrl: row.icon_url ? String(row.icon_url) : null,
     scopes: [...new Set(String(row.scopes ?? '').split(/[,\s]+/).filter(Boolean))],
     authorizedAt: String(row.authorized_at)
   }))
+  return {
+    applications,
+    total,
+    page,
+    pageSize,
+    pageCount,
+    hasMore: offset + applications.length < total
+  }
 }
 
 export async function revokeUserAppTokens(userUuid: string, appSid: string) {

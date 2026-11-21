@@ -4,5 +4,6 @@ export default defineEventHandler(async event => {
   const user = await getAuthUser(event)
   if (!user) throw createError({ statusCode: 401, statusMessage: 'Not signed in' })
   await enforceUserRateLimit(event, user.uuid, 'oauth:authorizations:list', 60, 3600)
-  return { applications: await listUserAuthorizations(user.uuid) }
+  const requestedPage = Number.parseInt(String(getQuery(event).page ?? '1'), 10)
+  return await listUserAuthorizations(user.uuid, requestedPage)
 })
