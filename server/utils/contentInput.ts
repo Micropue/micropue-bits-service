@@ -44,6 +44,38 @@ export function slugifyContentName(value: string): string {
     .slice(0, 40)
 }
 
+export const CONTENT_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+export function normalizeContentSlug(value: unknown): string | null {
+  const raw = String(value ?? '').trim().toLowerCase()
+  if (!raw) return null
+  if (raw.length > 40 || !CONTENT_SLUG_RE.test(raw)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'URL name must use lowercase letters, numbers and single hyphens (max 40 characters)',
+      data: { field: 'slug' }
+    })
+  }
+  return raw
+}
+
+export async function contentSlugAvailable(
+  ownerUuid: string,
+  slug: string,
+  excludeSid = ''
+): Promise<boolean> {
+  const db = useDb()
+  const [[row]] = await db.query(
+    `SELECT
+       (SELECT COUNT(*) FROM \`contents\`
+         WHERE \`owner_uuid\` = ? AND \`slug\` = ? AND \`sid\` <> ?) +
+       (SELECT COUNT(*) FROM \`content_aliases\`
+         WHERE \`owner_uuid\` = ? AND \`slug\` = ? AND \`content_sid\` <> ?) AS \`count\``,
+    [ownerUuid, slug, excludeSid, ownerUuid, slug, excludeSid]
+  ) as [{ count: number }[], unknown]
+  return !Number(row?.count ?? 0)
+}
+
 // 目录名在用户内唯一；与历史别名也不能冲突（后续改名重定向用）
 // adjusted = 原名生成的 slug 已被占用，实际 URL 追加了 -2 / -3…，用于前端提示
 export async function nextContentSlug(

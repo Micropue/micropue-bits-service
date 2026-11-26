@@ -5,8 +5,14 @@ import type { RowDataPacket } from 'mysql2/promise'
 export default defineEventHandler(async event => {
   const viewer = await requireAuth(event)
   await enforceUserRateLimit(event, viewer.uuid, 'snippets:fork', 10, 3600)
+  const body = await readBody<Record<string, unknown>>(event).catch(() => ({}))
   const username = String(getRouterParam(event, 'username') ?? '').trim()
   const slug = String(getRouterParam(event, 'slug') ?? '').trim()
+  const requestedSlug = normalizeContentSlug(body?.slug)
+  const visibility = String(body?.visibility ?? 'private')
+  if (!VISIBILITIES.includes(visibility as typeof VISIBILITIES[number])) {
+    throw createError({ statusCode: 400, statusMessage: 'Unknown visibility', data: { field: 'visibility' } })
+  }
 
   const owner = await findPublicUser(username)
   if (!owner) throw createError({ statusCode: 404, statusMessage: 'Snippet not found' })
@@ -27,7 +33,15 @@ export default defineEventHandler(async event => {
   }
 
   const db = useDb()
-  const { slug: newSlug } = await nextContentSlug(viewer.uuid, source.name)
+  let newSlug: string
+  if (requestedSlug) {
+    if (!(await contentSlugAvailable(viewer.uuid, requestedSlug))) {
+      throw createError({ statusCode: 409, statusMessage: 'This URL is already taken', data: { field: 'slug' } })
+    }
+    newSlug = requestedSlug
+  } else {
+    newSlug = (await nextContentSlug(viewer.uuid, source.name)).slug
+  }
   const languageSidValue = source.language_slug ? await languageSid(source.language_slug) : null
   const sid = shortId()
 
@@ -38,8 +52,8 @@ export default defineEventHandler(async event => {
     await conn.execute(
       `INSERT INTO \`contents\`
          (\`sid\`, \`owner_uuid\`, \`kind\`, \`slug\`, \`name\`, \`intro\`, \`visibility\`, \`fork_from_sid\`, \`language_sid\`, \`code\`)
-       VALUES (?, ?, 'snippet', ?, ?, ?, 'private', ?, ?, ?)`,
-      [sid, viewer.uuid, newSlug, source.name, source.intro, source.sid, languageSidValue, source.code]
+       VALUES (?, ?, 'snippet', ?, ?, ?, ?, ?, ?, ?)`,
+      [sid, viewer.uuid, newSlug, source.name, source.intro, visibility, source.sid, languageSidValue, source.code]
     )
 
     const [tagRows] = await conn.query<RowDataPacket[]>(

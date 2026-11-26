@@ -1,6 +1,6 @@
 <template>
   <div ref="host" class="code-editor"
-    :class="{ 'is-readonly': readonly, 'no-gutters': !showLineNumbers }"
+    :class="{ 'is-readonly': readonly, 'no-gutters': !showLineNumbers, 'is-fill': fill }"
     :style="{ '--editor-height': `${height}px` }" />
 </template>
 
@@ -18,12 +18,15 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   /** 是否显示行号（详情页隐藏） */
   showLineNumbers?: boolean
+  /** 撑满可用高度，滚动交给编辑器内部 */
+  fill?: boolean
 }>(), {
   language: '',
   placeholder: 'Paste your code here…',
   height: 360,
   readonly: false,
-  showLineNumbers: true
+  showLineNumbers: true,
+  fill: false
 })
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -193,6 +196,22 @@ onBeforeUnmount(() => {
     overflow: auto;
   }
 
+  &.is-fill {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+
+    :deep(.cm-editor) {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+
+    :deep(.cm-scroller) {
+      min-height: 0;
+    }
+  }
+
   /* 只读展示：高度随内容完整展开；隐藏光标/当前行；与详情页 pre 的内边距一致 */
   &.is-readonly {
     :deep(.cm-editor) {
@@ -227,6 +246,10 @@ onBeforeUnmount(() => {
 
     &.is-readonly :deep(.cm-editor) {
       height: auto;
+    }
+
+    &.is-fill :deep(.cm-editor) {
+      height: 280px;
     }
   }
 }

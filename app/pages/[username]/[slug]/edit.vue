@@ -3,7 +3,7 @@
     <header class="page-head">
       <p class="eyebrow">Edit snippet</p>
       <h1 class="page-title">{{ initial?.name || 'Edit snippet' }}</h1>
-      <p class="page-sub">URL: <code>/{{ username }}/{{ slug }}</code> · the URL name cannot be changed.</p>
+      <p class="page-sub">URL: <code>/{{ username }}/{{ slug }}</code> · you can change the URL name below.</p>
     </header>
 
     <section v-if="!signedIn" class="panel panel--center">
@@ -22,7 +22,7 @@
 
     <template v-else>
       <ContentForm :initial="initial" :slug="slug" submit-label="Save changes" :saving="saving" :error="errorMessage"
-        @submit="save">
+        fill @submit="save">
         <template #secondary-actions>
           <Button label="Cancel" severity="secondary" text @click="navigateTo(`/${username}/${slug}`)" />
           <Button label="Delete" severity="danger" text :loading="deleting" @click="askDelete" />
@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import type { ContentFormInitial, ContentFormPayload } from '~/components/ContentForm.vue'
 
-// 编辑代码段（仅作者本人）：/{username}/{slug}/edit；slug 不可修改
+// 编辑代码段（仅作者本人）：/{username}/{slug}/edit；slug 可修改
 definePageMeta({ layout: 'default' })
 
 interface EditResponse {
@@ -79,7 +79,8 @@ const initial = computed<ContentFormInitial | null>(() => {
     tags: snippet.tags,
     visibility: snippet.visibility,
     code: snippet.code,
-    group: snippet.group
+    group: snippet.group,
+    slug: snippet.slug
   }
 })
 
@@ -93,8 +94,10 @@ async function save(payload: ContentFormPayload) {
   saving.value = true
   errorMessage.value = ''
   try {
-    await $fetch(`/api/contents/${encodeURIComponent(slug)}`, { method: 'PATCH', body: payload })
-    await navigateTo(`/${username}/${slug}`)
+    const response = await $fetch<{
+      snippet: { slug: string }
+    }>(`/api/contents/${encodeURIComponent(slug)}`, { method: 'PATCH', body: payload })
+    await navigateTo(`/${username}/${response.snippet.slug}`)
   } catch (err) {
     errorMessage.value = (err as { statusMessage?: string }).statusMessage ?? 'Save failed'
   } finally {
@@ -136,11 +139,30 @@ useHead({
 <style scoped lang="scss">
 .edit-page {
   width: min(1120px, 94vw);
+  height: calc(100dvh - 90px);
+  min-height: 620px;
   margin: 0 auto;
   padding: 3.5rem 0 5rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.edit-page > :deep(.content-form) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .edit-page {
+    height: auto;
+    min-height: calc(100dvh - 90px);
+    padding-bottom: 3rem;
+  }
+
+  .edit-page > :deep(.content-form) {
+    min-height: 700px;
+  }
 }
 
 .eyebrow {

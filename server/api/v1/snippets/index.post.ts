@@ -1,0 +1,9 @@
+// 创建代码段：字段与网页编辑器一致，可选 slug
+export default defineEventHandler(async event => {
+  const auth = await requireApiV1(event, 'content:create')
+  const body = await readBody<Record<string, unknown>>(event).catch(() => null)
+  if (!body) throw createError({ statusCode: 400, statusMessage: 'JSON body is required' })
+  const result = await createApiSnippet(auth, body)
+  setResponseStatus(event, 201)
+  return { data: result.snippet, meta: { deduplicated: result.deduplicated } }
+})

@@ -6,7 +6,19 @@ export default defineEventHandler(async event => {
   const body = await readBody<Record<string, unknown>>(event)
 
   const fields = await readSnippetFields(body, user)
-  const { slug, adjusted: deduplicated } = await nextContentSlug(user.uuid, fields.name)
+  const requestedSlug = normalizeContentSlug(body?.slug)
+  let slug: string
+  let deduplicated = false
+  if (requestedSlug) {
+    if (!(await contentSlugAvailable(user.uuid, requestedSlug))) {
+      throw createError({ statusCode: 409, statusMessage: 'This URL is already taken', data: { field: 'slug' } })
+    }
+    slug = requestedSlug
+  } else {
+    const generated = await nextContentSlug(user.uuid, fields.name)
+    slug = generated.slug
+    deduplicated = generated.adjusted
+  }
 
   const sid = shortId()
   const conn = await useDb().getConnection()

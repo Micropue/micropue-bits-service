@@ -48,7 +48,7 @@
             <ol v-else-if="block.type === 'ol'" class="docs-list">
               <li v-for="(item, itemIndex) in block.items" :key="itemIndex">{{ item }}</li>
             </ol>
-            <pre v-else-if="block.type === 'code'" class="docs-code"><code>{{ block.text }}</code></pre>
+            <DocsCodeBlock v-else-if="block.type === 'code'" :text="block.text" :language="block.language" />
             <p v-else-if="block.type === 'note'" class="docs-note">{{ block.text }}</p>
             <div v-else-if="block.type === 'table'" class="docs-table-wrap">
               <table class="docs-table">
@@ -85,11 +85,11 @@
 import Globe from '@primeicons/vue/globe'
 import { DOC_CHAPTERS, type DocLocale } from '~/data/docs'
 
-// 公开文档：/docs 与 /docs/{chapter}；左侧目录、右侧正文，中英文切换记忆在 localStorage
+// 公开文档：/docs 与 /docs/{chapter...}；左侧目录、右侧正文，中英文切换记忆在 localStorage
 definePageMeta({
   validate: (route) => {
     const raw = route.params.slug
-    const slug = Array.isArray(raw) ? raw[0] : raw
+    const slug = Array.isArray(raw) ? raw.join('/') : raw
     return !slug || DOC_CHAPTERS.some(chapter => chapter.slug === slug)
   }
 })
@@ -100,7 +100,7 @@ const chapters = DOC_CHAPTERS
 const route = useRoute()
 const slugParam = computed(() => {
   const raw = route.params.slug
-  return Array.isArray(raw) ? raw[0] : raw
+  return Array.isArray(raw) ? raw.join('/') : raw
 })
 
 const chapterIndex = computed(() => {

@@ -16,8 +16,10 @@
         </button>
         <div class="developer-subnav" :class="{ 'is-open': docsOpen }" :inert="!docsOpen">
           <div class="developer-subnav-inner">
-            <NuxtLink to="/developer/docs/apps" class="nav-subitem">Apps</NuxtLink>
-            <NuxtLink to="/developer/docs/oauth" class="nav-subitem">OAuth</NuxtLink>
+            <NuxtLink to="/docs/developer/apps" class="nav-subitem">Apps</NuxtLink>
+            <NuxtLink to="/docs/developer/oauth" class="nav-subitem">OAuth</NuxtLink>
+            <NuxtLink to="/docs/developer/api-keys" class="nav-subitem">API Keys</NuxtLink>
+            <NuxtLink to="/docs/developer/open-api" class="nav-subitem">Open API</NuxtLink>
           </div>
         </div>
       </nav>
@@ -35,14 +37,15 @@
 import type { AuthUser } from '~/composables/useAuthUser'
 import Box from '@primeicons/vue/box'
 import Key from '@primeicons/vue/key'
+import Lock from '@primeicons/vue/lock'
 import Book from '@primeicons/vue/book'
 import ChevronDown from '@primeicons/vue/chevron-down'
 
 // 开发者入口要求账号已设置用户名、密码并开启 2FA
 const route = useRoute()
-const docsOpen = ref(route.path.startsWith('/developer/docs'))
+const docsOpen = ref(route.path.startsWith('/docs/developer') || route.path.startsWith('/developer/docs'))
 watch(() => route.path, path => {
-  if (path.startsWith('/developer/docs')) docsOpen.value = true
+  if (path.startsWith('/docs/developer') || path.startsWith('/developer/docs')) docsOpen.value = true
 })
 
 const { data } = await useFetch<{ user: AuthUser }>('/api/auth/me')
@@ -57,7 +60,8 @@ if (!current) {
 
 const sections = [
   { label: 'Apps', to: '/developer/apps', icon: Box },
-  { label: 'OAuth', to: '/developer/oauth', icon: Key }
+  { label: 'OAuth', to: '/developer/oauth', icon: Key },
+  { label: 'API Keys', to: '/developer/api-keys', icon: Lock }
 ]
 
 useHead({

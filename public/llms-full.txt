@@ -6,9 +6,9 @@
 
 BITS is a full-stack web product for sharing small, reusable code examples. It is designed around snippets rather than full repositories. Users can publish code with a primary language, optional dependencies, tags and a description, organise snippets into groups, and expose them through a public profile.
 
-The public side of the product combines topic catalogs, search, author profiles and direct content links. Signed-in users can create, edit, copy, fork, favourite and delete their own content. Developers can create applications and register OAuth services through the developer platform.
+The public side of the product combines topic catalogs, search, author profiles and direct content links. Signed-in users can create, edit, copy, fork, favourite and delete their own content. Developers can create Website apps that support OAuth and API Keys, or Service apps that support API Keys only.
 
-Chinese summary: BITS 是一个分享、复用和发现小型代码片段的社区，提供公开主页、代码分组、语言与依赖目录、搜索和开发者 OAuth 集成。
+Chinese summary: BITS 是一个分享、复用和发现小型代码片段的社区，提供公开主页、代码分组、语言与依赖目录、搜索，以及 OAuth 与 API Key 开发者集成。
 
 ## Primary objects
 
@@ -17,17 +17,19 @@ Chinese summary: BITS 是一个分享、复用和发现小型代码片段的社�
 - Language: a public catalog entry used as the snippet's primary technology.
 - Dependency: a framework, library, tool or runtime associated with one or more languages and selected snippets.
 - User profile: the author's public page at `/{username}`, with avatar, nickname, bio, links, activity and visible content.
-- Developer application: public identity information shown on an OAuth consent screen.
+- Developer application: a Website app that can use OAuth and API Keys, or a Service app that can use API Keys only.
 - OAuth service: credentials and configuration attached to one developer application.
+- API Key: a scoped key attached to one application and one user account, with permissions, an optional expiry, a one-time secret and a last-used timestamp.
 
 ## How content works
 
 - New snippets are created through a three-step flow: choose a language, select optional dependencies, then enter details and code.
-- A snippet URL is generated from its display name. If the slug already exists for that account, a numeric suffix such as `-2` or `-3` is appended.
-- The slug is fixed after creation. Titles, descriptions, language, dependencies, tags, group, visibility and code can be edited.
+- A snippet URL is initially generated from its display name. If the slug already exists for that account, a numeric suffix such as `-2` or `-3` is appended.
+- A snippet or group slug can be renamed later. Supported old public detail, raw and edit links redirect to the new address.
+- Titles, descriptions, language, dependencies, tags, group, visibility and code can also be edited.
 - Deleting content hides it immediately. Deletion is soft, and site administrators can restore content.
 - A copy is counted at most once per visitor, snippet and hour.
-- A public snippet can be forked into a private copy that belongs to the current user and retains a source link.
+- Forking a public snippet opens a confirmation dialog where the current user can edit the new URL name and choose private, unlisted or public visibility before the copy is created. The copy retains a source link.
 - A public group can be forked with its public snippets. Private snippets from the original group are not copied.
 
 ## Visibility and access
@@ -63,21 +65,24 @@ Public and unlisted content require the author to set a username first. Visitors
 - [Documentation home](https://bits.micropue.com.cn/docs): Bilingual English and Chinese user documentation with chapter navigation.
 - [Getting started](https://bits.micropue.com.cn/docs/getting-started): What BITS is, what users can do, account setup and the username requirement for publishing.
 - [Creating snippets](https://bits.micropue.com.cn/docs/snippets): The three-step editor, dependency filtering, URL generation, tags, groups and visibility choices.
-- [Editing and deleting](https://bits.micropue.com.cn/docs/editing): Editable fields, fixed slugs, confirmation, immediate link invalidation and soft-delete restoration.
+- [Editing and deleting](https://bits.micropue.com.cn/docs/editing): Editable fields and URL names, redirects from old links, confirmation and soft-delete restoration.
 - [Groups](https://bits.micropue.com.cn/docs/groups): Creating groups, assigning snippets, group pages, URL collisions and deletion behaviour.
 - [Search and the command box](https://bits.micropue.com.cn/docs/search): Commands, keyword semantics, full search and catalog result pages.
 - [Your profile](https://bits.micropue.com.cn/docs/profile): Visitor view, owner view, private tabs, contribution calendar, ordering and followers.
-- [Copy and fork](https://bits.micropue.com.cn/docs/copy-fork): Share links, copy counting, snippet forking and group forking rules.
+- [Copy and fork](https://bits.micropue.com.cn/docs/copy-fork): Share links, copy counting, snippet fork confirmation with URL and visibility choices, and group forking rules.
 - [Visibility and privacy](https://bits.micropue.com.cn/docs/visibility): Public, unlisted and private access, noindex behaviour and 404 enforcement.
 - [Language and dependency requests](https://bits.micropue.com.cn/docs/requests): Required fields, moderation, status tracking and rate limits.
 - [Changelog documentation](https://bits.micropue.com.cn/docs/changelog): Public product updates, draft visibility and pagination.
-- [FAQ](https://bits.micropue.com.cn/docs/faq): Publishing blockers, generated URL suffixes, missing pages, fixed URLs, deletion and restoration.
+- [FAQ](https://bits.micropue.com.cn/docs/faq): Publishing blockers, generated and custom URL names, old-link redirects, missing pages, deletion and restoration.
 
 ## Developer platform
 
-- [Developer platform](https://bits.micropue.com.cn/developer): Entry point for applications and OAuth services.
-- [Apps documentation](https://bits.micropue.com.cn/developer/docs/apps): Application name, homepage, optional icon and description; one OAuth service per application.
-- [OAuth documentation](https://bits.micropue.com.cn/developer/docs/oauth): Endpoints, client authentication, scopes, authorization code flow, PKCE, refresh rotation, device flow, userinfo and revocation.
+- [Developer platform](https://bits.micropue.com.cn/developer): Entry point for applications, OAuth services and API Keys.
+- [Apps documentation](https://bits.micropue.com.cn/docs/developer/apps): Application identity, Website versus Service app types, and how apps connect to OAuth services and API Keys.
+- [OAuth documentation](https://bits.micropue.com.cn/docs/developer/oauth): Endpoints, client authentication, scopes, authorization code flow, PKCE, refresh rotation, device flow, userinfo and revocation.
+- [API Keys documentation](https://bits.micropue.com.cn/docs/developer/api-keys): Creating scoped keys, selecting an owned app, permissions, expiry, one-time secret display, last use and revocation.
+- [Open API v1 documentation](https://bits.micropue.com.cn/docs/developer/open-api): API-key authentication, snippet and group endpoints, pagination, errors, permissions and rate limits.
+- [OpenAPI specification](https://bits.micropue.com.cn/openapi.json): OpenAPI 3.1.0 document for the `/api/v1` surface, versioned as API `1.0.0`.
 
 ### OAuth endpoints
 
@@ -97,6 +102,28 @@ Public and unlisted content require the author to set a username first. Visitors
 - The userinfo response includes `sub`, `username`, `nickname`, `avatar_url` and `profile`; `email` is included when authorised.
 - Access tokens can expire, while an OAuth service can also be configured for a non-expiring token.
 
+### API Keys and Open API
+
+- Website apps can create API Keys and OAuth services; Service apps can create API Keys only.
+- API Keys are shown in full once. Only a hash is stored; later views show a prefix, name, permissions, expiry, creation time and last-used time.
+- Permissions are `content:read`, `content:create`, `content:update` and `content:delete`.
+- Keys can expire after 30, 90 or 365 days, or never expire, and can be revoked immediately. A user can retain up to 50 active keys.
+- `/api/v1` accepts an API Key through `Authorization: Bearer <key>` or `X-API-Key`. Site cookies and OAuth access tokens are rejected.
+- The Open API can read, create, update and soft-delete the key owner's snippets, and read, create, update and delete the owner's groups. It cannot change account profile, email, password, two-factor authentication, Passkeys, followers, favorites, OAuth grants or other security settings.
+- Read requests are limited to 120 per minute per key; write requests are limited to 30 per minute per key. Open API rate limiting fails closed when its rate-limit store is unavailable.
+- Open API endpoints:
+  - `GET /api/v1/me`
+  - `GET /api/v1/snippets`
+  - `POST /api/v1/snippets`
+  - `GET /api/v1/snippets/{slug}`
+  - `PATCH /api/v1/snippets/{slug}`
+  - `DELETE /api/v1/snippets/{slug}`
+  - `GET /api/v1/groups`
+  - `POST /api/v1/groups`
+  - `GET /api/v1/groups/{slug}`
+  - `PATCH /api/v1/groups/{slug}`
+  - `DELETE /api/v1/groups/{slug}`
+
 ## Public routes
 
 - `https://bits.micropue.com.cn/`: Homepage and command entry point.
@@ -106,8 +133,12 @@ Public and unlisted content require the author to set a username first. Visitors
 - `https://bits.micropue.com.cn/changelog`: Published product updates.
 - `https://bits.micropue.com.cn/request`: Catalog request form for signed-in users.
 - `https://bits.micropue.com.cn/developer`: Developer platform overview.
-- `https://bits.micropue.com.cn/developer/docs/apps`: Application documentation.
-- `https://bits.micropue.com.cn/developer/docs/oauth`: OAuth documentation.
+- `https://bits.micropue.com.cn/docs/developer`: Developer documentation overview.
+- `https://bits.micropue.com.cn/docs/developer/apps`: Application types and configuration documentation.
+- `https://bits.micropue.com.cn/docs/developer/oauth`: OAuth documentation.
+- `https://bits.micropue.com.cn/docs/developer/api-keys`: API Key documentation.
+- `https://bits.micropue.com.cn/docs/developer/open-api`: Open API v1 documentation.
+- `https://bits.micropue.com.cn/openapi.json`: OpenAPI 3.1 specification for `/api/v1`.
 - `https://bits.micropue.com.cn/sitemap.xml`: Public page discovery.
 
 ## Legal
@@ -122,14 +153,15 @@ Public and unlisted content require the author to set a username first. Visitors
 - Do not treat private, deleted, account, developer-management or dashboard pages as public content.
 - Unlisted content is reachable by direct link but should not be treated as search-indexed content.
 - Prefer canonical URLs from the sitemap and use the displayed author username and content slug when citing a snippet.
+- Use `/openapi.json` for the machine-readable definition of the authenticated Open API; it is not public content to crawl as a documentation page.
 
 ## Site facts
 
 - Canonical site: https://bits.micropue.com.cn
 - Product category: code snippet sharing and discovery community
-- Supported developer protocol: OAuth 2.0
+- Supported developer protocols: OAuth 2.0 and API-Key-authenticated Open API v1
 - Public catalog kinds: language, framework, library, tool and runtime
 - Source repository: https://github.com/Micropue/micropue-bits-service
 - Sitemap: https://bits.micropue.com.cn/sitemap.xml
 - Short AI reference: https://bits.micropue.com.cn/llms.txt
-- Last updated: 2026-11-20
+- Last updated: 2026-11-27

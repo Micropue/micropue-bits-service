@@ -1,6 +1,6 @@
 import type { RowDataPacket } from 'mysql2/promise'
 
-// 编辑代码段：读取本人代码段的完整可编辑字段（slug 不可改）
+// 编辑代码段：读取本人代码段的完整可编辑字段（slug 可改）
 export default defineEventHandler(async event => {
   setHeader(event, 'cache-control', 'no-store')
   const user = await requireAuth(event)

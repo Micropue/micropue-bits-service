@@ -1,5 +1,5 @@
 <template>
-  <div class="content-form">
+  <div class="content-form" :class="{ 'is-fill': fill }">
     <div class="details">
       <div class="details-fields">
         <div class="field">
@@ -9,14 +9,14 @@
             @change="onLanguageChange">
             <template #option="{ option }">
               <span class="option-row">
-                <img v-if="option.logo_url" class="option-logo" :src="option.logo_url" alt="" width="18" height="18"
+                <img v-if="option.logo_url" class="option-logo" :src="option.logo_url" :alt="`${option.name} logo`" width="18" height="18"
                   loading="lazy">
                 {{ option.name }}
               </span>
             </template>
             <template #value>
               <span v-if="language" class="option-row">
-                <img v-if="language.logo_url" class="option-logo" :src="language.logo_url" alt="" width="18"
+                <img v-if="language.logo_url" class="option-logo" :src="language.logo_url" :alt="`${language.name} logo`" width="18"
                   height="18" loading="lazy">
                 {{ language.name }}
               </span>
@@ -34,14 +34,14 @@
             placeholder="Select dependencies" aria-label="Dependencies" @filter="onDependencyFilter">
             <template #option="{ option }">
               <span class="dep-option">
-                <img v-if="option.logo_url" class="dep-logo" :src="option.logo_url" alt="" width="16" height="16"
+                <img v-if="option.logo_url" class="dep-logo" :src="option.logo_url" :alt="`${option.name} logo`" width="16" height="16"
                   loading="lazy">
                 <span>{{ option.name }}</span>
               </span>
             </template>
             <template #chip="{ value, removeCallback }">
               <span class="dep-chip">
-                <img v-if="value.logo_url" class="dep-logo" :src="value.logo_url" alt="" width="14" height="14"
+                <img v-if="value.logo_url" class="dep-logo" :src="value.logo_url" :alt="`${value.name} logo`" width="14" height="14"
                   loading="lazy">
                 <span>{{ value.name }}</span>
                 <button type="button" class="dep-remove" :aria-label="`Remove ${value.name}`"
@@ -64,8 +64,19 @@
           <label class="field-label" for="content-name">Name</label>
           <InputText id="content-name" v-model="name" name="name" maxlength="60" autocomplete="off" fluid
             placeholder="e.g. Debounced fetch" />
-          <small class="field-hint">URL name: <code>{{ slugPreview }}</code></small>
-          <small v-if="nameConflict" class="name-warning" role="status">
+          <label class="field-label" for="content-slug">URL name</label>
+          <div class="slug-input">
+            <span class="slug-prefix" aria-hidden="true">/{{ username }}/</span>
+            <InputText id="content-slug" v-model="slugInput" name="slug" maxlength="40" autocomplete="off" fluid
+              placeholder="auto-generated-from-name" aria-describedby="content-slug-hint" />
+          </div>
+          <small id="content-slug-hint" class="field-hint">
+            Lowercase letters, numbers and hyphens. Max 40 characters.
+            <template v-if="!props.slug">Leave blank to generate it from the name.</template>
+          </small>
+          <small v-if="slugError" class="field-error" role="alert">{{ slugError }}</small>
+          <small v-else-if="slugPreview" class="field-hint">URL: <code>/{{ username }}/{{ slugPreview }}</code></small>
+          <small v-if="nameConflict && !slugConflict" class="name-warning" role="status">
             <ExclamationTriangle aria-hidden="true" />
             <span class="name-warning-text">
               <template v-if="slug">
@@ -118,6 +129,9 @@
         </div>
 
         <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <p v-if="codeTooLarge" class="error" role="alert">
+          Code is {{ formattedCodeBytes }}. The maximum is 1 MB (1,048,576 bytes); remove some code before publishing.
+        </p>
 
         <div class="details-actions">
           <Button :label="submitLabel" :loading="saving" :disabled="!canSubmit || saving" @click="submit" />
@@ -132,7 +146,7 @@
             <span class="code-lang">{{ language?.name ?? 'Code' }}</span>
             <span>{{ codeSize }}</span>
           </div>
-          <CodeEditor v-model="code" :language="language?.name" :height="520" />
+          <CodeEditor v-model="code" :language="language?.name" :height="520" fill />
         </div>
       </div>
     </div>
@@ -172,6 +186,7 @@ export interface ContentFormInitial {
   visibility?: 'public' | 'unlisted' | 'private'
   code?: string
   group?: string
+  slug?: string
 }
 
 export interface ContentFormPayload {
@@ -183,6 +198,7 @@ export interface ContentFormPayload {
   dependencies: string[]
   tags: string[]
   group: string
+  slug?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -190,14 +206,17 @@ const props = withDefaults(defineProps<{
   submitLabel?: string
   saving?: boolean
   error?: string
-  /** 编辑模式下的固定 slug（不可改） */
+  /** 编辑模式下的当前 slug（可改） */
   slug?: string
+  /** 让表单占满右侧可用高度，代码编辑器内部滚动 */
+  fill?: boolean
 }>(), {
   initial: () => ({}),
   submitLabel: 'Save',
   saving: false,
   error: '',
-  slug: ''
+  slug: '',
+  fill: false
 })
 
 const emit = defineEmits<{ submit: [payload: ContentFormPayload] }>()
@@ -217,6 +236,7 @@ const KIND_LABELS: Record<string, string> = {
 
 const { user: authUser } = useAuthUser()
 const usernameSet = computed(() => authUser.value?.usernameSet ?? false)
+const username = computed(() => authUser.value?.username ?? authUser.value?.email ?? 'username')
 
 // 标签建议（自由创建）
 const { data: tagData } = await useFetch<{ tags: TagOption[] }>('/api/tags')
@@ -237,6 +257,8 @@ const tags = ref<string[]>([])
 const tagInput = ref('')
 const visibility = ref<'public' | 'unlisted' | 'private'>('private')
 const code = ref('')
+const slugInput = ref('')
+const slugTouched = ref(false)
 
 const groupOptions = computed(() => groupData.value?.groups ?? [])
 
@@ -304,6 +326,7 @@ onMounted(() => {
   const initial = props.initial
   language.value = initial.language ?? null
   name.value = initial.name ?? ''
+  slugInput.value = initial.slug ?? props.slug ?? ''
   intro.value = initial.intro ?? ''
   tags.value = [...(initial.tags ?? [])]
   visibility.value = initial.visibility ?? 'private'
@@ -344,7 +367,15 @@ function slugify(value: string) {
     .slice(0, 40)
 }
 
-const slugPreview = computed(() => props.slug || slugify(name.value) || 'snippet')
+const normalizedSlug = computed(() => slugInput.value.trim().toLowerCase())
+const slugValid = computed(() => !normalizedSlug.value || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug.value))
+const slugError = computed(() => {
+  if (!slugValid.value) return 'Use lowercase letters, numbers and single hyphens only.'
+  if (props.slug && !normalizedSlug.value) return 'URL name cannot be empty.'
+  return ''
+})
+const slugPreview = computed(() => normalizedSlug.value || slugify(name.value) || 'snippet')
+const slugConflict = ref(false)
 
 interface NameConflict {
   slug: string
@@ -365,17 +396,39 @@ async function checkName() {
   try {
     const result = await $fetch<{ available: boolean } & NameConflict>(
       '/api/profile/name-availability',
-      { query: { kind: 'snippet', name: value, exclude: props.slug || '' } }
+      {
+        query: {
+          kind: 'snippet',
+          name: value,
+          slug: normalizedSlug.value || undefined,
+          exclude: props.slug || ''
+        }
+      }
     )
     if (seq !== nameCheckSeq) return
     nameConflict.value = result.available ? null : result
+    slugConflict.value = result.reason === 'slug' && !!normalizedSlug.value
   } catch {
-    if (seq === nameCheckSeq) nameConflict.value = null
+    if (seq === nameCheckSeq) {
+      nameConflict.value = null
+      slugConflict.value = false
+    }
   }
 }
 
 const nameCheck = debounce(() => { void checkName() }, 300)
-watch(name, () => { nameConflict.value = null; nameCheck.run() })
+watch(name, () => {
+  nameConflict.value = null
+  slugConflict.value = false
+  if (!slugTouched.value && !props.slug) slugInput.value = ''
+  nameCheck.run()
+})
+watch(slugInput, () => {
+  slugTouched.value = true
+  nameConflict.value = null
+  slugConflict.value = false
+  nameCheck.run()
+})
 
 function hasTag(value: string) {
   return tags.value.some(tag => tag.toLowerCase() === value.toLowerCase())
@@ -417,10 +470,22 @@ const codeSize = computed(() => {
   return `${(bytes / 1024).toFixed(1)} KB / 1 MB`
 })
 
-const canSubmit = computed(() => !!language.value && !!name.value.trim() && !!code.value.trim())
+const codeBytes = computed(() => new TextEncoder().encode(code.value).length)
+const codeTooLarge = computed(() => codeBytes.value > 1024 * 1024)
+const formattedCodeBytes = computed(() => `${codeBytes.value.toLocaleString()} bytes`)
+
+const canSubmit = computed(() =>
+  !!language.value
+  && !!name.value.trim()
+  && !!code.value.trim()
+  && !codeTooLarge.value
+  && !slugError.value
+  && !slugConflict.value
+  && (!props.slug || !!normalizedSlug.value)
+)
 
 function submit() {
-  if (!canSubmit.value || !language.value) return
+  if (!canSubmit.value || !language.value || codeTooLarge.value) return
   emit('submit', {
     name: name.value.trim(),
     intro: intro.value.trim(),
@@ -429,7 +494,8 @@ function submit() {
     language: language.value.slug,
     dependencies: dependencySelection.value.map(dependency => dependency.slug),
     tags: tags.value,
-    group: groupSlug.value
+    group: groupSlug.value,
+    slug: normalizedSlug.value || undefined
   })
 }
 </script>
@@ -440,6 +506,39 @@ function submit() {
   grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
   gap: 1.5rem;
   align-items: start;
+}
+
+.content-form.is-fill {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+
+  .details {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .details-fields {
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.35rem;
+  }
+
+  .details-code {
+    min-height: 0;
+  }
+
+  .code-card {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .code-card :deep(.code-editor) {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 .details-fields {
@@ -471,6 +570,38 @@ function submit() {
 
 .field-hint {
   font-size: 0.78rem;
+  color: var(--p-text-muted-color);
+}
+
+.field-error {
+  font-size: 0.78rem;
+  color: var(--p-red-500, #ef4444);
+}
+
+.slug-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--p-inputtext-border-color);
+  border-radius: var(--p-inputtext-border-radius);
+  background: var(--p-inputtext-background);
+  overflow: hidden;
+}
+
+.slug-input:focus-within {
+  border-color: var(--p-inputtext-focus-border-color);
+  box-shadow: var(--p-inputtext-focus-ring-shadow);
+}
+
+.slug-input :deep(.p-inputtext) {
+  border: 0;
+  box-shadow: none;
+}
+
+.slug-prefix {
+  flex: none;
+  padding-left: 0.75rem;
+  font-family: var(--font-code);
+  font-size: 0.8rem;
   color: var(--p-text-muted-color);
 }
 
@@ -665,6 +796,21 @@ function submit() {
 @media (max-width: 900px) {
   .details {
     grid-template-columns: 1fr;
+  }
+
+  .content-form.is-fill {
+    .details-fields {
+      overflow: visible;
+      padding-right: 0;
+    }
+
+    .details-code {
+      min-height: 320px;
+    }
+
+    .code-card :deep(.cm-editor) {
+      height: 280px;
+    }
   }
 }
 </style>

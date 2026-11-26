@@ -127,7 +127,7 @@
                   </Button>
                 </div>
                 <Button v-if="kind === 'group' && group?.visibility === 'public'" label="Fork group" size="small"
-                  outlined fluid :loading="forking" @click="forkGroup" />
+                  outlined fluid @click="openFork" />
               </template>
             </div>
           </div>
@@ -181,7 +181,7 @@
                 <span class="code-lang">{{ snippet.language?.name ?? 'Code' }}</span>
                 <div class="code-actions">
                   <Button v-if="!snippet.isOwner && snippet.visibility === 'public'" label="Fork" size="small"
-                    severity="secondary" outlined :loading="forking" @click="forkSnippet" />
+                    severity="secondary" outlined @click="openFork" />
                   <Button :label="copied ? 'Copied' : 'Copy'" size="small" text @click="copyCode" />
                 </div>
               </div>
@@ -238,6 +238,9 @@
   <ReportDialog v-if="kind" v-model:visible="reportDialog"
     :target-kind="kind === 'group' ? 'group' : 'snippet'" :username="author.username"
     :slug="kind === 'snippet' ? snippet?.slug : group?.slug" :target-name="title" />
+  <ForkDialog v-if="kind" v-model:visible="forkDialog" :kind="kind" :source-username="author.username"
+    :source-slug="kind === 'snippet' ? snippet?.slug ?? slug : group?.slug ?? slug" :source-name="title"
+    @forked="finishFork" />
   <Toast />
 </template>
 
@@ -391,6 +394,7 @@ async function toggleFavorite() {
 
 const feedbackDialog = ref(false)
 const reportDialog = ref(false)
+const forkDialog = ref(false)
 
 async function openFeedback() {
   if (!authUser.value) {
@@ -406,6 +410,18 @@ async function openReport() {
     return
   }
   reportDialog.value = true
+}
+
+async function openFork() {
+  if (!authUser.value) {
+    await navigateTo('/sign')
+    return
+  }
+  forkDialog.value = true
+}
+
+async function finishFork(result: { slug: string }) {
+  await navigateTo(`/${authUser.value?.username ?? username}/${result.slug}`)
 }
 
 // ---------- 公开反馈 / 评论 ----------
@@ -513,68 +529,6 @@ async function copyCode() {
     if (response?.counted) copyCount.value += 1
   } catch {
     // 剪贴板不可用时保持静默
-  }
-}
-
-const forking = ref(false)
-
-async function forkSnippet() {
-  if (!snippet.value || forking.value) return
-  forking.value = true
-  try {
-    const response = await $fetch<{ snippet: { slug: string } }>(
-      `/api/snippets/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/fork`,
-      { method: 'POST' }
-    )
-    await navigateTo(`/${authUser.value?.username ?? username}/${response.snippet.slug}`)
-  } catch (err) {
-    const e = err as { statusCode?: number, statusMessage?: string }
-    if (e.statusCode === 401) {
-      await navigateTo('/sign')
-      return
-    }
-    if (e.statusCode === 400 && e.statusMessage?.toLowerCase().includes('username')) {
-      toast.add({
-        severity: 'warn',
-        summary: 'Set a username first',
-        detail: 'Your public profile needs a username before you can fork a snippet.',
-        life: 4500
-      })
-    } else {
-      toast.add({ severity: 'error', summary: e.statusMessage ?? 'Fork failed', life: 4000 })
-    }
-  } finally {
-    forking.value = false
-  }
-}
-
-async function forkGroup() {
-  if (!group.value || forking.value) return
-  forking.value = true
-  try {
-    const response = await $fetch<{ group: { slug: string } }>(
-      `/api/groups/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/fork`,
-      { method: 'POST' }
-    )
-    await navigateTo(`/${authUser.value?.username ?? username}/${response.group.slug}`)
-  } catch (err) {
-    const e = err as { statusCode?: number, statusMessage?: string }
-    if (e.statusCode === 401) {
-      await navigateTo('/sign')
-      return
-    }
-    if (e.statusCode === 400 && e.statusMessage?.toLowerCase().includes('username')) {
-      toast.add({
-        severity: 'warn',
-        summary: 'Set a username first',
-        detail: 'Your public profile needs a username before you can fork a group.',
-        life: 4500
-      })
-    } else {
-      toast.add({ severity: 'error', summary: e.statusMessage ?? 'Fork failed', life: 4000 })
-    }
-  } finally {
-    forking.value = false
   }
 }
 

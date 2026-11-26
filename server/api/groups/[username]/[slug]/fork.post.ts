@@ -5,8 +5,14 @@ import type { RowDataPacket } from 'mysql2/promise'
 export default defineEventHandler(async event => {
   const viewer = await requireAuth(event)
   await enforceUserRateLimit(event, viewer.uuid, 'groups:fork', 3, 3600)
+  const body = await readBody<Record<string, unknown>>(event).catch(() => ({}))
   const ownerName = String(getRouterParam(event, 'username') ?? '').trim()
   const slug = String(getRouterParam(event, 'slug') ?? '').trim()
+  const requestedSlug = normalizeContentSlug(body?.slug)
+  const visibility = String(body?.visibility ?? 'private')
+  if (!VISIBILITIES.includes(visibility as typeof VISIBILITIES[number])) {
+    throw createError({ statusCode: 400, statusMessage: 'Unknown visibility', data: { field: 'visibility' } })
+  }
 
   const owner = await findPublicUser(ownerName)
   if (!owner) throw createError({ statusCode: 404, statusMessage: 'Group not found' })
@@ -27,6 +33,9 @@ export default defineEventHandler(async event => {
   }
 
   const db = useDb()
+  if (requestedSlug && !(await contentSlugAvailable(viewer.uuid, requestedSlug))) {
+    throw createError({ statusCode: 409, statusMessage: 'This URL is already taken', data: { field: 'slug' } })
+  }
   const [sourceSnippets] = await db.query<RowDataPacket[]>(
     `SELECT \`sid\`, \`name\`, \`intro\`, \`code\`, \`language_sid\`
        FROM \`contents\`
@@ -59,7 +68,8 @@ export default defineEventHandler(async event => {
   }
 
   const groupSid = shortId()
-  const groupSlug = nextSlug(source.name)
+  const groupSlug = requestedSlug ?? nextSlug(source.name)
+  takenSlugs.add(groupSlug)
 
   const conn = await db.getConnection()
   try {
@@ -68,8 +78,8 @@ export default defineEventHandler(async event => {
     await conn.execute(
       `INSERT INTO \`contents\`
          (\`sid\`, \`owner_uuid\`, \`kind\`, \`slug\`, \`name\`, \`intro\`, \`visibility\`, \`fork_from_sid\`)
-       VALUES (?, ?, 'group', ?, ?, ?, 'private', ?)`,
-      [groupSid, viewer.uuid, groupSlug, source.name, source.intro, source.sid]
+       VALUES (?, ?, 'group', ?, ?, ?, ?, ?)`,
+      [groupSid, viewer.uuid, groupSlug, source.name, source.intro, visibility, source.sid]
     )
 
     const [groupTags] = await conn.query<RowDataPacket[]>(
@@ -90,8 +100,8 @@ export default defineEventHandler(async event => {
       await conn.execute(
         `INSERT INTO \`contents\`
            (\`sid\`, \`owner_uuid\`, \`kind\`, \`slug\`, \`name\`, \`intro\`, \`visibility\`, \`fork_from_sid\`, \`group_sid\`, \`language_sid\`, \`code\`)
-         VALUES (?, ?, 'snippet', ?, ?, ?, 'private', ?, ?, ?, ?)`,
-        [snippetSid, viewer.uuid, snippetSlug, snippet.name, snippet.intro, snippet.sid, groupSid, snippet.language_sid, snippet.code]
+         VALUES (?, ?, 'snippet', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [snippetSid, viewer.uuid, snippetSlug, snippet.name, snippet.intro, visibility, snippet.sid, groupSid, snippet.language_sid, snippet.code]
       )
 
       const [snippetTags] = await conn.query<RowDataPacket[]>(

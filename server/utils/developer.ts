@@ -42,6 +42,7 @@ export interface DeveloperAppInput {
   homepageUrl: string
   iconUrl: string | null
   description: string
+  appType: 'website' | 'service'
 }
 
 export interface DeveloperApp {
@@ -50,6 +51,7 @@ export interface DeveloperApp {
   homepageUrl: string
   iconUrl: string | null
   description: string
+  appType: 'website' | 'service'
   status: string
   createdAt: string
 }
@@ -61,6 +63,7 @@ interface DeveloperAppRow extends RowDataPacket {
   homepage_url: string
   icon_url: string | null
   description: string
+  app_type: 'website' | 'service'
   status: string
   created_at: string
 }
@@ -70,6 +73,7 @@ export function readDeveloperAppInput(body: Record<string, unknown>): DeveloperA
   const homepageUrl = String(body.homepageUrl ?? '').trim()
   const iconUrl = String(body.iconUrl ?? '').trim()
   const description = String(body.description ?? '').trim()
+  const appType = String(body.appType ?? 'website').trim().toLowerCase()
 
   if (!name || name.length > 80) {
     throw createError({
@@ -99,11 +103,18 @@ export function readDeveloperAppInput(body: Record<string, unknown>): DeveloperA
       data: { field: 'description' }
     })
   }
+  if (appType !== 'website' && appType !== 'service') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Application type must be website or service',
+      data: { field: 'appType' }
+    })
+  }
 
-  return { name, homepageUrl, iconUrl: iconUrl || null, description }
+  return { name, homepageUrl, iconUrl: iconUrl || null, description, appType }
 }
 
-const APP_COLUMNS = '`sid`, `user_uuid`, `name`, `homepage_url`, `icon_url`, `description`, `status`, `created_at`'
+const APP_COLUMNS = '`sid`, `user_uuid`, `name`, `homepage_url`, `icon_url`, `description`, `app_type`, `status`, `created_at`'
 
 function publicDeveloperApp(row: DeveloperAppRow): DeveloperApp {
   return {
@@ -112,6 +123,7 @@ function publicDeveloperApp(row: DeveloperAppRow): DeveloperApp {
     homepageUrl: row.homepage_url,
     iconUrl: row.icon_url,
     description: row.description,
+    appType: row.app_type,
     status: row.status,
     createdAt: row.created_at
   }
@@ -150,9 +162,9 @@ export async function getDeveloperAppDetail(userUuid: string, sid: string): Prom
 export async function createDeveloperApp(userUuid: string, input: DeveloperAppInput): Promise<DeveloperApp> {
   const sid = shortId()
   await useDb().execute(
-    `INSERT INTO \`developer_apps\` (\`sid\`, \`user_uuid\`, \`name\`, \`homepage_url\`, \`icon_url\`, \`description\`)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [sid, userUuid, input.name, input.homepageUrl, input.iconUrl, input.description]
+    `INSERT INTO \`developer_apps\` (\`sid\`, \`user_uuid\`, \`name\`, \`homepage_url\`, \`icon_url\`, \`description\`, \`app_type\`)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [sid, userUuid, input.name, input.homepageUrl, input.iconUrl, input.description, input.appType]
   )
   return (await getDeveloperAppDetail(userUuid, sid))!
 }
@@ -167,12 +179,25 @@ export async function updateDeveloperApp(
     [sid, userUuid]
   )
   if (!existing[0]) return null
+  if (input.appType === 'service') {
+    const [services] = await useDb().query<RowDataPacket[]>(
+      'SELECT `app_sid` FROM `developer_oauth_services` WHERE `app_sid` = ? LIMIT 1',
+      [sid]
+    )
+    if (services[0]) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'Remove the OAuth service before changing this app to service type',
+        data: { field: 'appType' }
+      })
+    }
+  }
 
   await useDb().execute(
     `UPDATE \`developer_apps\`
-        SET \`name\` = ?, \`homepage_url\` = ?, \`icon_url\` = ?, \`description\` = ?
+        SET \`name\` = ?, \`homepage_url\` = ?, \`icon_url\` = ?, \`description\` = ?, \`app_type\` = ?
       WHERE \`sid\` = ? AND \`user_uuid\` = ?`,
-    [input.name, input.homepageUrl, input.iconUrl, input.description, sid, userUuid]
+    [input.name, input.homepageUrl, input.iconUrl, input.description, input.appType, sid, userUuid]
   )
   return await getDeveloperAppDetail(userUuid, sid)
 }

@@ -49,14 +49,14 @@
           placeholder="Search languages" aria-label="Language" @filter="onLanguageFilter">
           <template #option="{ option }">
             <span class="option-row">
-              <img v-if="option.logo_url" class="option-logo" :src="option.logo_url" alt="" width="18" height="18"
+                <img v-if="option.logo_url" class="option-logo" :src="option.logo_url" :alt="`${option.name} logo`" width="18" height="18"
                 loading="lazy">
               {{ option.name }}
             </span>
           </template>
           <template #value>
             <span v-if="language" class="option-row">
-              <img v-if="language.logo_url" class="option-logo" :src="language.logo_url" alt="" width="18"
+                <img v-if="language.logo_url" class="option-logo" :src="language.logo_url" :alt="`${language.name} logo`" width="18"
                 height="18" loading="lazy">
               {{ language.name }}
             </span>
@@ -76,14 +76,14 @@
           placeholder="Select dependencies (optional)" aria-label="Dependencies" @filter="onDependencyFilter">
           <template #option="{ option }">
             <span class="dep-option">
-              <img v-if="option.logo_url" class="dep-logo" :src="option.logo_url" alt="" width="16" height="16"
+              <img v-if="option.logo_url" class="dep-logo" :src="option.logo_url" :alt="`${option.name} logo`" width="16" height="16"
                 loading="lazy">
               <span>{{ option.name }}</span>
             </span>
           </template>
           <template #chip="{ value, removeCallback }">
             <span class="dep-chip">
-              <img v-if="value.logo_url" class="dep-logo" :src="value.logo_url" alt="" width="14" height="14"
+              <img v-if="value.logo_url" class="dep-logo" :src="value.logo_url" :alt="`${value.name} logo`" width="14" height="14"
                 loading="lazy">
               <span>{{ value.name }}</span>
               <button type="button" class="dep-remove" :aria-label="`Remove ${value.name}`"
@@ -100,9 +100,9 @@
         </small>
       </section>
 
-      <section v-else class="step-card">
+      <section v-else class="step-card step-card--form">
         <ContentForm :initial="formInitial" submit-label="Create snippet" :saving="saving" :error="error"
-          @submit="create">
+          fill @submit="create">
           <template #secondary-actions>
             <Button label="Back" severity="secondary" text @click="step = 2" />
           </template>
@@ -317,6 +317,8 @@ useHead({
 <style scoped lang="scss">
 .new-page {
   width: min(1120px, 94vw);
+  height: calc(100dvh - 90px);
+  min-height: 620px;
   margin: 0 auto;
   padding: 3.5rem 0 5rem;
   display: flex;
@@ -397,6 +399,28 @@ useHead({
   border: 1px solid var(--p-content-border-color);
   border-radius: 1rem;
   background: var(--p-content-background);
+}
+
+.step-card--form {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.step-card--form > :deep(.content-form) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .new-page {
+    height: auto;
+    min-height: calc(100dvh - 90px);
+    padding-bottom: 3rem;
+  }
+
+  .step-card--form {
+    min-height: 700px;
+  }
 }
 
 .step-title {

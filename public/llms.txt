@@ -17,7 +17,7 @@
 - [BITS documentation](https://bits.micropue.com.cn/docs): Bilingual English and Chinese user documentation covering accounts, snippets, groups, discovery and privacy.
 - [Getting started](https://bits.micropue.com.cn/docs/getting-started): Explains what BITS is, what users can do and how to configure a username and public profile.
 - [Creating snippets](https://bits.micropue.com.cn/docs/snippets): Describes the three-step editor, snippet fields, generated URLs, tags, dependencies and visibility.
-- [Editing and deleting](https://bits.micropue.com.cn/docs/editing): Explains editable fields, fixed URL slugs, soft deletion and administrator restoration.
+- [Editing and deleting](https://bits.micropue.com.cn/docs/editing): Explains editable fields and URL names, redirects from old links, soft deletion and administrator restoration.
 - [Groups](https://bits.micropue.com.cn/docs/groups): Covers creating groups, assigning snippets and how group pages and deletion behave.
 - [Search and the command box](https://bits.micropue.com.cn/docs/search): Documents slash commands, keyword matching and catalog-aware search.
 - [Your profile](https://bits.micropue.com.cn/docs/profile): Explains profile content, owner-only actions, private tabs, ordering, contribution activity and followers.
@@ -29,13 +29,16 @@
 
 ## Developer platform
 
-- [Developer platform](https://bits.micropue.com.cn/developer): Entry point for BITS applications and OAuth integrations.
-- [Apps documentation](https://bits.micropue.com.cn/developer/docs/apps): Explains application identity fields and how an app is connected to one OAuth service.
-- [OAuth documentation](https://bits.micropue.com.cn/developer/docs/oauth): Documents authorization code flow, PKCE, refresh tokens, device flow, scopes, userinfo and revocation.
+- [Developer platform](https://bits.micropue.com.cn/developer): Entry point for BITS applications, OAuth services and API Keys.
+- [Apps documentation](https://bits.micropue.com.cn/docs/developer/apps): Explains Website and Service app types and how applications connect to OAuth services and API Keys.
+- [OAuth documentation](https://bits.micropue.com.cn/docs/developer/oauth): Documents authorization code flow, PKCE, refresh tokens, device flow, scopes, userinfo and revocation.
+- [API Keys documentation](https://bits.micropue.com.cn/docs/developer/api-keys): Explains scoped API Keys, permissions, expiry, one-time display, last use and revocation.
+- [Open API v1 documentation](https://bits.micropue.com.cn/docs/developer/open-api): Documents API-key authentication, endpoints, pagination, permissions and rate limits for managing owned snippets and groups.
+- [OpenAPI specification](https://bits.micropue.com.cn/openapi.json): Machine-readable OpenAPI 3.1 specification for `/api/v1`.
 
 ## Product definition
 
-BITS is a lightweight code-sharing product. Its primary objects are reusable snippets and folders called groups. A snippet has one primary language, optional dependencies and tags, a title, description, code body and visibility setting. Public profiles and catalog pages connect snippets to authors, technologies and discovery paths. BITS is oriented toward small, reusable examples rather than full repository hosting.
+BITS is a lightweight code-sharing product. Its primary objects are reusable snippets and folders called groups. A snippet has one primary language, optional dependencies and tags, a title, description, code body and visibility setting. Public profiles and catalog pages connect snippets to authors, technologies and discovery paths. Developers can create Website apps for OAuth and API Keys, or Service apps for API-only server integrations. BITS is oriented toward small, reusable examples rather than full repository hosting.
 
 ## Key facts
 
@@ -43,7 +46,9 @@ BITS is a lightweight code-sharing product. Its primary objects are reusable sni
 - Content visibility: public, unlisted and private; private content and unauthorised access return 404.
 - Public discovery: language and dependency catalog pages, public profiles, search and the slash command box.
 - Accounts: email-code, GitHub and passkey sign-in are supported; a username is required before publishing public or unlisted content.
-- URLs: profiles use `/{username}`; content uses `/{username}/{slug}`; slugs remain fixed after creation.
-- Developer access: OAuth 2.0 with `read:user` and `read:email` scopes.
+- URLs: profiles use `/{username}`; content uses `/{username}/{slug}`. Snippet and group slugs can be renamed after creation, and supported old public links redirect to the new address.
+- Forks: copying a public snippet opens a confirmation flow where the signed-in user can edit the new URL name and choose private, unlisted or public visibility before creating the copy.
+- Developer access: Website apps can use OAuth 2.0 with `read:user` and `read:email` scopes plus API Keys. Service apps can use API Keys only.
+- Open API: `/api/v1` uses scoped API Keys and can manage only the owner's snippets and groups, never account or security settings. Reads are limited to 120 requests per minute per key and writes to 30 per minute per key.
 - Sitemap: https://bits.micropue.com.cn/sitemap.xml
-- Last updated: 2026-11-20
+- Last updated: 2026-11-27

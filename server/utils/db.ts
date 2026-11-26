@@ -369,6 +369,7 @@ const DEVELOPER_TABLES_SQL: string[] = [
     \`homepage_url\` VARCHAR(512) NOT NULL COMMENT 'Homepage URL',
     \`icon_url\` VARCHAR(512) NULL COMMENT 'Optional icon URL',
     \`description\` VARCHAR(500) NOT NULL COMMENT 'Application description',
+    \`app_type\` ENUM('website','service') NOT NULL DEFAULT 'website' COMMENT '应用类型（website 可使用 OAuth，service 仅使用 API Key）',
     \`status\` ENUM('active','suspended') NOT NULL DEFAULT 'active' COMMENT '状态（管理员可封禁）',
     \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -411,7 +412,26 @@ const DEVELOPER_TABLES_SQL: string[] = [
     KEY \`idx_oauth_tokens_user\` (\`user_uuid\`),
     KEY \`idx_oauth_tokens_family\` (\`family_id\`),
     KEY \`idx_oauth_tokens_expires\` (\`expires_at\`)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='OAuth 访问令牌表'`
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='OAuth 访问令牌表'`,
+
+  // Developer API Keys：只保存 SHA-256 哈希，原文仅在创建响应中返回一次
+  `CREATE TABLE IF NOT EXISTS \`developer_api_keys\` (
+    \`sid\` ${SID} NOT NULL COMMENT 'API Key 短UUID',
+    \`user_uuid\` CHAR(36) NOT NULL COMMENT '所有者账户UUID',
+    \`app_sid\` ${SID} NOT NULL COMMENT '关联的开发者 App',
+    \`name\` VARCHAR(80) NOT NULL COMMENT 'API Key 名称',
+    \`key_prefix\` VARCHAR(24) NOT NULL COMMENT '用于识别的 Key 前缀',
+    \`key_hash\` CHAR(64) NOT NULL COMMENT 'API Key SHA-256',
+    \`permissions\` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '权限列表',
+    \`expires_at\` DATETIME NULL COMMENT '过期时间（NULL=永不过期）',
+    \`last_used_at\` DATETIME NULL COMMENT '上次使用时间',
+    \`revoked_at\` DATETIME NULL COMMENT '撤销时间',
+    \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (\`sid\`),
+    UNIQUE KEY \`uk_developer_api_keys_hash\` (\`key_hash\`),
+    KEY \`idx_developer_api_keys_user\` (\`user_uuid\`,\`created_at\`),
+    KEY \`idx_developer_api_keys_app\` (\`app_sid\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开发者 API Key 表'`
 ]
 
 // developer_apps 表增量列（旧表升级）
@@ -424,6 +444,10 @@ const DEVELOPER_COLUMNS_SQL: [string, string][] = [
     ALTER TABLE \`developer_apps\`
       ADD COLUMN \`status\` ENUM('active','suspended') NOT NULL DEFAULT 'active'
       COMMENT '状态（管理员可封禁）' AFTER \`description\``],
+  ['app_type', `
+    ALTER TABLE \`developer_apps\`
+      ADD COLUMN \`app_type\` ENUM('website','service') NOT NULL DEFAULT 'website'
+      COMMENT '应用类型（website 可使用 OAuth，service 仅使用 API Key）' AFTER \`description\``],
   ['updated_at', `
     ALTER TABLE \`developer_apps\`
       ADD COLUMN \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
