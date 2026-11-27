@@ -1,6 +1,10 @@
 import type { H3Event } from 'h3'
 import type { RowDataPacket } from 'mysql2/promise'
-import { DEVELOPER_DELETE_PHRASE, isDeveloperDeletePhrase } from '#shared/utils/developer'
+import {
+  DEVELOPER_DELETE_PHRASE,
+  MAX_DEVELOPER_APPS,
+  isDeveloperDeletePhrase
+} from '#shared/utils/developer'
 import { getAuthUser, type AuthUser } from './auth'
 import { useDb } from './db'
 import { shortId } from './id'
@@ -148,11 +152,33 @@ export async function getDeveloperAppDetail(userUuid: string, sid: string): Prom
 
 export async function createDeveloperApp(userUuid: string, input: DeveloperAppInput): Promise<DeveloperApp> {
   const sid = shortId()
-  await useDb().execute(
-    `INSERT INTO \`developer_apps\` (\`sid\`, \`user_uuid\`, \`name\`, \`homepage_url\`, \`icon_url\`, \`description\`)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [sid, userUuid, input.name, input.homepageUrl, input.iconUrl, input.description]
-  )
+  const conn = await useDb().getConnection()
+  try {
+    await conn.beginTransaction()
+    // Serialize App creation per account so concurrent requests cannot exceed the cap.
+    await conn.execute('SELECT `uuid` FROM `users` WHERE `uuid` = ? FOR UPDATE', [userUuid])
+    const [[countRow]] = await conn.query<RowDataPacket[]>(
+      'SELECT COUNT(*) AS `total` FROM `developer_apps` WHERE `user_uuid` = ?',
+      [userUuid]
+    )
+    if (Number(countRow?.total ?? 0) >= MAX_DEVELOPER_APPS) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `You can create at most ${MAX_DEVELOPER_APPS} Apps`
+      })
+    }
+    await conn.execute(
+      `INSERT INTO \`developer_apps\` (\`sid\`, \`user_uuid\`, \`name\`, \`homepage_url\`, \`icon_url\`, \`description\`)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [sid, userUuid, input.name, input.homepageUrl, input.iconUrl, input.description]
+    )
+    await conn.commit()
+  } catch (error) {
+    await conn.rollback()
+    throw error
+  } finally {
+    conn.release()
+  }
   return (await getDeveloperAppDetail(userUuid, sid))!
 }
 

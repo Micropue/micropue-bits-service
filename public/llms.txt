@@ -48,7 +48,7 @@ BITS is a lightweight code-sharing product. Its primary objects are reusable sni
 - Accounts: email-code, GitHub and passkey sign-in are supported; a username is required before publishing public or unlisted content.
 - URLs: profiles use `/{username}`; content uses `/{username}/{slug}`. In the website editor, a snippet URL name is read-only and follows Name. The Open API can rename snippet and group slugs explicitly, and supported old public links redirect to the new address.
 - Forks: copying a public snippet opens a confirmation flow where the signed-in user can edit the new URL name and choose private, unlisted or public visibility before creating the copy.
-- Developer access: Apps can use OAuth 2.0 with `read:user` and `read:email` scopes. Account-level API Keys use scoped permissions and are not tied to an App.
+- Developer access: Apps can use OAuth 2.0 with `read:user` and `read:email` scopes. Accounts can keep up to 50 Apps and 50 OAuth services. Account-level API Keys use scoped permissions, are not tied to an App, and each account can retain up to 50 active keys.
 - Open API: `/api/v1` uses scoped API Keys and can manage only the owner's snippets and groups, never account or security settings. Writes require `Content-Type: application/json`. Reads are limited to 120 requests per minute per key and writes to 30 per minute per key, with account-wide caps of 240 reads and 60 writes per minute across all keys. Snippet lists omit code bodies; single-snippet responses include them. Errors use RFC 9457 `application/problem+json`.
 - Sitemap: https://bits.micropue.com.cn/sitemap.xml
 - Last updated: 2026-11-27

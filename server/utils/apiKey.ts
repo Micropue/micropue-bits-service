@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { H3Event } from 'h3'
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise'
+import { MAX_DEVELOPER_API_KEYS } from '#shared/utils/developer'
 import { useDb } from './db'
 import { shortId } from './id'
 import { enforceRateLimit } from './rateLimit'
@@ -15,7 +16,6 @@ export const API_KEY_PERMISSIONS = [
 
 export type ApiKeyPermission = typeof API_KEY_PERMISSIONS[number]
 
-const MAX_ACTIVE_KEYS = 50
 const MAX_INACTIVE_KEYS = 50
 const INACTIVE_KEY_RETENTION_DAYS = 30
 const MAX_EXPIRY_DAYS = 3650
@@ -196,16 +196,51 @@ export function requireApiKeyPermission(auth: ApiKeyAuth, permission: ApiKeyPerm
   })
 }
 
-export async function listApiKeys(userUuid: string): Promise<{ apiKeys: DeveloperApiKey[], total: number }> {
+export interface ApiKeyPage {
+  apiKeys: DeveloperApiKey[]
+  total: number
+  activeTotal: number
+  page: number
+  pageSize: number
+  pageCount: number
+  hasMore: boolean
+}
+
+export async function listApiKeys(userUuid: string, requestedPage = 1): Promise<ApiKeyPage> {
+  const pageSize = 20
+  const [[countRow]] = await useDb().query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS \`total\`,
+            COALESCE(SUM(CASE
+              WHEN k.\`expires_at\` IS NULL OR k.\`expires_at\` > NOW() THEN 1
+              ELSE 0
+            END), 0) AS \`active_total\`
+       FROM \`developer_api_keys\` k
+       JOIN \`users\` u ON u.\`uuid\` = k.\`user_uuid\`
+      WHERE k.\`user_uuid\` = ? AND k.\`revoked_at\` IS NULL`,
+    [userUuid]
+  )
+  const total = Number(countRow?.total ?? 0)
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(Math.max(1, Math.trunc(requestedPage) || 1), pageCount)
+  const offset = (page - 1) * pageSize
   const [rows] = await useDb().query<ApiKeyRow[]>(
     `SELECT ${KEY_COLUMNS}
        FROM \`developer_api_keys\` k
        JOIN \`users\` u ON u.\`uuid\` = k.\`user_uuid\`
       WHERE k.\`user_uuid\` = ? AND k.\`revoked_at\` IS NULL
-      ORDER BY k.\`created_at\` DESC, k.\`sid\` DESC`,
-    [userUuid]
+      ORDER BY k.\`created_at\` DESC, k.\`sid\` DESC
+      LIMIT ? OFFSET ?`,
+    [userUuid, pageSize, offset]
   )
-  return { apiKeys: rows.map(publicApiKey), total: rows.length }
+  return {
+    apiKeys: rows.map(publicApiKey),
+    total,
+    activeTotal: Number(countRow?.active_total ?? 0),
+    page,
+    pageSize,
+    pageCount,
+    hasMore: offset + rows.length < total
+  }
 }
 
 async function pruneApiKeyHistory(conn: PoolConnection, userUuid: string) {
@@ -278,10 +313,10 @@ export async function createApiKey(
           AND (\`expires_at\` IS NULL OR \`expires_at\` > NOW())`,
       [userUuid]
     )
-    if (Number(countRow?.total ?? 0) >= MAX_ACTIVE_KEYS) {
+    if (Number(countRow?.total ?? 0) >= MAX_DEVELOPER_API_KEYS) {
       throw createError({
         statusCode: 409,
-        statusMessage: `You can have at most ${MAX_ACTIVE_KEYS} active API keys`
+        statusMessage: `You can have at most ${MAX_DEVELOPER_API_KEYS} active API keys`
       })
     }
 

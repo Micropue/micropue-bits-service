@@ -538,6 +538,7 @@ export const DOC_CHAPTERS: DocChapter[] = [
       en: [
         { type: 'h', text: 'Create an App' },
         { type: 'p', text: 'Open Developer → Apps and choose New app. Enter the application name, homepage URL, optional icon URL and description.' },
+        { type: 'p', text: 'Each account can keep up to 50 Apps. The Apps list loads 20 at a time.' },
         { type: 'h', text: 'Application fields' },
         {
           type: 'ul',
@@ -557,6 +558,7 @@ export const DOC_CHAPTERS: DocChapter[] = [
       zh: [
         { type: 'h', text: '创建应用' },
         { type: 'p', text: '打开 Developer → Apps，点击 New app，填写应用名称、主页 URL、可选图标 URL 和介绍。' },
+        { type: 'p', text: '每个账户最多保留 50 个 App，Apps 列表每页加载 20 个。' },
         { type: 'h', text: '字段说明' },
         {
           type: 'ul',
@@ -592,7 +594,9 @@ export const DOC_CHAPTERS: DocChapter[] = [
             'Client ID: the App ID.',
             'Client secret: shown once when the service is created or reset.',
             'Redirect URIs: up to 10; HTTPS is required outside localhost.',
-            'Each App can have one OAuth service.'
+            'Each App can have one OAuth service.',
+            'An account can have up to 50 OAuth services.',
+            'The OAuth list loads 20 services at a time.'
           ]
         },
         { type: 'h', text: 'Endpoints' },
@@ -648,7 +652,9 @@ GET  /oauth/device` },
             'Client ID：即 App ID。',
             'Client Secret：创建或重置服务时只显示一次。',
             '重定向 URI：最多 10 条；除 localhost 外必须使用 HTTPS。',
-            '每个 App 只能有一个 OAuth 服务。'
+            '每个 App 只能有一个 OAuth 服务。',
+            '每个账户最多保留 50 个 OAuth 服务。',
+            'OAuth 列表每页加载 20 个服务。'
           ]
         },
         { type: 'h', text: '端点' },
@@ -727,6 +733,7 @@ GET  /oauth/device` },
             'The list shows a prefix, permissions, expiry, creation time and last-used time.',
             'Revoke a key at any time; requests using it fail immediately.',
             'A user can have up to 50 active keys.',
+            'The API Keys list loads 20 at a time.',
             'Keys belong to your account, not to an App.'
           ]
         },
@@ -755,6 +762,7 @@ GET  /oauth/device` },
             '列表显示前缀、权限、过期时间、创建时间和上次使用时间。',
             '可以随时撤销；撤销后使用该 Key 的请求会立即失败。',
             '每个用户最多保留 50 个有效 Key。',
+            'API Keys 列表每页加载 20 个。',
             'Key 属于你的账户，不隶属于任何 App。'
           ]
         },

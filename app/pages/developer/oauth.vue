@@ -16,7 +16,7 @@
     <section class="group">
       <h3 class="group-title">
         OAuth services
-        <span v-if="services.length" class="service-count">{{ services.length }}</span>
+        <span v-if="total" class="service-count">{{ total }}</span>
       </h3>
 
       <div v-if="!services.length" class="card">
@@ -85,7 +85,14 @@
         </table>
       </div>
 
-      <p v-if="!availableApps.length && services.length" class="service-note">
+      <div v-if="total" class="oauth-pagination">
+        <span class="oauth-total">{{ total }} OAuth service{{ total === 1 ? '' : 's' }}</span>
+        <Paginator v-if="pageCount > 1" :first="(page - 1) * pageSize" :rows="pageSize" :total="total"
+          :page-link-size="5" template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink"
+          @page="onPage" />
+      </div>
+
+      <p v-if="!availableApps.length && total" class="service-note">
         All active Apps already have an OAuth service.
         <NuxtLink to="/developer/apps" class="inline-link">Create another App</NuxtLink> to register more.
       </p>
@@ -187,6 +194,7 @@
 import Box from '@primeicons/vue/box'
 import Key from '@primeicons/vue/key'
 import Plus from '@primeicons/vue/plus'
+import type { PageState } from 'primevue/paginator'
 
 interface DeveloperApp {
   sid: string
@@ -211,6 +219,15 @@ interface OAuthServiceDetail extends OAuthService {
   clientSecret?: string
 }
 
+interface OAuthServicePage {
+  services: OAuthService[]
+  total: number
+  page: number
+  pageSize: number
+  pageCount: number
+  hasMore: boolean
+}
+
 interface OAuthForm {
   redirectUris: string[]
   allowWildcard: boolean
@@ -219,9 +236,11 @@ interface OAuthForm {
 }
 
 const MAX_REDIRECT_URIS = 10
+const PAGE_SIZE = 20
 const URL_RE = /^https?:\/\/[^\s]+$/i
 const toast = useToast()
 const confirm = useConfirm()
+const page = ref(1)
 const deleteOpen = ref(false)
 const deleting = ref(false)
 const deleteTarget = ref<OAuthService | null>(null)
@@ -229,10 +248,19 @@ const deleteMessage = computed(() => deleteTarget.value
   ? `Delete the OAuth service for ${deleteTarget.value.name}? All tokens will be revoked. The App itself is kept.`
   : '')
 
-const { data, refresh, pending } = await useFetch<{ services: OAuthService[] }>('/api/developer/oauth')
+const { data, refresh, pending } = await useFetch<OAuthServicePage>('/api/developer/oauth', {
+  query: computed(() => ({ page: page.value }))
+})
 const { data: appData, refresh: refreshApps } = await useFetch<{ apps: DeveloperApp[] }>('/api/developer/oauth/available-apps')
 const services = computed(() => data.value?.services ?? [])
+const total = computed(() => data.value?.total ?? 0)
+const pageSize = computed(() => data.value?.pageSize ?? PAGE_SIZE)
+const pageCount = computed(() => data.value?.pageCount ?? 1)
 const availableApps = computed(() => appData.value?.apps ?? [])
+
+watch(data, value => {
+  if (value && value.page !== page.value) page.value = value.page
+})
 
 const dialogVisible = ref(false)
 const saving = ref(false)
@@ -315,6 +343,10 @@ function markIconBroken(appSid: string) {
   brokenIcons.add(appSid)
 }
 
+function onPage(event: PageState) {
+  page.value = event.page + 1
+}
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en', { dateStyle: 'medium' })
 }
@@ -348,6 +380,7 @@ async function submit() {
     } else {
       toast.add({ severity: 'success', summary: 'OAuth service registered', detail: 'Client credentials are shown under Edit.', life: 4500 })
     }
+    if (!editing) page.value = 1
     await Promise.all([refresh(), refreshApps()])
     if (!editing) applyDetail(res.service, res.service.clientSecret)
   } catch (err) {
@@ -410,6 +443,7 @@ async function confirmDelete(phrase: string) {
     deleteTarget.value = null
     if (editingAppSid.value === service.appSid) dialogVisible.value = false
     brokenIcons.delete(service.appSid)
+    if (services.value.length === 1 && page.value > 1) page.value -= 1
     await Promise.all([refresh(), refreshApps()])
     toast.add({ severity: 'success', summary: 'OAuth service deleted', life: 3000 })
   } catch (err) {
@@ -452,6 +486,27 @@ useHead({ title: 'OAuth' })
   margin-left: 0.35rem;
   color: var(--p-text-muted-color);
   font-weight: 400;
+}
+
+.oauth-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--p-content-border-color);
+}
+
+.oauth-total {
+  color: var(--p-text-muted-color);
+  font-size: 0.8rem;
+}
+
+.oauth-pagination :deep(.p-paginator) {
+  justify-content: flex-end;
+  padding: 0;
+  background: transparent;
 }
 
 .table-wrap {
@@ -680,6 +735,16 @@ useHead({ title: 'OAuth' })
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
+  }
+
+  .oauth-pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .oauth-pagination :deep(.p-paginator) {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 </style>

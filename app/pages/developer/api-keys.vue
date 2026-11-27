@@ -8,7 +8,8 @@
           snippets and groups; they are not tied to an App.
         </p>
       </div>
-      <Button label="New API key" size="small" @click="openCreate">
+      <Button label="New API key" size="small" :disabled="activeTotal >= MAX_DEVELOPER_API_KEYS"
+        @click="openCreate">
         <template #icon><Plus /></template>
       </Button>
     </div>
@@ -66,6 +67,17 @@
           </tbody>
         </table>
       </div>
+
+      <div v-if="total" class="keys-pagination">
+        <span class="keys-count">{{ total }} API key{{ total === 1 ? '' : 's' }}</span>
+        <Paginator v-if="pageCount > 1" :first="(page - 1) * pageSize" :rows="pageSize" :total="total"
+          :page-link-size="5" template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink"
+          @page="onPage" />
+      </div>
+      <p v-if="activeTotal >= MAX_DEVELOPER_API_KEYS" class="keys-limit">
+        You have reached the limit of {{ MAX_DEVELOPER_API_KEYS }} active API keys. Revoke an unused key to create
+        another.
+      </p>
     </section>
   </div>
 
@@ -135,6 +147,8 @@
 <script setup lang="ts">
 import Lock from '@primeicons/vue/lock'
 import Plus from '@primeicons/vue/plus'
+import type { PageState } from 'primevue/paginator'
+import { MAX_DEVELOPER_API_KEYS } from '#shared/utils/developer'
 
 type ApiKeyPermission = 'content:read' | 'content:create' | 'content:update' | 'content:delete'
 
@@ -147,6 +161,16 @@ interface DeveloperApiKey {
   status: 'active' | 'expired'
   lastUsedAt: string | null
   createdAt: string
+}
+
+interface ApiKeyPage {
+  apiKeys: DeveloperApiKey[]
+  total: number
+  activeTotal: number
+  page: number
+  pageSize: number
+  pageCount: number
+  hasMore: boolean
 }
 
 interface KeyForm {
@@ -169,6 +193,7 @@ const EXPIRY_OPTIONS = [
   { label: 'Never', value: 0 }
 ]
 
+const PAGE_SIZE = 20
 const toast = useToast()
 const confirm = useConfirm()
 const createOpen = ref(false)
@@ -178,6 +203,7 @@ const revokingSid = ref('')
 const dialogError = ref('')
 const createdKey = ref('')
 const createdName = ref('')
+const page = ref(1)
 
 function blankForm(): KeyForm {
   return { name: '', permissions: ['content:read'], expiry: 90 }
@@ -185,12 +211,19 @@ function blankForm(): KeyForm {
 
 const form = ref<KeyForm>(blankForm())
 
-const { data, refresh, pending } = await useFetch<{ apiKeys: DeveloperApiKey[], total: number }>(
-  '/api/developer/api-keys'
-)
+const { data, refresh, pending } = await useFetch<ApiKeyPage>('/api/developer/api-keys', {
+  query: computed(() => ({ page: page.value }))
+})
 
 const apiKeys = computed(() => data.value?.apiKeys ?? [])
 const total = computed(() => data.value?.total ?? 0)
+const activeTotal = computed(() => data.value?.activeTotal ?? 0)
+const pageSize = computed(() => data.value?.pageSize ?? PAGE_SIZE)
+const pageCount = computed(() => data.value?.pageCount ?? 1)
+
+watch(data, value => {
+  if (value && value.page !== page.value) page.value = value.page
+})
 
 const valid = computed(() => {
   const name = form.value.name.trim()
@@ -198,9 +231,14 @@ const valid = computed(() => {
 })
 
 function openCreate() {
+  if (activeTotal.value >= MAX_DEVELOPER_API_KEYS) return
   form.value = blankForm()
   dialogError.value = ''
   createOpen.value = true
+}
+
+function onPage(event: PageState) {
+  page.value = event.page + 1
 }
 
 function permissionLabel(permission: ApiKeyPermission) {
@@ -242,6 +280,7 @@ async function submitCreate() {
     createOpen.value = false
     createdOpen.value = true
     form.value = blankForm()
+    page.value = 1
     await refresh()
     toast.add({ severity: 'success', summary: 'API key created', life: 3000 })
   } catch (err) {
@@ -278,6 +317,7 @@ function askRevoke(key: DeveloperApiKey) {
       revokingSid.value = key.sid
       try {
         await $fetch(`/api/developer/api-keys/${encodeURIComponent(key.sid)}`, { method: 'DELETE' })
+        if (apiKeys.value.length === 1 && page.value > 1) page.value -= 1
         await refresh()
         toast.add({ severity: 'success', summary: 'API key revoked', life: 3000 })
       } catch (err) {
@@ -322,6 +362,33 @@ useHead({ title: 'API Keys' })
   margin-left: 0.35rem;
   color: var(--p-text-muted-color);
   font-weight: 400;
+}
+
+.keys-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--p-content-border-color);
+}
+
+.keys-count {
+  color: var(--p-text-muted-color);
+  font-size: 0.8rem;
+}
+
+.keys-pagination :deep(.p-paginator) {
+  justify-content: flex-end;
+  padding: 0;
+  background: transparent;
+}
+
+.keys-limit {
+  margin: 0.75rem 0 0;
+  color: var(--p-orange-500);
+  font-size: 0.8rem;
 }
 
 .table-wrap {
@@ -561,6 +628,16 @@ useHead({ title: 'API Keys' })
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
+  }
+
+  .keys-pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .keys-pagination :deep(.p-paginator) {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 </style>

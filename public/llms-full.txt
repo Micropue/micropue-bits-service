@@ -105,9 +105,10 @@ Public and unlisted content require the author to set a username first. Visitors
 ### API Keys and Open API
 
 - Apps can register an OAuth service. API Keys are separate account-level credentials and do not require an App.
+- Each account can keep up to 50 Apps and 50 OAuth services. The Apps and OAuth service lists show 20 records per page.
 - API Keys are shown in full once. Only a hash is stored; later views show a prefix, name, permissions, expiry, creation time and last-used time.
 - Permissions are `content:read`, `content:create`, `content:update` and `content:delete`.
-- Keys can expire after 30, 90 or 365 days, or never expire, and can be revoked immediately. A user can retain up to 50 active keys.
+- Keys can expire after 30, 90 or 365 days, or never expire, and can be revoked immediately. A user can retain up to 50 active keys. The API Keys list shows 20 records per page.
 - `/api/v1` accepts an API Key through `Authorization: Bearer <key>` or `X-API-Key`. Site cookies and OAuth access tokens are rejected.
 - Write requests require `Content-Type: application/json`; other media types receive a 415 problem response.
 - The Open API can read, create, update and soft-delete the key owner's snippets, and read, create, update and delete the owner's groups. It cannot change account profile, email, password, two-factor authentication, Passkeys, followers, favorites, OAuth grants or other security settings.

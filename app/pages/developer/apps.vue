@@ -9,7 +9,7 @@
           account level.
         </p>
       </div>
-      <Button label="New app" size="small" @click="openDialog">
+      <Button label="New app" size="small" :disabled="total >= MAX_DEVELOPER_APPS" @click="openDialog">
         <template #icon><Plus /></template>
       </Button>
     </div>
@@ -67,6 +67,9 @@
           </tbody>
         </table>
       </div>
+      <p v-if="total >= MAX_DEVELOPER_APPS" class="apps-limit">
+        You have reached the limit of {{ MAX_DEVELOPER_APPS }} Apps. Delete an unused App to create another.
+      </p>
 
       <div v-if="total > PAGE_SIZE" class="apps-pagination">
         <span class="apps-count">{{ total }} applications</span>
@@ -118,6 +121,7 @@
 <script setup lang="ts">
 import Box from '@primeicons/vue/box'
 import Plus from '@primeicons/vue/plus'
+import { MAX_DEVELOPER_APPS } from '#shared/utils/developer'
 
 interface DeveloperApp {
   sid: string
@@ -318,6 +322,12 @@ useHead({ title: 'Apps' })
   margin-left: 0.35rem;
   color: var(--p-text-muted-color);
   font-weight: 400;
+}
+
+.apps-limit {
+  margin: 0.75rem 0 0;
+  color: var(--p-orange-500);
+  font-size: 0.8rem;
 }
 
 .table-wrap {

@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { H3Event } from 'h3'
 import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise'
+import { MAX_DEVELOPER_OAUTH_SERVICES } from '#shared/utils/developer'
 import type { AuthUser } from './auth'
 import type { DeveloperApp } from './developer'
 import { useDb } from './db'
@@ -301,16 +302,48 @@ const SERVICE_COLUMNS = `s.\`app_sid\`, s.\`user_uuid\`, s.\`client_secret_hash\
   s.\`allow_wildcard\`, s.\`device_flow\`, s.\`expire_user_tokens\`, s.\`status\`, s.\`created_at\`,
   a.\`name\`, a.\`homepage_url\`, a.\`icon_url\`, a.\`description\`, a.\`status\` AS \`app_status\``
 
-export async function listOAuthServices(userUuid: string): Promise<DeveloperOAuthService[]> {
+export interface OAuthServicePage {
+  services: DeveloperOAuthService[]
+  total: number
+  page: number
+  pageSize: number
+  pageCount: number
+  hasMore: boolean
+}
+
+export async function listOAuthServices(
+  userUuid: string,
+  requestedPage = 1
+): Promise<OAuthServicePage> {
+  const pageSize = 20
+  const [[countRow]] = await useDb().query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS \`total\`
+       FROM \`developer_oauth_services\` s
+       JOIN \`developer_apps\` a ON a.\`sid\` = s.\`app_sid\`
+      WHERE s.\`user_uuid\` = ?`,
+    [userUuid]
+  )
+  const total = Number(countRow?.total ?? 0)
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(Math.max(1, Math.trunc(requestedPage) || 1), pageCount)
+  const offset = (page - 1) * pageSize
   const [rows] = await useDb().query<OAuthServiceRow[]>(
     `SELECT ${SERVICE_COLUMNS}
        FROM \`developer_oauth_services\` s
        JOIN \`developer_apps\` a ON a.\`sid\` = s.\`app_sid\`
       WHERE s.\`user_uuid\` = ?
-      ORDER BY s.\`created_at\` DESC`,
-    [userUuid]
+      ORDER BY s.\`created_at\` DESC, s.\`app_sid\` ASC
+      LIMIT ? OFFSET ?`,
+    [userUuid, pageSize, offset]
   )
-  return rows.map(publicOAuthService)
+  return {
+    services: rows.map(publicOAuthService),
+    total,
+    page,
+    pageSize,
+    pageCount,
+    hasMore: offset + rows.length < total
+  }
 }
 
 export async function listAvailableApps(userUuid: string): Promise<DeveloperApp[]> {
@@ -354,30 +387,57 @@ export async function createOAuthService(
   appSid: string,
   input: OAuthServiceInput
 ): Promise<DeveloperOAuthServiceWithSecret> {
-  const [apps] = await useDb().query<RowDataPacket[]>(
-    "SELECT `sid` FROM `developer_apps` WHERE `sid` = ? AND `user_uuid` = ? AND `status` = 'active' LIMIT 1",
-    [appSid, userUuid]
-  )
-  if (!apps[0]) throw createError({ statusCode: 404, statusMessage: 'Application not found' })
+  const secret = randomToken(32)
+  const conn = await useDb().getConnection()
+  try {
+    await conn.beginTransaction()
+    // Serialize service creation per account. Apps are capped at 50 and each
+    // App can have one service, so this also keeps the OAuth list bounded.
+    await conn.execute('SELECT `uuid` FROM `users` WHERE `uuid` = ? FOR UPDATE', [userUuid])
+    const [apps] = await conn.query<RowDataPacket[]>(
+      "SELECT `sid` FROM `developer_apps` WHERE `sid` = ? AND `user_uuid` = ? AND `status` = 'active' LIMIT 1",
+      [appSid, userUuid]
+    )
+    if (!apps[0]) {
+      throw createError({ statusCode: 404, statusMessage: 'Application not found' })
+    }
 
-  const [existing] = await useDb().query<RowDataPacket[]>(
-    'SELECT `app_sid` FROM `developer_oauth_services` WHERE `app_sid` = ? LIMIT 1',
-    [appSid]
-  )
-  if (existing[0]) {
-    throw createError({ statusCode: 409, statusMessage: 'This app already has an OAuth service' })
+    const [existing] = await conn.query<RowDataPacket[]>(
+      'SELECT `app_sid` FROM `developer_oauth_services` WHERE `app_sid` = ? LIMIT 1',
+      [appSid]
+    )
+    if (existing[0]) {
+      throw createError({ statusCode: 409, statusMessage: 'This app already has an OAuth service' })
+    }
+
+    const [[countRow]] = await conn.query<RowDataPacket[]>(
+      'SELECT COUNT(*) AS `total` FROM `developer_oauth_services` WHERE `user_uuid` = ?',
+      [userUuid]
+    )
+    if (Number(countRow?.total ?? 0) >= MAX_DEVELOPER_OAUTH_SERVICES) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `You can have at most ${MAX_DEVELOPER_OAUTH_SERVICES} OAuth services`
+      })
+    }
+
+    await conn.execute(
+      `INSERT INTO \`developer_oauth_services\`
+        (\`app_sid\`, \`user_uuid\`, \`client_secret_hash\`, \`redirect_uris\`, \`allow_wildcard\`, \`device_flow\`, \`expire_user_tokens\`)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        appSid, userUuid, hashToken(secret), JSON.stringify(input.redirectUris),
+        input.allowWildcard ? 1 : 0, input.deviceFlow ? 1 : 0, input.expireUserTokens ? 1 : 0
+      ]
+    )
+    await conn.commit()
+  } catch (error) {
+    await conn.rollback()
+    throw error
+  } finally {
+    conn.release()
   }
 
-  const secret = randomToken(32)
-  await useDb().execute(
-    `INSERT INTO \`developer_oauth_services\`
-      (\`app_sid\`, \`user_uuid\`, \`client_secret_hash\`, \`redirect_uris\`, \`allow_wildcard\`, \`device_flow\`, \`expire_user_tokens\`)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      appSid, userUuid, hashToken(secret), JSON.stringify(input.redirectUris),
-      input.allowWildcard ? 1 : 0, input.deviceFlow ? 1 : 0, input.expireUserTokens ? 1 : 0
-    ]
-  )
   const service = await getOAuthServiceDetail(userUuid, appSid)
   if (!service) throw createError({ statusCode: 500, statusMessage: 'Failed to load OAuth service' })
   return { ...service, clientSecret: secret }
