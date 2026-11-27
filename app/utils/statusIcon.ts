@@ -34,6 +34,7 @@ export function statusIcon(status: string) {
       return Bolt
     case 'pending':
     case 'open':
+    case 'expired':
       return Clock
     case 'read':
       return Eye
@@ -43,6 +44,7 @@ export function statusIcon(status: string) {
     case 'disabled':
     case 'unbound':
     case 'ignored':
+    case 'revoked':
       return Ban
     case 'failed':
     case 'rejected':

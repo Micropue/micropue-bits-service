@@ -1,5 +1,6 @@
 import type { RowDataPacket } from 'mysql2/promise'
 import { normalizeRedirectUris } from './oauth'
+import { API_KEY_PERMISSIONS } from './apiKey'
 import { useDb } from './db'
 
 // 控制台 · Developer 管理：App 与 OAuth 服务
@@ -27,6 +28,40 @@ export interface AdminOAuthService {
   expireUserTokens: boolean
   createdAt: string
   owner: { uuid: string, email: string, username: string }
+}
+
+export type AdminApiKeyStatus = 'active' | 'expired' | 'revoked'
+
+export interface AdminApiKey {
+  sid: string
+  name: string
+  keyPrefix: string
+  permissions: string[]
+  status: AdminApiKeyStatus
+  expiresAt: string | null
+  lastUsedAt: string | null
+  revokedAt: string | null
+  createdAt: string
+  owner: { uuid: string, email: string, username: string }
+}
+
+const API_KEY_PERMISSION_SET = new Set<string>(API_KEY_PERMISSIONS)
+
+function parseApiKeyPermissions(value: unknown): string[] {
+  let parsed: unknown = value
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      parsed = []
+    }
+  }
+  if (!Array.isArray(parsed)) return []
+  return [...new Set(
+    parsed
+      .map(permission => String(permission))
+      .filter(permission => API_KEY_PERMISSION_SET.has(permission))
+  )]
 }
 
 export async function listAdminDeveloperApps(): Promise<AdminDeveloperApp[]> {
@@ -80,6 +115,76 @@ export async function listAdminOAuthServices(): Promise<AdminOAuthService[]> {
     createdAt: String(row.created_at),
     owner: { uuid: String(row.user_uuid), email: String(row.email), username: String(row.username) }
   }))
+}
+
+export async function listAdminApiKeys(): Promise<{
+  apiKeys: AdminApiKey[]
+  total: number
+  active: number
+  limit: number
+}> {
+  const limit = 1000
+  const [[countRow]] = await useDb().query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS \`total\`,
+            COALESCE(SUM(
+              \`revoked_at\` IS NULL
+              AND (\`expires_at\` IS NULL OR \`expires_at\` > NOW())
+            ), 0) AS \`active\`
+       FROM \`developer_api_keys\``
+  )
+  const [rows] = await useDb().query<RowDataPacket[]>(
+    `SELECT k.\`sid\`, k.\`name\`, k.\`key_prefix\`, k.\`permissions\`,
+            k.\`expires_at\`, k.\`last_used_at\`, k.\`revoked_at\`, k.\`created_at\`,
+            u.\`uuid\` AS \`user_uuid\`, u.\`email\`, u.\`username\`,
+            CASE
+              WHEN k.\`revoked_at\` IS NOT NULL THEN 'revoked'
+              WHEN k.\`expires_at\` IS NOT NULL AND k.\`expires_at\` <= NOW() THEN 'expired'
+              ELSE 'active'
+            END AS \`key_status\`
+       FROM \`developer_api_keys\` k
+       JOIN \`users\` u ON u.\`uuid\` = k.\`user_uuid\`
+      ORDER BY (
+                k.\`revoked_at\` IS NULL
+                AND (k.\`expires_at\` IS NULL OR k.\`expires_at\` > NOW())
+              ) DESC,
+              k.\`created_at\` DESC,
+              k.\`sid\` DESC
+      LIMIT ?`,
+    [limit]
+  )
+  return {
+    apiKeys: rows.map(row => ({
+      sid: String(row.sid),
+      name: String(row.name),
+      keyPrefix: String(row.key_prefix),
+      permissions: parseApiKeyPermissions(row.permissions),
+      status: String(row.key_status) as AdminApiKeyStatus,
+      expiresAt: row.expires_at ? String(row.expires_at) : null,
+      lastUsedAt: row.last_used_at ? String(row.last_used_at) : null,
+      revokedAt: row.revoked_at ? String(row.revoked_at) : null,
+      createdAt: String(row.created_at),
+      owner: {
+        uuid: String(row.user_uuid),
+        email: String(row.email),
+        username: String(row.username)
+      }
+    })),
+    total: Number(countRow?.total ?? 0),
+    active: Number(countRow?.active ?? 0),
+    limit
+  }
+}
+
+export async function revokeAdminApiKey(sid: string): Promise<boolean> {
+  const [result] = await useDb().execute(
+    `UPDATE \`developer_api_keys\`
+        SET \`revoked_at\` = NOW()
+      WHERE \`sid\` = ?
+        AND \`revoked_at\` IS NULL
+        AND (\`expires_at\` IS NULL OR \`expires_at\` > NOW())`,
+    [sid]
+  )
+  return Number(result.affectedRows ?? 0) > 0
 }
 
 export async function updateDeveloperAppStatus(sid: string, status: string): Promise<boolean> {

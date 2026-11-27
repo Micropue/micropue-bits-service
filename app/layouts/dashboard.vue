@@ -188,7 +188,8 @@ const baseNavGroups: { labelKey: string, items: NavItem[] }[] = [
     labelKey: 'nav.developer',
     items: [
       { labelKey: 'nav.developerApps', to: '/dashboard/developer/apps', icon: Box },
-      { labelKey: 'nav.developerOAuth', to: '/dashboard/developer/oauth', icon: Key }
+      { labelKey: 'nav.developerOAuth', to: '/dashboard/developer/oauth', icon: Key },
+      { labelKey: 'nav.developerApiKeys', to: '/dashboard/developer/api-keys', icon: Key }
     ]
   }
 ]
@@ -236,6 +237,7 @@ const titleKeys: Record<string, string> = {
   '/dashboard/emails': 'title.email',
   '/dashboard/developer/apps': 'title.developerApps',
   '/dashboard/developer/oauth': 'title.developerOAuth',
+  '/dashboard/developer/api-keys': 'title.developerApiKeys',
   '/dashboard/auth': 'title.signIn'
 }
 const title = computed(() => {
