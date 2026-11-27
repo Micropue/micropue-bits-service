@@ -417,6 +417,15 @@ async function openFork() {
     await navigateTo('/sign')
     return
   }
+  if (!authUser.value.usernameSet) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Set a username first',
+      detail: 'Forking needs a profile URL. Set a username in Account → Profile, then try again.',
+      life: 6000
+    })
+    return
+  }
   forkDialog.value = true
 }
 

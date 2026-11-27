@@ -315,10 +315,10 @@ export async function listOAuthServices(userUuid: string): Promise<DeveloperOAut
 
 export async function listAvailableApps(userUuid: string): Promise<DeveloperApp[]> {
   const [rows] = await useDb().query<RowDataPacket[]>(
-    `SELECT a.\`sid\`, a.\`name\`, a.\`homepage_url\`, a.\`icon_url\`, a.\`description\`, a.\`app_type\`, a.\`created_at\`
+    `SELECT a.\`sid\`, a.\`name\`, a.\`homepage_url\`, a.\`icon_url\`, a.\`description\`, a.\`created_at\`
        FROM \`developer_apps\` a
        LEFT JOIN \`developer_oauth_services\` s ON s.\`app_sid\` = a.\`sid\`
-      WHERE a.\`user_uuid\` = ? AND a.\`status\` = 'active' AND a.\`app_type\` = 'website'
+      WHERE a.\`user_uuid\` = ? AND a.\`status\` = 'active'
         AND s.\`app_sid\` IS NULL
       ORDER BY a.\`created_at\` DESC`,
     [userUuid]
@@ -329,7 +329,6 @@ export async function listAvailableApps(userUuid: string): Promise<DeveloperApp[
     homepageUrl: String(row.homepage_url),
     iconUrl: row.icon_url ? String(row.icon_url) : null,
     description: String(row.description),
-    appType: row.app_type === 'service' ? 'service' : 'website',
     status: 'active',
     createdAt: String(row.created_at)
   }))
@@ -356,10 +355,10 @@ export async function createOAuthService(
   input: OAuthServiceInput
 ): Promise<DeveloperOAuthServiceWithSecret> {
   const [apps] = await useDb().query<RowDataPacket[]>(
-    "SELECT `sid` FROM `developer_apps` WHERE `sid` = ? AND `user_uuid` = ? AND `status` = 'active' AND `app_type` = 'website' LIMIT 1",
+    "SELECT `sid` FROM `developer_apps` WHERE `sid` = ? AND `user_uuid` = ? AND `status` = 'active' LIMIT 1",
     [appSid, userUuid]
   )
-  if (!apps[0]) throw createError({ statusCode: 404, statusMessage: 'Website application not found' })
+  if (!apps[0]) throw createError({ statusCode: 404, statusMessage: 'Application not found' })
 
   const [existing] = await useDb().query<RowDataPacket[]>(
     'SELECT `app_sid` FROM `developer_oauth_services` WHERE `app_sid` = ? LIMIT 1',

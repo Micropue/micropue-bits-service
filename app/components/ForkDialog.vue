@@ -12,9 +12,9 @@
         <div class="slug-input">
           <span class="slug-prefix" aria-hidden="true">/{{ destinationUsername }}/</span>
           <InputText id="fork-slug" v-model="slug" maxlength="40" autocomplete="off" fluid
-            placeholder="auto-generated-from-name" @blur="checkSlug" @keydown.enter.prevent="submit" />
+            placeholder="auto-generated-from-name" @blur="checkSlug()" @keydown.enter.prevent="submit" />
         </div>
-        <small class="hint">Lowercase letters, numbers and hyphens. Leave blank to generate one automatically.</small>
+        <small class="hint">Lowercase letters, numbers and hyphens. Defaults to the original URL name.</small>
         <small v-if="slugError" class="error" role="alert">{{ slugError }}</small>
         <small v-else-if="slugConflict" class="error" role="alert">This URL is already used by another item.</small>
         <small v-else class="hint">The fork will be created at <code>/{{ destinationUsername }}/{{ slug || '…' }}</code>.</small>
@@ -65,11 +65,15 @@ const visibility = ref<'public' | 'unlisted' | 'private'>('private')
 const saving = ref(false)
 const error = ref('')
 const slugConflict = ref(false)
-let checkSeq = 0
+const slugChecking = ref(false)
+let slugRevision = 0
+let checkedRevision = -1
+let checkedAvailable = true
+let checkTimer: ReturnType<typeof setTimeout> | null = null
 
 const slugValid = computed(() => !slug.value.trim() || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.value.trim()))
 const slugError = computed(() => slugValid.value ? '' : 'Use lowercase letters, numbers and single hyphens only.')
-const canSubmit = computed(() => slugValid.value && !slugConflict.value)
+const canSubmit = computed(() => slugValid.value && !slugConflict.value && !slugChecking.value)
 const visibilityHint = computed(() => ({
   private: 'Only you can open the fork.',
   unlisted: 'Anyone with the link can open it, but it stays out of search.',
@@ -77,40 +81,76 @@ const visibilityHint = computed(() => ({
 })[visibility.value])
 
 watch(visible, open => {
-  if (!open) return
-  slug.value = ''
+  slugRevision++
+  if (checkTimer) clearTimeout(checkTimer)
+  if (!open) {
+    slugChecking.value = false
+    return
+  }
+  slug.value = props.sourceSlug
   visibility.value = 'private'
   saving.value = false
   error.value = ''
   slugConflict.value = false
+  scheduleCheck(0)
 })
 
 watch(slug, () => {
+  slugRevision++
+  checkedRevision = -1
+  if (checkTimer) clearTimeout(checkTimer)
   slugConflict.value = false
   error.value = ''
+  if (!slug.value.trim() || !slugValid.value) {
+    slugChecking.value = false
+    return
+  }
+  scheduleCheck(300)
 })
 
-async function checkSlug() {
+function scheduleCheck(delay: number) {
+  const revision = slugRevision
+  checkTimer = setTimeout(() => {
+    checkTimer = null
+    void checkSlug(revision)
+  }, delay)
+}
+
+async function checkSlug(revision = slugRevision): Promise<boolean> {
   const value = slug.value.trim()
   if (!value || !slugValid.value) {
     slugConflict.value = false
-    return
+    slugChecking.value = false
+    return true
   }
-  const seq = ++checkSeq
+  if (checkTimer) clearTimeout(checkTimer)
+  checkTimer = null
+  if (checkedRevision === revision) return checkedAvailable
+
+  slugChecking.value = true
   try {
     const result = await $fetch<{ available: boolean }>('/api/profile/name-availability', {
-      query: { kind: props.kind, name: props.sourceName, slug: value }
+      query: { kind: props.kind, slug: value }
     })
-    if (seq === checkSeq) slugConflict.value = !result.available
+    if (revision !== slugRevision) return true
+    checkedRevision = revision
+    checkedAvailable = result.available
+    slugConflict.value = !result.available
+    return result.available
   } catch {
-    if (seq === checkSeq) slugConflict.value = false
+    if (revision !== slugRevision) return true
+    // 网络错误不冒充“可用”，但也不阻止用户提交；服务端会在创建时再次原子校验。
+    slugConflict.value = false
+    return true
+  } finally {
+    if (revision === slugRevision) slugChecking.value = false
   }
 }
 
 async function submit() {
   if (!canSubmit.value || saving.value) return
-  await checkSlug()
-  if (slugConflict.value) return
+  const available = await checkSlug()
+  if (!available || slugConflict.value || !canSubmit.value) return
   saving.value = true
   error.value = ''
   try {
@@ -204,10 +244,14 @@ async function submit() {
 
 .slug-prefix {
   flex: none;
+  max-width: 55%;
+  overflow: hidden;
   padding-left: 0.75rem;
   font-family: var(--font-code);
   font-size: 0.8rem;
   color: var(--p-text-muted-color);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hint,

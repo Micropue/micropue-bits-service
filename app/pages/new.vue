@@ -316,14 +316,21 @@ useHead({
 
 <style scoped lang="scss">
 .new-page {
+  box-sizing: border-box;
   width: min(1120px, 94vw);
-  height: calc(100dvh - 90px);
-  min-height: 620px;
+  min-height: calc(100dvh - 70px);
+  --content-editor-height: clamp(460px, calc(100dvh - 300px), 760px);
   margin: 0 auto;
-  padding: 3.5rem 0 5rem;
+  padding: 2rem 0 2.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.15rem;
+}
+
+.page-head,
+.steps,
+.step-actions {
+  flex: none;
 }
 
 .page-title {
@@ -392,6 +399,7 @@ useHead({
 
 /* ---------- 步骤卡片 ---------- */
 .step-card {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
@@ -413,8 +421,8 @@ useHead({
 
 @media (max-width: 900px) {
   .new-page {
-    height: auto;
-    min-height: calc(100dvh - 90px);
+    box-sizing: border-box;
+    min-height: calc(100dvh - 70px);
     padding-bottom: 3rem;
   }
 

@@ -1,5 +1,5 @@
-// 当前 API Key 对应的用户、应用与权限
-export default defineEventHandler(async event => {
+// 当前 API Key 对应的用户与权限
+export default defineApiV1Handler(async event => {
   setHeader(event, 'cache-control', 'no-store')
   const auth = await requireApiV1(event, 'content:read')
   return {
@@ -7,10 +7,8 @@ export default defineEventHandler(async event => {
       user: {
         uuid: auth.user.uuid,
         username: auth.user.username,
-        nickname: auth.user.nickname,
-        email: auth.user.email
+        nickname: auth.user.nickname
       },
-      application: auth.app,
       apiKey: apiKeySummary(auth)
     }
   }

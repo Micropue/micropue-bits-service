@@ -62,12 +62,26 @@ export async function enforceRateLimit(event: H3Event, options: RateLimitOptions
     count = Number(result?.[0] ?? 0)
     ttl = Number(result?.[1] ?? 0)
   } catch (err) {
-    if (options.failOpen === false) throw err
+    if (options.failOpen === false) {
+      console.error('[rate-limit] Redis unavailable, rejecting request:', options.bucket, err)
+      throw createError({
+        statusCode: 503,
+        statusMessage: 'Rate limiting is temporarily unavailable',
+        data: { code: 'RATE_LIMIT_UNAVAILABLE', retryAfterSeconds: options.window }
+      })
+    }
     console.warn('[rate-limit] Redis unavailable, allowing request:', options.bucket)
   }
 
   const retryAfter = Math.max(ttl > 0 ? ttl : options.window, 1)
   const remaining = Math.max(options.limit - count, 0)
+
+  setResponseHeader(event, 'X-RateLimit-Limit', String(options.limit))
+  setResponseHeader(event, 'X-RateLimit-Remaining', String(remaining))
+  setResponseHeader(event, 'X-RateLimit-Reset', String(retryAfter))
+  setResponseHeader(event, 'RateLimit-Limit', String(options.limit))
+  setResponseHeader(event, 'RateLimit-Remaining', String(remaining))
+  setResponseHeader(event, 'RateLimit-Reset', String(retryAfter))
 
   if (count > options.limit) {
     setResponseHeader(event, 'Retry-After', String(retryAfter))
@@ -76,11 +90,6 @@ export async function enforceRateLimit(event: H3Event, options: RateLimitOptions
       statusMessage: options.message ?? 'Too many requests, please try again later',
       data: { retryAfterSeconds: retryAfter }
     })
-  }
-
-  if (count > 0) {
-    setResponseHeader(event, 'X-RateLimit-Limit', String(options.limit))
-    setResponseHeader(event, 'X-RateLimit-Remaining', String(remaining))
   }
 
   return { limit: options.limit, remaining, retryAfter }

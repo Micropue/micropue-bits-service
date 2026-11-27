@@ -4,8 +4,8 @@
       <div>
         <h2 class="section-title">OAuth</h2>
         <p class="oauth-lead">
-          Register OAuth services for Website Apps. Each App can have one service. Service Apps cannot use OAuth;
-          use <NuxtLink to="/developer/api-keys" class="inline-link">API Keys</NuxtLink> for those instead.
+          Register OAuth 2.0 services for your Apps. Each App can have one service. For server-to-server content
+          access, use account-level <NuxtLink to="/developer/api-keys" class="inline-link">API Keys</NuxtLink>.
         </p>
       </div>
       <Button label="Register service" size="small" :disabled="!availableApps.length" @click="openCreate">
@@ -27,15 +27,10 @@
             <template v-if="availableApps.length">
               Choose one of your Apps to register an OAuth service.
             </template>
-            <template v-else-if="websiteApps.length">
-              All of your Website Apps already have an OAuth service.
-              <NuxtLink to="/developer/apps" class="inline-link">Create another Website App</NuxtLink>
-              to register more.
-            </template>
             <template v-else>
-              No Website App is available. Service Apps can only use API Keys.
-              <NuxtLink to="/developer/apps" class="inline-link">Create a Website App</NuxtLink>
-              first.
+              No App is available for a new OAuth service. Every active App may already have one;
+              <NuxtLink to="/developer/apps" class="inline-link">create another App</NuxtLink>
+              to register more.
             </template>
           </p>
         </div>
@@ -91,14 +86,8 @@
       </div>
 
       <p v-if="!availableApps.length && services.length" class="service-note">
-        <template v-if="websiteApps.length">
-          All Website Apps already have an OAuth service.
-          <NuxtLink to="/developer/apps" class="inline-link">Create another Website App</NuxtLink> to register more.
-        </template>
-        <template v-else>
-          OAuth requires a Website App.
-          <NuxtLink to="/developer/apps" class="inline-link">Create a Website App</NuxtLink> to register a service.
-        </template>
+        All active Apps already have an OAuth service.
+        <NuxtLink to="/developer/apps" class="inline-link">Create another App</NuxtLink> to register more.
       </p>
     </section>
   </div>
@@ -203,7 +192,6 @@ interface DeveloperApp {
   sid: string
   name: string
   iconUrl: string | null
-  appType: 'website' | 'service'
 }
 
 interface OAuthService {
@@ -243,13 +231,8 @@ const deleteMessage = computed(() => deleteTarget.value
 
 const { data, refresh, pending } = await useFetch<{ services: OAuthService[] }>('/api/developer/oauth')
 const { data: appData, refresh: refreshApps } = await useFetch<{ apps: DeveloperApp[] }>('/api/developer/oauth/available-apps')
-const { data: allAppsData, refresh: refreshAllApps } = await useFetch<{ apps: DeveloperApp[] }>(
-  '/api/developer/apps',
-  { query: { limit: 100, offset: 0 } }
-)
 const services = computed(() => data.value?.services ?? [])
 const availableApps = computed(() => appData.value?.apps ?? [])
-const websiteApps = computed(() => (allAppsData.value?.apps ?? []).filter(app => app.appType === 'website'))
 
 const dialogVisible = ref(false)
 const saving = ref(false)
@@ -365,7 +348,7 @@ async function submit() {
     } else {
       toast.add({ severity: 'success', summary: 'OAuth service registered', detail: 'Client credentials are shown under Edit.', life: 4500 })
     }
-    await Promise.all([refresh(), refreshApps(), refreshAllApps()])
+    await Promise.all([refresh(), refreshApps()])
     if (!editing) applyDetail(res.service, res.service.clientSecret)
   } catch (err) {
     dialogError.value = (err as { statusMessage?: string }).statusMessage ??
@@ -427,7 +410,7 @@ async function confirmDelete(phrase: string) {
     deleteTarget.value = null
     if (editingAppSid.value === service.appSid) dialogVisible.value = false
     brokenIcons.delete(service.appSid)
-    await Promise.all([refresh(), refreshApps(), refreshAllApps()])
+    await Promise.all([refresh(), refreshApps()])
     toast.add({ severity: 'success', summary: 'OAuth service deleted', life: 3000 })
   } catch (err) {
     toast.add({

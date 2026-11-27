@@ -2,6 +2,7 @@
 // 用户级写操作在各自 endpoint 内用 enforceUserRateLimit 做更精确的分桶。
 const PUBLIC_READ_RULES: Array<{ bucket: string; pattern: RegExp; limit: number; window: number }> = [
   { bucket: 'sitemap', pattern: /^\/sitemap\.xml$/, limit: 10, window: 60 },
+  { bucket: 'openapi-metadata', pattern: /^(?:\/openapi\.json|\/api\/v1|\/api\/v1\/openapi\.json)$/, limit: 60, window: 60 },
   { bucket: 'oauth-github', pattern: /^\/api\/auth\/github\/(authorize|callback)$/, limit: 30, window: 600 },
   { bucket: 'users-search', pattern: /^\/api\/users\/search$/, limit: 60, window: 60 },
   { bucket: 'snippet-search', pattern: /^\/api\/snippets\/search$/, limit: 60, window: 60 },

@@ -5,6 +5,7 @@ import type { Connection } from 'mysql2/promise'
 
 export const MAX_CODE_BYTES = 1024 * 1024
 export const MAX_TAGS = 5
+export const MAX_DEPENDENCIES = 50
 export const VISIBILITIES = ['public', 'unlisted', 'private'] as const
 
 export interface TagInput {
@@ -19,7 +20,17 @@ interface Owner {
 }
 
 export function normalizeTags(value: unknown): TagInput[] {
-  if (!Array.isArray(value)) return []
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value)) {
+    throw createError({ statusCode: 400, statusMessage: 'Tags must be an array', data: { field: 'tags' } })
+  }
+  if (value.length > MAX_TAGS) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `Too many tags (max ${MAX_TAGS})`,
+      data: { field: 'tags' }
+    })
+  }
   const unique = new Map<string, string>()
   for (const raw of value) {
     const name = String(raw ?? '').trim().slice(0, 32)
@@ -88,8 +99,10 @@ export async function nextContentSlug(
     const candidate = attempt === 0 ? base : `${base.slice(0, 36)}-${attempt + 1}`
     const [[taken]] = await db.query(
       `SELECT
-         (SELECT COUNT(*) FROM \`contents\` WHERE \`owner_uuid\` = ? AND \`slug\` = ?) +
-         (SELECT COUNT(*) FROM \`content_aliases\` WHERE \`owner_uuid\` = ? AND \`slug\` = ?) AS \`count\``,
+         (SELECT COUNT(*) FROM \`contents\`
+           WHERE \`owner_uuid\` = ? AND \`slug\` = ?) +
+         (SELECT COUNT(*) FROM \`content_aliases\`
+           WHERE \`owner_uuid\` = ? AND \`slug\` = ?) AS \`count\``,
       [ownerUuid, candidate, ownerUuid, candidate]
     ) as [{ count: number }[], unknown]
     if (!Number(taken?.count ?? 0)) return { slug: candidate, adjusted: attempt > 0 }
@@ -157,9 +170,20 @@ export async function readSnippetFields(body: Record<string, unknown>, owner: Ow
   }
 
   // 依赖（可选）：必须是所选语言实际关联的条目
-  const dependencySlugs = Array.isArray(body?.dependencies)
-    ? [...new Set((body.dependencies as unknown[]).map(item => String(item ?? '').trim().toLowerCase()).filter(Boolean))]
+  const rawDependencies = body?.dependencies
+  if (rawDependencies !== undefined && rawDependencies !== null && !Array.isArray(rawDependencies)) {
+    throw createError({ statusCode: 400, statusMessage: 'Dependencies must be an array', data: { field: 'dependencies' } })
+  }
+  const dependencySlugs = Array.isArray(rawDependencies)
+    ? [...new Set(rawDependencies.map(item => String(item ?? '').trim().toLowerCase()).filter(Boolean))]
     : []
+  if (dependencySlugs.length > MAX_DEPENDENCIES) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `Too many dependencies (max ${MAX_DEPENDENCIES} unique values)`,
+      data: { field: 'dependencies' }
+    })
+  }
   let dependencySids: string[] = []
   if (dependencySlugs.length) {
     const placeholders = dependencySlugs.map(() => '?').join(', ')

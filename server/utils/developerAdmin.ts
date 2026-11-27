@@ -9,7 +9,6 @@ export interface AdminDeveloperApp {
   homepageUrl: string
   iconUrl: string | null
   description: string
-  appType: 'website' | 'service'
   status: string
   createdAt: string
   owner: { uuid: string, email: string, username: string }
@@ -32,7 +31,7 @@ export interface AdminOAuthService {
 
 export async function listAdminDeveloperApps(): Promise<AdminDeveloperApp[]> {
   const [rows] = await useDb().query<RowDataPacket[]>(
-    `SELECT a.\`sid\`, a.\`name\`, a.\`homepage_url\`, a.\`icon_url\`, a.\`description\`, a.\`app_type\`, a.\`status\`,
+    `SELECT a.\`sid\`, a.\`name\`, a.\`homepage_url\`, a.\`icon_url\`, a.\`description\`, a.\`status\`,
             a.\`created_at\`, a.\`user_uuid\`, u.\`email\`, u.\`username\`,
             s.\`app_sid\` AS \`service_app_sid\`, s.\`status\` AS \`service_status\`
        FROM \`developer_apps\` a
@@ -47,7 +46,6 @@ export async function listAdminDeveloperApps(): Promise<AdminDeveloperApp[]> {
     homepageUrl: String(row.homepage_url),
     iconUrl: row.icon_url ? String(row.icon_url) : null,
     description: String(row.description),
-    appType: row.app_type === 'service' ? 'service' : 'website',
     status: String(row.status),
     createdAt: String(row.created_at),
     owner: { uuid: String(row.user_uuid), email: String(row.email), username: String(row.username) },
@@ -110,7 +108,6 @@ export async function deleteDeveloperApp(sid: string, ownerUuid?: string): Promi
       return false
     }
     await conn.execute('DELETE FROM `oauth_tokens` WHERE `app_sid` = ?', [sid])
-    await conn.execute('DELETE FROM `developer_api_keys` WHERE `app_sid` = ?', [sid])
     await conn.execute('DELETE FROM `developer_oauth_services` WHERE `app_sid` = ?', [sid])
     await conn.execute('DELETE FROM `developer_apps` WHERE `sid` = ?', [sid])
     await conn.commit()

@@ -3,7 +3,7 @@
     <header class="page-head">
       <p class="eyebrow">Edit snippet</p>
       <h1 class="page-title">{{ initial?.name || 'Edit snippet' }}</h1>
-      <p class="page-sub">URL: <code>/{{ username }}/{{ slug }}</code> · you can change the URL name below.</p>
+      <p class="page-sub">URL: <code>/{{ username }}/{{ slug }}</code> · URL name follows Name.</p>
     </header>
 
     <section v-if="!signedIn" class="panel panel--center">
@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import type { ContentFormInitial, ContentFormPayload } from '~/components/ContentForm.vue'
 
-// 编辑代码段（仅作者本人）：/{username}/{slug}/edit；slug 可修改
+// 编辑代码段（仅作者本人）：/{username}/{slug}/edit；URL name 由 Name 派生
 definePageMeta({ layout: 'default' })
 
 interface EditResponse {
@@ -138,14 +138,15 @@ useHead({
 
 <style scoped lang="scss">
 .edit-page {
+  box-sizing: border-box;
   width: min(1120px, 94vw);
-  height: calc(100dvh - 90px);
-  min-height: 620px;
+  min-height: calc(100dvh - 70px);
+  --content-editor-height: clamp(460px, calc(100dvh - 235px), 820px);
   margin: 0 auto;
-  padding: 3.5rem 0 5rem;
+  padding: 2rem 0 2.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.15rem;
 }
 
 .edit-page > :deep(.content-form) {
@@ -153,10 +154,13 @@ useHead({
   min-height: 0;
 }
 
+.edit-page > .page-head {
+  flex: 0 0 auto;
+}
+
 @media (max-width: 900px) {
   .edit-page {
-    height: auto;
-    min-height: calc(100dvh - 90px);
+    min-height: calc(100dvh - 70px);
     padding-bottom: 3rem;
   }
 

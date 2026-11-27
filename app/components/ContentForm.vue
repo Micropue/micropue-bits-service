@@ -67,26 +67,23 @@
           <label class="field-label" for="content-slug">URL name</label>
           <div class="slug-input">
             <span class="slug-prefix" aria-hidden="true">/{{ username }}/</span>
-            <InputText id="content-slug" v-model="slugInput" name="slug" maxlength="40" autocomplete="off" fluid
-              placeholder="auto-generated-from-name" aria-describedby="content-slug-hint" />
+            <InputText id="content-slug" :model-value="slugInput" name="slug" maxlength="40" readonly
+              aria-describedby="content-slug-hint" placeholder="auto-generated-from-name" />
           </div>
           <small id="content-slug-hint" class="field-hint">
-            Lowercase letters, numbers and hyphens. Max 40 characters.
-            <template v-if="!props.slug">Leave blank to generate it from the name.</template>
+            Generated from Name using lowercase letters, numbers and hyphens (max 40 characters).
           </small>
           <small v-if="slugError" class="field-error" role="alert">{{ slugError }}</small>
-          <small v-else-if="slugPreview" class="field-hint">URL: <code>/{{ username }}/{{ slugPreview }}</code></small>
+          <small v-else-if="slugConflict" class="field-error" role="alert">
+            This URL is already used by another item. Choose a different Name.
+          </small>
+          <small v-else-if="normalizedSlug" class="field-hint">
+            URL: <code>/{{ username }}/{{ normalizedSlug }}</code>
+          </small>
           <small v-if="nameConflict && !slugConflict" class="name-warning" role="status">
             <ExclamationTriangle aria-hidden="true" />
             <span class="name-warning-text">
-              <template v-if="slug">
-                This name or URL is already used by another snippet or group
-                (<code>{{ nameConflict.existing?.slug }}</code>).
-              </template>
-              <template v-else>
-                This name or URL is already in use
-                (<code>{{ nameConflict.existing?.slug }}</code>). The URL will be adjusted when created.
-              </template>
+              This name is also used by <code>{{ nameConflict.existing?.slug }}</code>, but this URL is available.
             </span>
           </small>
         </div>
@@ -206,7 +203,7 @@ const props = withDefaults(defineProps<{
   submitLabel?: string
   saving?: boolean
   error?: string
-  /** 编辑模式下的当前 slug（可改） */
+  /** 编辑模式下的当前 slug；Name 不变时保持不变，Name 修改后由 Name 派生 */
   slug?: string
   /** 让表单占满右侧可用高度，代码编辑器内部滚动 */
   fill?: boolean
@@ -257,8 +254,6 @@ const tags = ref<string[]>([])
 const tagInput = ref('')
 const visibility = ref<'public' | 'unlisted' | 'private'>('private')
 const code = ref('')
-const slugInput = ref('')
-const slugTouched = ref(false)
 
 const groupOptions = computed(() => groupData.value?.groups ?? [])
 
@@ -326,7 +321,6 @@ onMounted(() => {
   const initial = props.initial
   language.value = initial.language ?? null
   name.value = initial.name ?? ''
-  slugInput.value = initial.slug ?? props.slug ?? ''
   intro.value = initial.intro ?? ''
   tags.value = [...(initial.tags ?? [])]
   visibility.value = initial.visibility ?? 'private'
@@ -367,14 +361,22 @@ function slugify(value: string) {
     .slice(0, 40)
 }
 
+// URL name is derived from Name. The current URL is preserved until Name actually changes.
+const slugInput = computed(() => {
+  const currentName = name.value.trim()
+  const initialName = (props.initial.name ?? '').trim()
+  if (props.slug && currentName === initialName) return props.slug
+  return slugify(currentName)
+})
 const normalizedSlug = computed(() => slugInput.value.trim().toLowerCase())
 const slugValid = computed(() => !normalizedSlug.value || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug.value))
 const slugError = computed(() => {
   if (!slugValid.value) return 'Use lowercase letters, numbers and single hyphens only.'
-  if (props.slug && !normalizedSlug.value) return 'URL name cannot be empty.'
+  if (name.value.trim() && !normalizedSlug.value) {
+    return 'Name must include a Latin letter or number so a URL can be generated.'
+  }
   return ''
 })
-const slugPreview = computed(() => normalizedSlug.value || slugify(name.value) || 'snippet')
 const slugConflict = ref(false)
 
 interface NameConflict {
@@ -384,15 +386,19 @@ interface NameConflict {
 }
 
 const nameConflict = ref<NameConflict | null>(null)
+const slugChecking = ref(false)
 let nameCheckSeq = 0
 
 async function checkName() {
   const value = name.value.trim()
   if (!value) {
     nameConflict.value = null
+    slugConflict.value = false
+    slugChecking.value = false
     return
   }
   const seq = ++nameCheckSeq
+  slugChecking.value = true
   try {
     const result = await $fetch<{ available: boolean } & NameConflict>(
       '/api/profile/name-availability',
@@ -413,20 +419,17 @@ async function checkName() {
       nameConflict.value = null
       slugConflict.value = false
     }
+  } finally {
+    if (seq === nameCheckSeq) slugChecking.value = false
   }
 }
 
 const nameCheck = debounce(() => { void checkName() }, 300)
 watch(name, () => {
+  nameCheckSeq++
   nameConflict.value = null
   slugConflict.value = false
-  if (!slugTouched.value && !props.slug) slugInput.value = ''
-  nameCheck.run()
-})
-watch(slugInput, () => {
-  slugTouched.value = true
-  nameConflict.value = null
-  slugConflict.value = false
+  slugChecking.value = !!name.value.trim()
   nameCheck.run()
 })
 
@@ -479,9 +482,10 @@ const canSubmit = computed(() =>
   && !!name.value.trim()
   && !!code.value.trim()
   && !codeTooLarge.value
+  && !!normalizedSlug.value
   && !slugError.value
   && !slugConflict.value
-  && (!props.slug || !!normalizedSlug.value)
+  && !slugChecking.value
 )
 
 function submit() {
@@ -509,35 +513,92 @@ function submit() {
 }
 
 .content-form.is-fill {
+  box-sizing: border-box;
   display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
   min-height: 0;
+  min-width: 0;
 
   .details {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
     flex: 1 1 auto;
+    width: 100%;
     min-height: 0;
+    align-items: stretch;
   }
 
   .details-fields {
+    display: flex;
+    flex-direction: column;
     min-height: 0;
-    overflow-y: auto;
-    padding-right: 0.35rem;
+    padding-right: 0;
+
+    > * {
+      min-width: 0;
+      max-width: 100%;
+    }
   }
 
   .details-code {
-    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    align-self: stretch;
+    height: auto;
+    min-height: var(--content-editor-height, clamp(460px, calc(100dvh - 300px), 760px));
   }
 
   .code-card {
     display: flex;
-    flex: 1 1 auto;
+    flex: 1 1 0;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
   }
 
   .code-card :deep(.code-editor) {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    width: 100%;
+    height: 0;
     min-height: 0;
+  }
+
+  .details-actions {
+    flex-wrap: wrap;
+  }
+
+  .slug-input,
+  .tag-input,
+  .tag-list,
+  .tag-suggest,
+  .name-warning,
+  .name-warning-text {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .name-warning-text,
+  .name-warning code {
+    overflow-wrap: anywhere;
+  }
+
+  .details-fields > .field {
+    flex: none;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .details-fields :deep(.p-inputtext),
+  .details-fields :deep(.p-textarea),
+  .details-fields :deep(.p-select),
+  .details-fields :deep(.p-multiselect),
+  .details-fields :deep(.p-selectbutton) {
+    min-width: 0;
+    max-width: 100%;
   }
 }
 
@@ -546,6 +607,7 @@ function submit() {
   flex-direction: column;
   gap: 1.1rem;
   min-width: 0;
+  min-height: 0;
 }
 
 .details-code {
@@ -553,12 +615,15 @@ function submit() {
   flex-direction: column;
   gap: 0.45rem;
   min-width: 0;
+  max-width: 100%;
 }
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .field-label {
@@ -593,16 +658,28 @@ function submit() {
 }
 
 .slug-input :deep(.p-inputtext) {
+  flex: 1 1 0%;
+  width: 0;
+  min-width: 0;
   border: 0;
   box-shadow: none;
 }
 
+.slug-input :deep(.p-inputtext[readonly]) {
+  cursor: default;
+  opacity: 1;
+}
+
 .slug-prefix {
   flex: none;
+  max-width: 55%;
+  overflow: hidden;
   padding-left: 0.75rem;
   font-family: var(--font-code);
   font-size: 0.8rem;
   color: var(--p-text-muted-color);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .name-warning {
@@ -648,9 +725,13 @@ function submit() {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
 
   :deep(.p-inputtext) {
-    flex: 1 1 auto;
+    flex: 1 1 0%;
+    width: 0;
+    min-width: 0;
   }
 }
 
@@ -799,17 +880,17 @@ function submit() {
   }
 
   .content-form.is-fill {
+    .details {
+      align-items: start;
+    }
+
     .details-fields {
-      overflow: visible;
       padding-right: 0;
     }
 
     .details-code {
-      min-height: 320px;
-    }
-
-    .code-card :deep(.cm-editor) {
-      height: 280px;
+      height: 460px;
+      min-height: 460px;
     }
   }
 }

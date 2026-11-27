@@ -4,7 +4,7 @@
     "title": "BITS Open API",
     "version": "1.0.0",
     "summary": "Manage your own BITS snippets and groups with an API Key.",
-    "description": "The BITS Open API is a versioned, API-key-authenticated interface for managing the content owned by the key's account. It can read, create, update and soft-delete snippets, and read, create, update and delete groups. It cannot change account profile, email, password, two-factor authentication, Passkeys, followers, favorites, OAuth grants or other security settings.\n\nSend the key as `Authorization: Bearer bits_sk_YOUR_KEY` or `X-API-Key: bits_sk_YOUR_KEY`. Site cookies and OAuth access tokens are not accepted. Read requests are limited to 120 per minute per key and write requests to 30 per minute per key. Rate limiting fails closed when the rate-limit store is unavailable.",
+    "description": "The BITS Open API is a versioned, API-key-authenticated interface for managing the content owned by the key's account. It can read, create, update and soft-delete snippets, and read, create, update and delete groups. It cannot change account profile, email, password, two-factor authentication, Passkeys, followers, favorites, OAuth grants or other security settings. API Keys are account-level credentials and are not tied to an App.\n\nSend the key as `Authorization: Bearer bits_sk_YOUR_KEY` or `X-API-Key: bits_sk_YOUR_KEY`. Site cookies and OAuth access tokens are not accepted. Read requests are limited to 120 per minute per key and write requests to 30 per minute per key. An account-wide limit of 240 reads and 60 writes per minute applies across all of the account's keys. Invalid authentication attempts are limited to 30 per minute per IP address. Rate limiting fails closed when the rate-limit store is unavailable.\n\nErrors use RFC 9457 `application/problem+json`. Every API response includes `X-Request-Id` and `X-API-Version: v1`. Requests that reach a rate limiter also include the current quota, remaining requests and reset delay in both the legacy `X-RateLimit-*` and standard `RateLimit-*` header families. Rate-limited responses also include `Retry-After`.",
     "contact": {
       "name": "BITS",
       "url": "https://bits.micropue.com.cn/docs/developer/api-keys"
@@ -12,7 +12,7 @@
   },
   "servers": [
     {
-      "url": "https://bits.micropue.com.cn",
+      "url": "https://bits.micropue.com.cn/api/v1",
       "description": "Production"
     }
   ],
@@ -30,6 +30,10 @@
   ],
   "tags": [
     {
+      "name": "Meta",
+      "description": "Public API discovery and OpenAPI metadata"
+    },
+    {
       "name": "Account",
       "description": "Identity and permission information for the current API key"
     },
@@ -43,21 +47,153 @@
     }
   ],
   "paths": {
-    "/api/v1/me": {
+    "/": {
       "get": {
-        "tags": ["Account"],
-        "summary": "Get the current API identity",
-        "description": "Returns the account, application and API key represented by the supplied key. Requires `content:read`.",
-        "operationId": "getCurrentIdentity",
+        "tags": [
+          "Meta"
+        ],
+        "summary": "Get API information",
+        "description": "Returns the API name, version, human documentation URL and OpenAPI document URL. This endpoint does not require authentication and is limited to 60 requests per minute per client IP.",
+        "operationId": "getApiInfo",
+        "security": [],
         "responses": {
           "200": {
-            "description": "Current identity and key metadata",
+            "description": "API metadata",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiInfoResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "Meta"
+        ],
+        "summary": "Get the OpenAPI document",
+        "description": "Returns this OpenAPI 3.1 document. The same document is available at `/openapi.json` for tooling that expects the file at the origin root. This endpoint is limited to 60 requests per minute per client IP.",
+        "operationId": "getOpenApiDocument",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 document",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Get the current API identity",
+        "description": "Returns the account and API key represented by the supplied key. Requires `content:read`.",
+        "operationId": "getCurrentIdentity",
+        "x-bits-permission": "content:read",
+        "responses": {
+          "200": {
+            "description": "Current identity and key metadata",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -76,16 +212,22 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
     },
-    "/api/v1/snippets": {
+    "/snippets": {
       "get": {
-        "tags": ["Snippets"],
+        "tags": [
+          "Snippets"
+        ],
         "summary": "List your snippets",
-        "description": "Lists non-deleted snippets owned by the API key's account, including private and unlisted snippets. Requires `content:read`.",
+        "description": "Lists non-deleted snippets owned by the API key's account, including private and unlisted snippets. List items are summaries and do not include the code body; fetch one snippet to read its code. Requires `content:read`.",
         "operationId": "listSnippets",
+        "x-bits-permission": "content:read",
         "parameters": [
           {
             "$ref": "#/components/parameters/Limit"
@@ -104,11 +246,29 @@
           "200": {
             "description": "A page of snippets",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -130,14 +290,20 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
       "post": {
-        "tags": ["Snippets"],
+        "tags": [
+          "Snippets"
+        ],
         "summary": "Create a snippet",
         "description": "Creates a snippet owned by the API key's account. Requires `content:create`. If `slug` is omitted, a URL name is generated from the name; a numeric suffix is added when needed. Public and unlisted content require the account to have a username set.",
         "operationId": "createSnippet",
+        "x-bits-permission": "content:create",
         "requestBody": {
           "required": true,
           "content": {
@@ -152,11 +318,29 @@
           "201": {
             "description": "Snippet created",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -179,32 +363,62 @@
           "409": {
             "$ref": "#/components/responses/Conflict"
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
     },
-    "/api/v1/snippets/{slug}": {
+    "/snippets/{slug}": {
       "parameters": [
         {
           "$ref": "#/components/parameters/SnippetSlug"
         }
       ],
       "get": {
-        "tags": ["Snippets"],
+        "tags": [
+          "Snippets"
+        ],
         "summary": "Get one of your snippets",
         "description": "Returns a snippet owned by the API key's account, including its code body. Requires `content:read`.",
         "operationId": "getSnippet",
+        "x-bits-permission": "content:read",
         "responses": {
           "200": {
             "description": "Snippet detail",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -226,14 +440,20 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
       "patch": {
-        "tags": ["Snippets"],
+        "tags": [
+          "Snippets"
+        ],
         "summary": "Update or rename a snippet",
         "description": "Partially updates a snippet owned by the API key's account. Omitted fields keep their current values. Sending `slug` renames the URL name; the old public URL redirects to the new one. Requires `content:update`.",
         "operationId": "updateSnippet",
+        "x-bits-permission": "content:update",
         "requestBody": {
           "required": true,
           "content": {
@@ -248,11 +468,29 @@
           "200": {
             "description": "Updated snippet",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -278,25 +516,55 @@
           "409": {
             "$ref": "#/components/responses/Conflict"
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
       "delete": {
-        "tags": ["Snippets"],
+        "tags": [
+          "Snippets"
+        ],
         "summary": "Soft-delete a snippet",
         "description": "Soft-deletes a snippet owned by the API key's account. Requires `content:delete`.",
         "operationId": "deleteSnippet",
+        "x-bits-permission": "content:delete",
         "responses": {
           "200": {
             "description": "Snippet deleted",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -318,16 +586,22 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
     },
-    "/api/v1/groups": {
+    "/groups": {
       "get": {
-        "tags": ["Groups"],
+        "tags": [
+          "Groups"
+        ],
         "summary": "List your groups",
         "description": "Lists non-deleted groups owned by the API key's account. Requires `content:read`.",
         "operationId": "listGroups",
+        "x-bits-permission": "content:read",
         "parameters": [
           {
             "$ref": "#/components/parameters/Limit"
@@ -346,11 +620,29 @@
           "200": {
             "description": "A page of groups",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -372,14 +664,20 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
       "post": {
-        "tags": ["Groups"],
+        "tags": [
+          "Groups"
+        ],
         "summary": "Create a group",
         "description": "Creates a group owned by the API key's account. Requires `content:create`. If `slug` is omitted, a URL name is generated from the name; a numeric suffix is added when needed. Public and unlisted content require the account to have a username set.",
         "operationId": "createGroup",
+        "x-bits-permission": "content:create",
         "requestBody": {
           "required": true,
           "content": {
@@ -394,11 +692,29 @@
           "201": {
             "description": "Group created",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -421,32 +737,62 @@
           "409": {
             "$ref": "#/components/responses/Conflict"
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
     },
-    "/api/v1/groups/{slug}": {
+    "/groups/{slug}": {
       "parameters": [
         {
           "$ref": "#/components/parameters/GroupSlug"
         }
       ],
       "get": {
-        "tags": ["Groups"],
+        "tags": [
+          "Groups"
+        ],
         "summary": "Get one of your groups",
         "description": "Returns a group owned by the API key's account. Requires `content:read`.",
         "operationId": "getGroup",
+        "x-bits-permission": "content:read",
         "responses": {
           "200": {
             "description": "Group detail",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -468,14 +814,20 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
       "patch": {
-        "tags": ["Groups"],
+        "tags": [
+          "Groups"
+        ],
         "summary": "Update or rename a group",
         "description": "Partially updates a group owned by the API key's account. Omitted fields keep their current values. Sending `slug` renames the URL name; the old public URL redirects to the new one. Requires `content:update`.",
         "operationId": "updateGroup",
+        "x-bits-permission": "content:update",
         "requestBody": {
           "required": true,
           "content": {
@@ -490,11 +842,29 @@
           "200": {
             "description": "Updated group",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -520,25 +890,55 @@
           "409": {
             "$ref": "#/components/responses/Conflict"
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
       "delete": {
-        "tags": ["Groups"],
+        "tags": [
+          "Groups"
+        ],
         "summary": "Delete a group",
         "description": "Deletes a group owned by the API key's account. Snippets inside the group are kept and lose their group association. Requires `content:delete`.",
         "operationId": "deleteGroup",
+        "x-bits-permission": "content:delete",
         "responses": {
           "200": {
             "description": "Group deleted",
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              },
+              "X-API-Version": {
+                "$ref": "#/components/headers/X-API-Version"
+              },
               "X-RateLimit-Limit": {
                 "$ref": "#/components/headers/X-RateLimit-Limit"
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimit-Limit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimit-Remaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimit-Reset"
               }
             },
             "content": {
@@ -560,6 +960,9 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -570,13 +973,14 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Send the full API key as a Bearer token."
+        "bearerFormat": "bits_sk",
+        "description": "Send the full account-level API key as `Authorization: Bearer bits_sk_<your-key>`. Session cookies and OAuth access tokens are rejected."
       },
       "apiKeyAuth": {
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "Send the full API key in the X-API-Key header."
+        "description": "Send the full account-level API key in the `X-API-Key` header. This is an alternative to Bearer authentication."
       }
     },
     "parameters": {
@@ -595,11 +999,12 @@
       "Offset": {
         "name": "offset",
         "in": "query",
-        "description": "Number of records to skip. Defaults to 0.",
+        "description": "Number of records to skip. Defaults to 0; values above 10,000 are rejected.",
         "required": false,
         "schema": {
           "type": "integer",
           "minimum": 0,
+          "maximum": 10000,
           "default": 0
         }
       },
@@ -646,6 +1051,20 @@
       }
     },
     "headers": {
+      "X-Request-Id": {
+        "description": "Unique request identifier used in logs and RFC 9457 problem responses.",
+        "schema": {
+          "type": "string",
+          "example": "req_4c94234bc6e04e2d9e7c17586e03c639"
+        }
+      },
+      "X-API-Version": {
+        "description": "Version of the BITS Open API that served the request.",
+        "schema": {
+          "type": "string",
+          "const": "v1"
+        }
+      },
       "X-RateLimit-Limit": {
         "description": "Request limit for the current read or write bucket.",
         "schema": {
@@ -654,6 +1073,30 @@
       },
       "X-RateLimit-Remaining": {
         "description": "Requests remaining in the current window.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "X-RateLimit-Reset": {
+        "description": "Seconds until the current rate-limit window resets.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "RateLimit-Limit": {
+        "description": "Standard rate-limit header containing the request limit for the current bucket.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "RateLimit-Remaining": {
+        "description": "Standard rate-limit header containing the requests remaining in the current window.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "RateLimit-Reset": {
+        "description": "Standard rate-limit header containing the seconds until the current window resets.",
         "schema": {
           "type": "integer"
         }
@@ -667,18 +1110,51 @@
     },
     "responses": {
       "BadRequest": {
-        "description": "Invalid field, malformed JSON or unsupported visibility.",
+        "description": "Invalid field, malformed JSON, unknown field or unsupported filter.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          },
+          "X-RateLimit-Limit": {
+            "$ref": "#/components/headers/X-RateLimit-Limit"
+          },
+          "X-RateLimit-Remaining": {
+            "$ref": "#/components/headers/X-RateLimit-Remaining"
+          },
+          "X-RateLimit-Reset": {
+            "$ref": "#/components/headers/X-RateLimit-Reset"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimit-Limit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimit-Remaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimit-Reset"
+          }
+        },
         "content": {
-          "application/json": {
+          "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/ErrorResponse"
             },
             "example": {
-              "statusCode": 400,
-              "statusMessage": "Code is too large (max 1 MB)",
-              "data": {
-                "field": "code"
-              }
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/invalid-request",
+              "title": "Bad Request",
+              "status": 400,
+              "code": "invalid_request",
+              "detail": "Invalid query parameter limit",
+              "requestId": "req_7a394d7f4ae34d40b75bef2d3a9a6504",
+              "errors": [
+                {
+                  "path": "limit",
+                  "message": "limit must be an integer between 1 and 50"
+                }
+              ]
             }
           }
         }
@@ -686,6 +1162,30 @@
       "Unauthorized": {
         "description": "API key is missing, malformed, invalid, expired or revoked.",
         "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          },
+          "X-RateLimit-Limit": {
+            "$ref": "#/components/headers/X-RateLimit-Limit"
+          },
+          "X-RateLimit-Remaining": {
+            "$ref": "#/components/headers/X-RateLimit-Remaining"
+          },
+          "X-RateLimit-Reset": {
+            "$ref": "#/components/headers/X-RateLimit-Reset"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimit-Limit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimit-Remaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimit-Reset"
+          },
           "WWW-Authenticate": {
             "description": "Bearer challenge for API key authentication.",
             "schema": {
@@ -694,65 +1194,156 @@
           }
         },
         "content": {
-          "application/json": {
+          "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/ErrorResponse"
             },
             "example": {
-              "statusCode": 401,
-              "statusMessage": "The API key is invalid or has expired",
-              "data": {
-                "code": "API_KEY_INVALID"
-              }
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/api-key-invalid",
+              "title": "Unauthorized",
+              "status": 401,
+              "code": "api_key_invalid",
+              "detail": "The API key is invalid or has expired",
+              "requestId": "req_2e2017dcac314f43ac4f9c524aab014f"
             }
           }
         }
       },
       "Forbidden": {
-        "description": "The key lacks the required permission, the application is suspended or the account is disabled.",
+        "description": "The key lacks the required permission or the account is disabled.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          },
+          "X-RateLimit-Limit": {
+            "$ref": "#/components/headers/X-RateLimit-Limit"
+          },
+          "X-RateLimit-Remaining": {
+            "$ref": "#/components/headers/X-RateLimit-Remaining"
+          },
+          "X-RateLimit-Reset": {
+            "$ref": "#/components/headers/X-RateLimit-Reset"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimit-Limit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimit-Remaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimit-Reset"
+          }
+        },
         "content": {
-          "application/json": {
+          "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/ErrorResponse"
             },
             "example": {
-              "statusCode": 403,
-              "statusMessage": "This API key does not have the content:update permission",
-              "data": {
-                "code": "API_KEY_PERMISSION_REQUIRED",
-                "requiredPermission": "content:update"
-              }
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/api-key-permission-required",
+              "title": "Forbidden",
+              "status": 403,
+              "code": "api_key_permission_required",
+              "detail": "This API key does not have the content:update permission",
+              "requestId": "req_fd9878239dc84dd592f48f8aa1a1462c",
+              "requiredPermission": "content:update"
             }
           }
         }
       },
       "NotFound": {
         "description": "The requested content does not exist in the key owner's account.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          },
+          "X-RateLimit-Limit": {
+            "$ref": "#/components/headers/X-RateLimit-Limit"
+          },
+          "X-RateLimit-Remaining": {
+            "$ref": "#/components/headers/X-RateLimit-Remaining"
+          },
+          "X-RateLimit-Reset": {
+            "$ref": "#/components/headers/X-RateLimit-Reset"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimit-Limit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimit-Remaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimit-Reset"
+          }
+        },
         "content": {
-          "application/json": {
+          "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/ErrorResponse"
             },
             "example": {
-              "statusCode": 404,
-              "statusMessage": "Snippet not found"
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/not-found",
+              "title": "Not Found",
+              "status": 404,
+              "code": "not_found",
+              "detail": "Snippet not found",
+              "requestId": "req_a70d09e4088044dcb9ea3ef9ee2828f4"
             }
           }
         }
       },
       "Conflict": {
         "description": "The requested URL name is already used by another content item or alias.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          },
+          "X-RateLimit-Limit": {
+            "$ref": "#/components/headers/X-RateLimit-Limit"
+          },
+          "X-RateLimit-Remaining": {
+            "$ref": "#/components/headers/X-RateLimit-Remaining"
+          },
+          "X-RateLimit-Reset": {
+            "$ref": "#/components/headers/X-RateLimit-Reset"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimit-Limit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimit-Remaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimit-Reset"
+          }
+        },
         "content": {
-          "application/json": {
+          "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/ErrorResponse"
             },
             "example": {
-              "statusCode": 409,
-              "statusMessage": "This URL is already taken",
-              "data": {
-                "field": "slug"
-              }
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/conflict",
+              "title": "Conflict",
+              "status": 409,
+              "code": "conflict",
+              "detail": "This URL is already taken",
+              "requestId": "req_662cac18ac6248209a45ac27743fe4e8",
+              "errors": [
+                {
+                  "path": "slug",
+                  "message": "This URL is already taken"
+                }
+              ]
             }
           }
         }
@@ -760,21 +1351,190 @@
       "TooManyRequests": {
         "description": "The read or write rate limit was exceeded.",
         "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          },
+          "X-RateLimit-Limit": {
+            "$ref": "#/components/headers/X-RateLimit-Limit"
+          },
+          "X-RateLimit-Remaining": {
+            "$ref": "#/components/headers/X-RateLimit-Remaining"
+          },
+          "X-RateLimit-Reset": {
+            "$ref": "#/components/headers/X-RateLimit-Reset"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimit-Limit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimit-Remaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimit-Reset"
+          },
           "Retry-After": {
             "$ref": "#/components/headers/Retry-After"
           }
         },
         "content": {
-          "application/json": {
+          "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/ErrorResponse"
             },
             "example": {
-              "statusCode": 429,
-              "statusMessage": "API read rate limit exceeded (120 requests per minute)",
-              "data": {
-                "retryAfterSeconds": 42
-              }
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/rate-limited",
+              "title": "Too Many Requests",
+              "status": 429,
+              "code": "rate_limited",
+              "detail": "API read rate limit exceeded (120 requests per minute)",
+              "requestId": "req_4c94234bc6e04e2d9e7c17586e03c639",
+              "retryAfter": 42
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "The request body exceeds the 2 MB transport limit.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          },
+          "X-RateLimit-Limit": {
+            "$ref": "#/components/headers/X-RateLimit-Limit"
+          },
+          "X-RateLimit-Remaining": {
+            "$ref": "#/components/headers/X-RateLimit-Remaining"
+          },
+          "X-RateLimit-Reset": {
+            "$ref": "#/components/headers/X-RateLimit-Reset"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimit-Limit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimit-Remaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimit-Reset"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/payload-too-large",
+              "title": "Payload Too Large",
+              "status": 413,
+              "code": "payload_too_large",
+              "detail": "Request body must be 2 MB or smaller",
+              "requestId": "req_3af1af64c4c84830b224a86b712111a5"
+            }
+          }
+        }
+      },
+      "UnsupportedMediaType": {
+        "description": "Write requests must use the application/json content type.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          },
+          "X-RateLimit-Limit": {
+            "$ref": "#/components/headers/X-RateLimit-Limit"
+          },
+          "X-RateLimit-Remaining": {
+            "$ref": "#/components/headers/X-RateLimit-Remaining"
+          },
+          "X-RateLimit-Reset": {
+            "$ref": "#/components/headers/X-RateLimit-Reset"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimit-Limit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimit-Remaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimit-Reset"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/unsupported-media-type",
+              "title": "Unsupported Media Type",
+              "status": 415,
+              "code": "unsupported_media_type",
+              "detail": "Content-Type must be application/json",
+              "requestId": "req_6b0e198fa9ec4a5eb2f86deae195c25b"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Unexpected server failure.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/internal-error",
+              "title": "Internal Server Error",
+              "status": 500,
+              "code": "internal_error",
+              "detail": "An unexpected error occurred. Try again later.",
+              "requestId": "req_9fdb78e5a4dc44f2966d25cdec4fcc5d"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "A required dependency such as the rate-limit store is unavailable.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/X-Request-Id"
+          },
+          "X-API-Version": {
+            "$ref": "#/components/headers/X-API-Version"
+          },
+          "Retry-After": {
+            "$ref": "#/components/headers/Retry-After"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/rate-limit-unavailable",
+              "title": "Service Unavailable",
+              "status": 503,
+              "code": "rate_limit_unavailable",
+              "detail": "Rate limiting is temporarily unavailable",
+              "requestId": "req_556fbf433e9845c3a65ea83d984dea19"
             }
           }
         }
@@ -783,15 +1543,27 @@
     "schemas": {
       "Visibility": {
         "type": "string",
-        "enum": ["public", "unlisted", "private"]
+        "enum": [
+          "public",
+          "unlisted",
+          "private"
+        ]
       },
       "Permission": {
         "type": "string",
-        "enum": ["content:read", "content:create", "content:update", "content:delete"]
+        "enum": [
+          "content:read",
+          "content:create",
+          "content:update",
+          "content:delete"
+        ]
       },
       "Tag": {
         "type": "object",
-        "required": ["key", "name"],
+        "required": [
+          "key",
+          "name"
+        ],
         "properties": {
           "key": {
             "type": "string"
@@ -803,7 +1575,11 @@
       },
       "Language": {
         "type": "object",
-        "required": ["slug", "name", "logoUrl"],
+        "required": [
+          "slug",
+          "name",
+          "logoUrl"
+        ],
         "properties": {
           "slug": {
             "type": "string"
@@ -812,13 +1588,20 @@
             "type": "string"
           },
           "logoUrl": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
       "Dependency": {
         "type": "object",
-        "required": ["slug", "name", "kind"],
+        "required": [
+          "slug",
+          "name",
+          "kind"
+        ],
         "properties": {
           "slug": {
             "type": "string"
@@ -828,13 +1611,21 @@
           },
           "kind": {
             "type": "string",
-            "enum": ["framework", "library", "tool", "runtime"]
+            "enum": [
+              "framework",
+              "library",
+              "tool",
+              "runtime"
+            ]
           }
         }
       },
       "GroupReference": {
         "type": "object",
-        "required": ["slug", "name"],
+        "required": [
+          "slug",
+          "name"
+        ],
         "properties": {
           "slug": {
             "type": "string"
@@ -844,8 +1635,110 @@
           }
         }
       },
+      "SnippetSummary": {
+        "type": "object",
+        "description": "A snippet without its code body. Used by list responses to keep payloads small.",
+        "required": [
+          "sid",
+          "slug",
+          "name",
+          "intro",
+          "visibility",
+          "language",
+          "group",
+          "tags",
+          "dependencies",
+          "forkFromSid",
+          "favoriteCount",
+          "copyCount",
+          "forkCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "sid": {
+            "type": "string",
+            "description": "Stable internal identifier."
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "intro": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "language": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GroupReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Dependency"
+            }
+          },
+          "forkFromSid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "favoriteCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "copyCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "forkCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "Snippet": {
         "type": "object",
+        "description": "A complete snippet, including its code body.",
         "required": [
           "sid",
           "slug",
@@ -922,7 +1815,10 @@
             }
           },
           "forkFromSid": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "favoriteCount": {
             "type": "integer",
@@ -993,7 +1889,10 @@
             "minimum": 0
           },
           "forkFromSid": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "favoriteCount": {
             "type": "integer",
@@ -1015,7 +1914,12 @@
       },
       "Pagination": {
         "type": "object",
-        "required": ["limit", "offset", "total", "hasMore"],
+        "required": [
+          "limit",
+          "offset",
+          "total",
+          "hasMore"
+        ],
         "properties": {
           "limit": {
             "type": "integer",
@@ -1037,7 +1941,11 @@
       },
       "UserSummary": {
         "type": "object",
-        "required": ["uuid", "username", "nickname", "email"],
+        "required": [
+          "uuid",
+          "username",
+          "nickname"
+        ],
         "properties": {
           "uuid": {
             "type": "string",
@@ -1048,32 +1956,18 @@
           },
           "nickname": {
             "type": "string"
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          }
-        }
-      },
-      "ApplicationSummary": {
-        "type": "object",
-        "required": ["sid", "name", "appType"],
-        "properties": {
-          "sid": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "appType": {
-            "type": "string",
-            "enum": ["website", "service"]
           }
         }
       },
       "ApiKeySummary": {
         "type": "object",
-        "required": ["sid", "name", "permissions", "expiresAt", "lastUsedAt"],
+        "required": [
+          "sid",
+          "name",
+          "permissions",
+          "expiresAt",
+          "lastUsedAt"
+        ],
         "properties": {
           "sid": {
             "type": "string"
@@ -1088,12 +1982,18 @@
             }
           },
           "expiresAt": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
             "description": "null when the key never expires."
           },
           "lastUsedAt": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
             "description": "Updated at most once per minute while the key is used."
           }
@@ -1101,7 +2001,12 @@
       },
       "CreateSnippetRequest": {
         "type": "object",
-        "required": ["name", "language", "code"],
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "language",
+          "code"
+        ],
         "properties": {
           "name": {
             "type": "string",
@@ -1138,7 +2043,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Dependency slugs associated with the selected language."
+            "description": "Dependency slugs associated with the selected language. The server deduplicates the list and accepts at most 50 unique values."
           },
           "group": {
             "type": "string",
@@ -1157,13 +2062,19 @@
           "slug": "primevue-theme-token",
           "language": "typescript",
           "visibility": "private",
-          "tags": ["vue", "primevue"],
-          "dependencies": ["primevue"],
+          "tags": [
+            "vue",
+            "primevue"
+          ],
+          "dependencies": [
+            "primevue"
+          ],
           "code": "const color = getComputedStyle(document.documentElement).getPropertyValue('--p-primary-color')"
         }
       },
       "UpdateSnippetRequest": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Partial update. Omitted fields keep their current values.",
         "properties": {
           "name": {
@@ -1198,7 +2109,8 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Replacement dependency slugs associated with the selected language. The server deduplicates the list and accepts at most 50 unique values."
           },
           "group": {
             "type": "string"
@@ -1212,7 +2124,10 @@
       },
       "CreateGroupRequest": {
         "type": "object",
-        "required": ["name"],
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
         "properties": {
           "name": {
             "type": "string",
@@ -1246,11 +2161,14 @@
           "intro": "Reusable Vue examples",
           "slug": "vue-patterns",
           "visibility": "private",
-          "tags": ["vue"]
+          "tags": [
+            "vue"
+          ]
         }
       },
       "UpdateGroupRequest": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Partial update. Omitted fields keep their current values.",
         "properties": {
           "name": {
@@ -1282,17 +2200,19 @@
       },
       "MeResponse": {
         "type": "object",
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "properties": {
           "data": {
             "type": "object",
-            "required": ["user", "application", "apiKey"],
+            "required": [
+              "user",
+              "apiKey"
+            ],
             "properties": {
               "user": {
                 "$ref": "#/components/schemas/UserSummary"
-              },
-              "application": {
-                "$ref": "#/components/schemas/ApplicationSummary"
               },
               "apiKey": {
                 "$ref": "#/components/schemas/ApiKeySummary"
@@ -1303,7 +2223,9 @@
       },
       "SnippetResponse": {
         "type": "object",
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Snippet"
@@ -1312,12 +2234,15 @@
       },
       "SnippetListResponse": {
         "type": "object",
-        "required": ["data", "pagination"],
+        "required": [
+          "data",
+          "pagination"
+        ],
         "properties": {
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Snippet"
+              "$ref": "#/components/schemas/SnippetSummary"
             }
           },
           "pagination": {
@@ -1327,7 +2252,10 @@
       },
       "SnippetWriteResponse": {
         "type": "object",
-        "required": ["data", "meta"],
+        "required": [
+          "data",
+          "meta"
+        ],
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Snippet"
@@ -1351,7 +2279,9 @@
       },
       "GroupResponse": {
         "type": "object",
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Group"
@@ -1360,7 +2290,10 @@
       },
       "GroupListResponse": {
         "type": "object",
-        "required": ["data", "pagination"],
+        "required": [
+          "data",
+          "pagination"
+        ],
         "properties": {
           "data": {
             "type": "array",
@@ -1375,7 +2308,10 @@
       },
       "GroupWriteResponse": {
         "type": "object",
-        "required": ["data", "meta"],
+        "required": [
+          "data",
+          "meta"
+        ],
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Group"
@@ -1399,11 +2335,16 @@
       },
       "DeleteResponse": {
         "type": "object",
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "properties": {
           "data": {
             "type": "object",
-            "required": ["ok", "slug"],
+            "required": [
+              "ok",
+              "slug"
+            ],
             "properties": {
               "ok": {
                 "type": "boolean",
@@ -1416,19 +2357,100 @@
           }
         }
       },
-      "ErrorResponse": {
+      "ApiInfoResponse": {
         "type": "object",
-        "required": ["statusCode", "statusMessage"],
+        "required": [
+          "name",
+          "version",
+          "apiVersion",
+          "docs",
+          "openapi"
+        ],
         "properties": {
-          "statusCode": {
-            "type": "integer"
+          "name": {
+            "type": "string",
+            "const": "BITS Open API"
           },
-          "statusMessage": {
+          "version": {
+            "type": "string",
+            "const": "v1"
+          },
+          "apiVersion": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "docs": {
+            "type": "string",
+            "format": "uri"
+          },
+          "openapi": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "ErrorIssue": {
+        "type": "object",
+        "required": [
+          "path",
+          "message"
+        ],
+        "properties": {
+          "path": {
             "type": "string"
           },
-          "data": {
-            "type": "object",
-            "additionalProperties": true
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "RFC 9457 problem details with BITS-specific extensions.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail",
+          "requestId"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "pattern": "^req_[a-f0-9]{32}$"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErrorIssue"
+            }
+          },
+          "requiredPermission": {
+            "$ref": "#/components/schemas/Permission"
+          },
+          "retryAfter": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       }

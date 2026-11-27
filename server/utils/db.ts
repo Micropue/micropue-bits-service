@@ -369,7 +369,6 @@ const DEVELOPER_TABLES_SQL: string[] = [
     \`homepage_url\` VARCHAR(512) NOT NULL COMMENT 'Homepage URL',
     \`icon_url\` VARCHAR(512) NULL COMMENT 'Optional icon URL',
     \`description\` VARCHAR(500) NOT NULL COMMENT 'Application description',
-    \`app_type\` ENUM('website','service') NOT NULL DEFAULT 'website' COMMENT '应用类型（website 可使用 OAuth，service 仅使用 API Key）',
     \`status\` ENUM('active','suspended') NOT NULL DEFAULT 'active' COMMENT '状态（管理员可封禁）',
     \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -418,7 +417,6 @@ const DEVELOPER_TABLES_SQL: string[] = [
   `CREATE TABLE IF NOT EXISTS \`developer_api_keys\` (
     \`sid\` ${SID} NOT NULL COMMENT 'API Key 短UUID',
     \`user_uuid\` CHAR(36) NOT NULL COMMENT '所有者账户UUID',
-    \`app_sid\` ${SID} NOT NULL COMMENT '关联的开发者 App',
     \`name\` VARCHAR(80) NOT NULL COMMENT 'API Key 名称',
     \`key_prefix\` VARCHAR(24) NOT NULL COMMENT '用于识别的 Key 前缀',
     \`key_hash\` CHAR(64) NOT NULL COMMENT 'API Key SHA-256',
@@ -429,8 +427,7 @@ const DEVELOPER_TABLES_SQL: string[] = [
     \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (\`sid\`),
     UNIQUE KEY \`uk_developer_api_keys_hash\` (\`key_hash\`),
-    KEY \`idx_developer_api_keys_user\` (\`user_uuid\`,\`created_at\`),
-    KEY \`idx_developer_api_keys_app\` (\`app_sid\`)
+    KEY \`idx_developer_api_keys_user\` (\`user_uuid\`,\`created_at\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开发者 API Key 表'`
 ]
 
@@ -444,10 +441,6 @@ const DEVELOPER_COLUMNS_SQL: [string, string][] = [
     ALTER TABLE \`developer_apps\`
       ADD COLUMN \`status\` ENUM('active','suspended') NOT NULL DEFAULT 'active'
       COMMENT '状态（管理员可封禁）' AFTER \`description\``],
-  ['app_type', `
-    ALTER TABLE \`developer_apps\`
-      ADD COLUMN \`app_type\` ENUM('website','service') NOT NULL DEFAULT 'website'
-      COMMENT '应用类型（website 可使用 OAuth，service 仅使用 API Key）' AFTER \`description\``],
   ['updated_at', `
     ALTER TABLE \`developer_apps\`
       ADD COLUMN \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -879,6 +872,21 @@ export async function ensureSchema(): Promise<number> {
   }
   for (const [col, sql] of OAUTH_TOKEN_COLUMNS_SQL) {
     if (!(await hasColumn('oauth_tokens', col))) await pool.query(sql)
+  }
+
+  // API Keys 从“App 附属资源”改为账号级资源；App 也不再区分网站/服务类型。
+  // 迁移只删除结构列，不删除任何 Key 或 OAuth 数据。
+  if (!(await migrationApplied('developer_account_scoped_api_keys_v1'))) {
+    if (await hasIndex('developer_api_keys', 'idx_developer_api_keys_app')) {
+      await pool.query('ALTER TABLE `developer_api_keys` DROP INDEX `idx_developer_api_keys_app`')
+    }
+    if (await hasColumn('developer_api_keys', 'app_sid')) {
+      await pool.query('ALTER TABLE `developer_api_keys` DROP COLUMN `app_sid`')
+    }
+    if (await hasColumn('developer_apps', 'app_type')) {
+      await pool.query('ALTER TABLE `developer_apps` DROP COLUMN `app_type`')
+    }
+    await markMigration('developer_account_scoped_api_keys_v1')
   }
 
   // 旧版把 OAuth 配置直接挂在 App 上：一次性迁移到 OAuth 服务表，然后删除旧列

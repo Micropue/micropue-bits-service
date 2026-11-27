@@ -18,9 +18,129 @@ import { enforceRateLimit } from './rateLimit'
 
 const READ_LIMIT = 120
 const WRITE_LIMIT = 30
+const ACCOUNT_READ_LIMIT = 240
+const ACCOUNT_WRITE_LIMIT = 60
 const RATE_WINDOW = 60
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
+const MAX_OFFSET = 10000
+const MAX_API_BODY_BYTES = 2 * 1024 * 1024
+
+function payloadTooLarge() {
+  return createError({
+    statusCode: 413,
+    statusMessage: 'Request body must be 2 MB or smaller',
+    data: { code: 'PAYLOAD_TOO_LARGE' }
+  })
+}
+
+async function readBoundedRequestBody(event: H3Event): Promise<string> {
+  const request = event.node.req
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    let total = 0
+    let settled = false
+
+    const cleanup = () => {
+      request.off('data', onData)
+      request.off('end', onEnd)
+      request.off('error', onError)
+      request.off('aborted', onAborted)
+    }
+    const fail = (error: unknown) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(error)
+    }
+    const onData = (raw: Buffer | string) => {
+      if (settled) return
+      const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+      total += chunk.byteLength
+      if (total > MAX_API_BODY_BYTES) {
+        // Stop buffering and close the connection after the 413 response. Destroying
+        // the Node request here would prevent the framework from sending a response.
+        request.pause()
+        setResponseHeader(event, 'connection', 'close')
+        fail(payloadTooLarge())
+        return
+      }
+      chunks.push(chunk)
+    }
+    const onEnd = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(Buffer.concat(chunks, total).toString('utf8'))
+    }
+    const onError = () => fail(createError({
+      statusCode: 400,
+      statusMessage: 'Request body could not be read',
+      data: { code: 'INVALID_JSON' }
+    }))
+    const onAborted = onError
+
+    request.on('data', onData)
+    request.on('end', onEnd)
+    request.on('error', onError)
+    request.on('aborted', onAborted)
+  })
+}
+
+export async function readApiV1Body(
+  event: H3Event,
+  allowedFields: readonly string[]
+): Promise<Record<string, unknown>> {
+  const contentType = (getRequestHeader(event, 'content-type') ?? '')
+    .split(';', 1)[0]
+    .trim()
+    .toLowerCase()
+  if (contentType !== 'application/json') {
+    throw createError({
+      statusCode: 415,
+      statusMessage: 'Content-Type must be application/json',
+      data: { code: 'UNSUPPORTED_MEDIA_TYPE' }
+    })
+  }
+
+  const declaredLength = Number(getRequestHeader(event, 'content-length') ?? 0)
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_API_BODY_BYTES) {
+    throw payloadTooLarge()
+  }
+
+  const rawBody = await readBoundedRequestBody(event)
+  let body: unknown
+  try {
+    body = JSON.parse(rawBody)
+  } catch {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Request body must be valid JSON',
+      data: { code: 'INVALID_JSON' }
+    })
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Request body must be a JSON object',
+      data: { code: 'INVALID_REQUEST_BODY' }
+    })
+  }
+
+  const allowed = new Set(allowedFields)
+  const unknown = Object.keys(body).filter(field => !allowed.has(field))
+  if (unknown.length) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `Unknown field: ${unknown[0]}`,
+      data: {
+        code: 'UNKNOWN_FIELD',
+        field: unknown[0]
+      }
+    })
+  }
+  return body as Record<string, unknown>
+}
 
 export interface ApiPagination {
   limit: number
@@ -46,13 +166,12 @@ export interface ApiDependency {
   kind: string
 }
 
-export interface ApiSnippet {
+export interface ApiSnippetSummary {
   sid: string
   slug: string
   name: string
   intro: string
   visibility: string
-  code: string
   language: ApiLanguage | null
   group: { slug: string, name: string } | null
   tags: ApiTag[]
@@ -80,13 +199,17 @@ export interface ApiGroup {
   updatedAt: string
 }
 
+export interface ApiSnippet extends ApiSnippetSummary {
+  code: string
+}
+
 interface SnippetDetailRow extends RowDataPacket {
   sid: string
   slug: string
   name: string
   intro: string
   visibility: string
-  code: string
+  code?: string
   fork_from_sid: string | null
   favorite_count: number
   copy_count: number
@@ -105,9 +228,20 @@ export async function requireApiV1(
   event: H3Event,
   permission: ApiKeyPermission
 ): Promise<ApiKeyAuth> {
+  setHeader(event, 'cache-control', 'no-store')
   const auth = await authenticateApiKey(event)
-  requireApiKeyPermission(auth, permission)
   const write = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(getMethod(event))
+  // 每个账号还有跨 Key 的聚合额度，避免通过创建多个 Key 绕过单 Key 限流。
+  await enforceRateLimit(event, {
+    bucket: write ? 'api-v1:account-write' : 'api-v1:account-read',
+    identity: `user:${auth.user.uuid}`,
+    limit: write ? ACCOUNT_WRITE_LIMIT : ACCOUNT_READ_LIMIT,
+    window: RATE_WINDOW,
+    failOpen: false,
+    message: write
+      ? `API account write rate limit exceeded (${ACCOUNT_WRITE_LIMIT} requests per minute across all keys)`
+      : `API account read rate limit exceeded (${ACCOUNT_READ_LIMIT} requests per minute across all keys)`
+  })
   await enforceRateLimit(event, {
     bucket: write ? 'api-v1:write' : 'api-v1:read',
     identity: `key:${auth.keySid}`,
@@ -118,13 +252,27 @@ export async function requireApiV1(
       ? 'API write rate limit exceeded (30 requests per minute)'
       : 'API read rate limit exceeded (120 requests per minute)'
   })
+  // 权限检查放在限流之后，避免持有一个低权限 Key 时无限请求高权限端点。
+  requireApiKeyPermission(auth, permission)
   return auth
 }
 
 export function readPagination(event: H3Event): { limit: number, offset: number } {
   const query = getQuery(event)
-  const limit = Math.min(Math.max(Number(query.limit) || DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE)
-  const offset = Math.max(Number(query.offset) || 0, 0)
+  const readInteger = (value: unknown, fallback: number, field: string, min: number, max: number) => {
+    if (value === undefined || value === '') return fallback
+    const number = Number(value)
+    if (!Number.isSafeInteger(number) || number < min || number > max) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: `${field} must be an integer between ${min} and ${max}`,
+        data: { field }
+      })
+    }
+    return number
+  }
+  const limit = readInteger(query.limit, DEFAULT_PAGE_SIZE, 'limit', 1, MAX_PAGE_SIZE)
+  const offset = readInteger(query.offset, 0, 'offset', 0, MAX_OFFSET)
   return { limit, offset }
 }
 
@@ -143,6 +291,18 @@ export function readVisibilityFilter(value: unknown): string | null {
 
 function escapeLike(value: string) {
   return value.replace(/[\\%_]/g, char => `\\${char}`)
+}
+
+function readSearchQuery(value: unknown): string {
+  const q = String(value ?? '').trim()
+  if (q.length > 200) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'q must be 200 characters or fewer',
+      data: { field: 'q' }
+    })
+  }
+  return q
 }
 
 async function attachDependencies<T extends { sid: string }>(items: T[]) {
@@ -174,7 +334,7 @@ export async function listApiSnippets(
 ) {
   const { limit, offset } = options
   const visibility = readVisibilityFilter(options.visibility)
-  const q = String(options.q ?? '').trim().slice(0, 200)
+  const q = readSearchQuery(options.q)
   const params: (string | number)[] = [auth.user.uuid]
   const conditions = [
     'c.`owner_uuid` = ?',
@@ -197,7 +357,7 @@ export async function listApiSnippets(
   )
   const total = Number(countRow?.total ?? 0)
   const [rows] = await useDb().query<SnippetDetailRow[]>(
-    `SELECT c.\`sid\`, c.\`slug\`, c.\`name\`, c.\`intro\`, c.\`visibility\`, c.\`code\`,
+    `SELECT c.\`sid\`, c.\`slug\`, c.\`name\`, c.\`intro\`, c.\`visibility\`,
             c.\`fork_from_sid\`, c.\`favorite_count\`, c.\`copy_count\`, c.\`fork_count\`,
             c.\`created_at\`, c.\`updated_at\`, c.\`language_sid\`,
             l.\`slug\` AS \`language_slug\`, l.\`name\` AS \`language_name\`, l.\`logo_url\` AS \`language_logo\`,
@@ -210,21 +370,20 @@ export async function listApiSnippets(
       LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   )
-  const decorated = await decorateSnippets(rows.map(rowToSnippet))
+  const decorated = await decorateSnippets(rows.map(rowToSnippetSummary))
   return {
     snippets: decorated,
     pagination: { limit, offset, total, hasMore: offset + rows.length < total } satisfies ApiPagination
   }
 }
 
-function rowToSnippet(row: SnippetDetailRow): ApiSnippet {
+function rowToSnippetSummary(row: SnippetDetailRow): ApiSnippetSummary {
   return {
     sid: row.sid,
     slug: row.slug,
     name: row.name,
     intro: row.intro,
     visibility: row.visibility,
-    code: row.code,
     language: {
       slug: row.language_slug,
       name: row.language_name,
@@ -240,6 +399,10 @@ function rowToSnippet(row: SnippetDetailRow): ApiSnippet {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }
+}
+
+function rowToSnippet(row: SnippetDetailRow): ApiSnippet {
+  return { ...rowToSnippetSummary(row), code: row.code ?? '' }
 }
 
 async function fetchOwnSnippet(ownerUuid: string, slug: string): Promise<ApiSnippet | null> {
@@ -440,7 +603,7 @@ export async function listApiGroups(
 ) {
   const { limit, offset } = options
   const visibility = readVisibilityFilter(options.visibility)
-  const q = String(options.q ?? '').trim().slice(0, 200)
+  const q = readSearchQuery(options.q)
   const params: (string | number)[] = [auth.user.uuid]
   const conditions = [
     'g.`owner_uuid` = ?',

@@ -4,9 +4,9 @@
       <div>
         <h2 class="section-title">Apps</h2>
         <p class="apps-lead">
-          Apps identify integrations that use BITS. Website apps can register OAuth under
-          <NuxtLink to="/developer/oauth" class="inline-link">OAuth</NuxtLink>; service apps can only use
-          <NuxtLink to="/developer/api-keys" class="inline-link">API Keys</NuxtLink>.
+          Apps identify OAuth integrations that use BITS. Register redirect URIs and credentials under
+          <NuxtLink to="/developer/oauth" class="inline-link">OAuth</NuxtLink>. API Keys are managed separately at
+          account level.
         </p>
       </div>
       <Button label="New app" size="small" @click="openDialog">
@@ -49,7 +49,6 @@
                     <Box v-else aria-hidden="true" />
                   </span>
                   <span class="cell-name">{{ app.name }}</span>
-                  <span class="app-type" :class="`app-type--${app.appType}`">{{ appTypeLabel(app.appType) }}</span>
                   <span v-if="app.status === 'suspended'" class="suspended">Suspended</span>
                 </div>
               </td>
@@ -89,15 +88,6 @@
         <span>Application name</span>
         <InputText id="app-name" v-model="form.name" maxlength="80" autocomplete="off" fluid />
       </label>
-      <div class="field">
-        <span>Application type</span>
-        <Select v-model="form.appType" :options="APP_TYPES" option-label="label" option-value="value" fluid />
-        <span class="field-hint">
-          {{ form.appType === 'service'
-            ? 'Service apps are for server-to-server integrations. They cannot use OAuth and only work with API Keys.'
-            : 'Website apps can register OAuth and can also use API Keys.' }}
-        </span>
-      </div>
       <label class="field" for="app-homepage">
         <span>Homepage URL</span>
         <InputText id="app-homepage" v-model="form.homepageUrl" type="url" maxlength="512" autocomplete="off"
@@ -135,7 +125,6 @@ interface DeveloperApp {
   homepageUrl: string
   iconUrl: string | null
   description: string
-  appType: 'website' | 'service'
   status: string
   createdAt: string
 }
@@ -145,21 +134,16 @@ interface AppForm {
   homepageUrl: string
   iconUrl: string
   description: string
-  appType: 'website' | 'service'
 }
 
 const PAGE_SIZE = 20
-const APP_TYPES: { value: AppForm['appType'], label: string }[] = [
-  { value: 'website', label: 'Website' },
-  { value: 'service', label: 'Service' }
-]
 const page = ref(1)
 const toast = useToast()
 const deleteOpen = ref(false)
 const deleting = ref(false)
 const deleteTarget = ref<DeveloperApp | null>(null)
 const deleteMessage = computed(() => deleteTarget.value
-  ? `Delete ${deleteTarget.value.name}, its OAuth service, tokens and API keys? This cannot be undone.`
+  ? `Delete ${deleteTarget.value.name}, its OAuth service and tokens? API Keys are account-level and will not be deleted. This cannot be undone.`
   : '')
 
 const { data, refresh, pending } = await useFetch<{ apps: DeveloperApp[], total: number }>('/api/developer/apps', {
@@ -176,7 +160,7 @@ const editingSid = ref('')
 const brokenIcons = reactive(new Set<string>())
 
 function blankForm(): AppForm {
-  return { name: '', homepageUrl: '', iconUrl: '', description: '', appType: 'website' }
+  return { name: '', homepageUrl: '', iconUrl: '', description: '' }
 }
 
 const form = ref<AppForm>(blankForm())
@@ -209,8 +193,7 @@ function openEdit(app: DeveloperApp) {
     name: app.name,
     homepageUrl: app.homepageUrl,
     iconUrl: app.iconUrl ?? '',
-    description: app.description,
-    appType: app.appType
+    description: app.description
   }
   dialogError.value = ''
   dialogVisible.value = true
@@ -236,10 +219,6 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en', { dateStyle: 'medium' })
 }
 
-function appTypeLabel(type: DeveloperApp['appType']) {
-  return type === 'service' ? 'Service' : 'Website'
-}
-
 async function submit() {
   if (!valid.value || saving.value) return
   saving.value = true
@@ -252,8 +231,7 @@ async function submit() {
         name: form.value.name.trim(),
         homepageUrl: form.value.homepageUrl.trim(),
         iconUrl: form.value.iconUrl.trim(),
-        description: form.value.description.trim(),
-        appType: form.value.appType
+        description: form.value.description.trim()
       }
     })
     dialogVisible.value = false
@@ -397,21 +375,6 @@ useHead({ title: 'Apps' })
 .cell-name {
   font-weight: 500;
   white-space: nowrap;
-}
-
-.app-type {
-  padding: 0.05rem 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--p-text-muted-color);
-  font-size: 0.65rem;
-  font-weight: 600;
-  white-space: nowrap;
-
-  &--service {
-    border-color: color-mix(in srgb, var(--p-primary-color) 30%, var(--border));
-    color: var(--p-primary-color);
-  }
 }
 
 .suspended {

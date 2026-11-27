@@ -6,7 +6,7 @@
 
 BITS is a full-stack web product for sharing small, reusable code examples. It is designed around snippets rather than full repositories. Users can publish code with a primary language, optional dependencies, tags and a description, organise snippets into groups, and expose them through a public profile.
 
-The public side of the product combines topic catalogs, search, author profiles and direct content links. Signed-in users can create, edit, copy, fork, favourite and delete their own content. Developers can create Website apps that support OAuth and API Keys, or Service apps that support API Keys only.
+The public side of the product combines topic catalogs, search, author profiles and direct content links. Signed-in users can create, edit, copy, fork, favourite and delete their own content. Developers can create Apps for OAuth integrations and account-level API Keys for server-to-server Open API access.
 
 Chinese summary: BITS 是一个分享、复用和发现小型代码片段的社区，提供公开主页、代码分组、语言与依赖目录、搜索，以及 OAuth 与 API Key 开发者集成。
 
@@ -17,15 +17,15 @@ Chinese summary: BITS 是一个分享、复用和发现小型代码片段的社�
 - Language: a public catalog entry used as the snippet's primary technology.
 - Dependency: a framework, library, tool or runtime associated with one or more languages and selected snippets.
 - User profile: the author's public page at `/{username}`, with avatar, nickname, bio, links, activity and visible content.
-- Developer application: a Website app that can use OAuth and API Keys, or a Service app that can use API Keys only.
+- Developer application: an App identity that can register one OAuth service.
 - OAuth service: credentials and configuration attached to one developer application.
-- API Key: a scoped key attached to one application and one user account, with permissions, an optional expiry, a one-time secret and a last-used timestamp.
+- API Key: an account-level scoped key with permissions, an optional expiry, a one-time secret and a last-used timestamp. It is not tied to an App.
 
 ## How content works
 
 - New snippets are created through a three-step flow: choose a language, select optional dependencies, then enter details and code.
-- A snippet URL is initially generated from its display name. If the slug already exists for that account, a numeric suffix such as `-2` or `-3` is appended.
-- A snippet or group slug can be renamed later. Supported old public detail, raw and edit links redirect to the new address.
+- In the website editor, a snippet's URL name is read-only and follows its Name. Leaving Name unchanged preserves the existing URL; changing Name generates and validates a new URL. If the generated URL is already occupied in that account, the author must choose a different Name.
+- Snippet and group slugs can also be renamed through the Open API by sending `slug`. Supported old public detail, raw and edit links redirect to the new address.
 - Titles, descriptions, language, dependencies, tags, group, visibility and code can also be edited.
 - Deleting content hides it immediately. Deletion is soft, and site administrators can restore content.
 - A copy is counted at most once per visitor, snippet and hour.
@@ -78,9 +78,9 @@ Public and unlisted content require the author to set a username first. Visitors
 ## Developer platform
 
 - [Developer platform](https://bits.micropue.com.cn/developer): Entry point for applications, OAuth services and API Keys.
-- [Apps documentation](https://bits.micropue.com.cn/docs/developer/apps): Application identity, Website versus Service app types, and how apps connect to OAuth services and API Keys.
+- [Apps documentation](https://bits.micropue.com.cn/docs/developer/apps): Application identity and how an App connects to an OAuth service.
 - [OAuth documentation](https://bits.micropue.com.cn/docs/developer/oauth): Endpoints, client authentication, scopes, authorization code flow, PKCE, refresh rotation, device flow, userinfo and revocation.
-- [API Keys documentation](https://bits.micropue.com.cn/docs/developer/api-keys): Creating scoped keys, selecting an owned app, permissions, expiry, one-time secret display, last use and revocation.
+- [API Keys documentation](https://bits.micropue.com.cn/docs/developer/api-keys): Creating account-level scoped keys, permissions, expiry, one-time secret display, last use and revocation.
 - [Open API v1 documentation](https://bits.micropue.com.cn/docs/developer/open-api): API-key authentication, snippet and group endpoints, pagination, errors, permissions and rate limits.
 - [OpenAPI specification](https://bits.micropue.com.cn/openapi.json): OpenAPI 3.1.0 document for the `/api/v1` surface, versioned as API `1.0.0`.
 
@@ -104,14 +104,19 @@ Public and unlisted content require the author to set a username first. Visitors
 
 ### API Keys and Open API
 
-- Website apps can create API Keys and OAuth services; Service apps can create API Keys only.
+- Apps can register an OAuth service. API Keys are separate account-level credentials and do not require an App.
 - API Keys are shown in full once. Only a hash is stored; later views show a prefix, name, permissions, expiry, creation time and last-used time.
 - Permissions are `content:read`, `content:create`, `content:update` and `content:delete`.
 - Keys can expire after 30, 90 or 365 days, or never expire, and can be revoked immediately. A user can retain up to 50 active keys.
 - `/api/v1` accepts an API Key through `Authorization: Bearer <key>` or `X-API-Key`. Site cookies and OAuth access tokens are rejected.
+- Write requests require `Content-Type: application/json`; other media types receive a 415 problem response.
 - The Open API can read, create, update and soft-delete the key owner's snippets, and read, create, update and delete the owner's groups. It cannot change account profile, email, password, two-factor authentication, Passkeys, followers, favorites, OAuth grants or other security settings.
-- Read requests are limited to 120 per minute per key; write requests are limited to 30 per minute per key. Open API rate limiting fails closed when its rate-limit store is unavailable.
+- Read requests are limited to 120 per minute per key and 240 per minute across all keys on an account; write requests are limited to 30 per minute per key and 60 per minute across all keys. Open API rate limiting fails closed when its rate-limit store is unavailable.
+- Snippet list responses omit code bodies. `GET /api/v1/snippets/{slug}` returns the full code body. Dependencies are limited to 50 unique values per snippet.
+- All API responses include `X-Request-Id` and `X-API-Version: v1`. Rate limits are exposed through `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` and equivalent `RateLimit-*` headers. Errors use RFC 9457 `application/problem+json`; rate-limited responses also include `Retry-After`.
 - Open API endpoints:
+  - `GET /api/v1`
+  - `GET /api/v1/openapi.json`
   - `GET /api/v1/me`
   - `GET /api/v1/snippets`
   - `POST /api/v1/snippets`
@@ -134,11 +139,12 @@ Public and unlisted content require the author to set a username first. Visitors
 - `https://bits.micropue.com.cn/request`: Catalog request form for signed-in users.
 - `https://bits.micropue.com.cn/developer`: Developer platform overview.
 - `https://bits.micropue.com.cn/docs/developer`: Developer documentation overview.
-- `https://bits.micropue.com.cn/docs/developer/apps`: Application types and configuration documentation.
+- `https://bits.micropue.com.cn/docs/developer/apps`: App configuration and OAuth service documentation.
 - `https://bits.micropue.com.cn/docs/developer/oauth`: OAuth documentation.
 - `https://bits.micropue.com.cn/docs/developer/api-keys`: API Key documentation.
 - `https://bits.micropue.com.cn/docs/developer/open-api`: Open API v1 documentation.
 - `https://bits.micropue.com.cn/openapi.json`: OpenAPI 3.1 specification for `/api/v1`.
+- `https://bits.micropue.com.cn/api/v1/openapi.json`: The same OpenAPI 3.1 document on the versioned API host.
 - `https://bits.micropue.com.cn/sitemap.xml`: Public page discovery.
 
 ## Legal

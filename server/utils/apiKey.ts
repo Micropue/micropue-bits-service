@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { H3Event } from 'h3'
-import type { RowDataPacket } from 'mysql2/promise'
+import type { PoolConnection, RowDataPacket } from 'mysql2/promise'
 import { useDb } from './db'
 import { shortId } from './id'
+import { enforceRateLimit } from './rateLimit'
 
 export const API_KEY_PREFIX = 'bits_sk_'
 export const API_KEY_PERMISSIONS = [
@@ -15,7 +16,11 @@ export const API_KEY_PERMISSIONS = [
 export type ApiKeyPermission = typeof API_KEY_PERMISSIONS[number]
 
 const MAX_ACTIVE_KEYS = 50
+const MAX_INACTIVE_KEYS = 50
+const INACTIVE_KEY_RETENTION_DAYS = 30
 const MAX_EXPIRY_DAYS = 3650
+const INVALID_AUTH_LIMIT = 30
+const INVALID_AUTH_WINDOW = 60
 const PERMISSION_SET = new Set<string>(API_KEY_PERMISSIONS)
 
 export interface ApiKeyUser {
@@ -31,23 +36,16 @@ export interface ApiKeyAuth {
   permissions: ApiKeyPermission[]
   expiresAt: string | null
   lastUsedAt: string | null
-  app: {
-    sid: string
-    name: string
-    appType: 'website' | 'service'
-  }
   user: ApiKeyUser
 }
 
 export interface DeveloperApiKey {
   sid: string
   name: string
-  appSid: string
-  appName: string
-  appType: 'website' | 'service'
   keyPrefix: string
   permissions: ApiKeyPermission[]
   expiresAt: string | null
+  status: 'active' | 'expired'
   lastUsedAt: string | null
   createdAt: string
 }
@@ -55,29 +53,27 @@ export interface DeveloperApiKey {
 interface ApiKeyRow extends RowDataPacket {
   sid: string
   user_uuid: string
-  app_sid: string
   name: string
   key_prefix: string
   key_hash: string
   permissions: unknown
   expires_at: string | null
+  key_status: 'active' | 'expired'
   last_used_at: string | null
   revoked_at: string | null
   created_at: string
-  app_name: string
-  app_type: 'website' | 'service'
-  app_status: string
   user_username: string
   user_email: string
   user_nickname: string
   user_status: string
 }
 
-const KEY_COLUMNS = `k.\`sid\`, k.\`user_uuid\`, k.\`app_sid\`, k.\`name\`, k.\`key_prefix\`,
+const KEY_COLUMNS = `k.\`sid\`, k.\`user_uuid\`, k.\`name\`, k.\`key_prefix\`,
   k.\`key_hash\`, k.\`permissions\`, k.\`expires_at\`, k.\`last_used_at\`, k.\`revoked_at\`,
-  k.\`created_at\`, a.\`name\` AS \`app_name\`, a.\`app_type\`, a.\`status\` AS \`app_status\`,
-  u.\`username\` AS \`user_username\`, u.\`email\` AS \`user_email\`,
-  u.\`nickname\` AS \`user_nickname\`, u.\`status\` AS \`user_status\``
+  CASE WHEN k.\`expires_at\` IS NOT NULL AND k.\`expires_at\` <= NOW()
+    THEN 'expired' ELSE 'active' END AS \`key_status\`,
+  k.\`created_at\`, u.\`username\` AS \`user_username\`,
+  u.\`email\` AS \`user_email\`, u.\`nickname\` AS \`user_nickname\`, u.\`status\` AS \`user_status\``
 
 function parsePermissions(value: unknown): ApiKeyPermission[] {
   let list: unknown = value
@@ -96,12 +92,10 @@ function publicApiKey(row: ApiKeyRow): DeveloperApiKey {
   return {
     sid: row.sid,
     name: row.name,
-    appSid: row.app_sid,
-    appName: row.app_name,
-    appType: row.app_type,
     keyPrefix: row.key_prefix,
     permissions: parsePermissions(row.permissions),
     expiresAt: row.expires_at,
+    status: row.key_status,
     lastUsedAt: row.last_used_at,
     createdAt: row.created_at
   }
@@ -118,10 +112,23 @@ function readApiKey(event: H3Event): string {
   return bearer || headerKey
 }
 
-// 开放 API 只接受 API Key，不接受站点 Cookie 或 OAuth token
+async function enforceInvalidAuthLimit(event: H3Event) {
+  await enforceRateLimit(event, {
+    bucket: 'api-v1:invalid-auth',
+    identity: `ip:${getClientIp(event)}`,
+    limit: INVALID_AUTH_LIMIT,
+    window: INVALID_AUTH_WINDOW,
+    failOpen: false,
+    message: 'Too many invalid API key attempts (30 per minute)'
+  })
+}
+
+// 开放 API 只接受 API Key，不接受站点 Cookie 或 OAuth token。
+// Key 属于账号，不依赖任何 App；删除 App 不会影响已签发的 Key。
 export async function authenticateApiKey(event: H3Event): Promise<ApiKeyAuth> {
   const rawKey = readApiKey(event)
   if (!rawKey || !rawKey.startsWith(API_KEY_PREFIX)) {
+    await enforceInvalidAuthLimit(event)
     setResponseHeader(event, 'WWW-Authenticate', 'Bearer realm="BITS API"')
     throw createError({
       statusCode: 401,
@@ -133,7 +140,6 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyAuth> {
   const [rows] = await useDb().query<ApiKeyRow[]>(
     `SELECT ${KEY_COLUMNS}
        FROM \`developer_api_keys\` k
-       JOIN \`developer_apps\` a ON a.\`sid\` = k.\`app_sid\`
        JOIN \`users\` u ON u.\`uuid\` = k.\`user_uuid\`
       WHERE k.\`key_hash\` = ?
         AND k.\`revoked_at\` IS NULL
@@ -143,6 +149,7 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyAuth> {
   )
   const row = rows[0]
   if (!row) {
+    await enforceInvalidAuthLimit(event)
     setResponseHeader(event, 'WWW-Authenticate', 'Bearer realm="BITS API", error="invalid_token"')
     throw createError({
       statusCode: 401,
@@ -150,14 +157,13 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyAuth> {
       data: { code: 'API_KEY_INVALID' }
     })
   }
-  if (row.app_status !== 'active') {
-    throw createError({ statusCode: 403, statusMessage: 'The application is suspended', data: { code: 'APP_SUSPENDED' } })
-  }
   if (row.user_status !== 'normal') {
+    await enforceInvalidAuthLimit(event)
+    setResponseHeader(event, 'WWW-Authenticate', 'Bearer realm="BITS API", error="invalid_token"')
     throw createError({ statusCode: 403, statusMessage: 'The account is disabled', data: { code: 'ACCOUNT_DISABLED' } })
   }
 
-  // last_used_at 仅做分钟级更新，避免每个读请求都产生一次写入
+  // last_used_at 仅做分钟级更新，避免每个读请求都产生一次写入。
   await useDb().execute(
     `UPDATE \`developer_api_keys\`
         SET \`last_used_at\` = NOW()
@@ -172,11 +178,6 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyAuth> {
     permissions: parsePermissions(row.permissions),
     expiresAt: row.expires_at,
     lastUsedAt: row.last_used_at,
-    app: {
-      sid: row.app_sid,
-      name: row.app_name,
-      appType: row.app_type
-    },
     user: {
       uuid: row.user_uuid,
       email: row.user_email,
@@ -199,7 +200,6 @@ export async function listApiKeys(userUuid: string): Promise<{ apiKeys: Develope
   const [rows] = await useDb().query<ApiKeyRow[]>(
     `SELECT ${KEY_COLUMNS}
        FROM \`developer_api_keys\` k
-       JOIN \`developer_apps\` a ON a.\`sid\` = k.\`app_sid\`
        JOIN \`users\` u ON u.\`uuid\` = k.\`user_uuid\`
       WHERE k.\`user_uuid\` = ? AND k.\`revoked_at\` IS NULL
       ORDER BY k.\`created_at\` DESC, k.\`sid\` DESC`,
@@ -208,58 +208,100 @@ export async function listApiKeys(userUuid: string): Promise<{ apiKeys: Develope
   return { apiKeys: rows.map(publicApiKey), total: rows.length }
 }
 
+async function pruneApiKeyHistory(conn: PoolConnection, userUuid: string) {
+  // Revoked and expired records are not usable. Keep a bounded recent history so
+  // repeated create/revoke cycles cannot grow the table without limit.
+  await conn.execute(
+    `DELETE FROM \`developer_api_keys\`
+      WHERE \`user_uuid\` = ?
+        AND (
+          (\`revoked_at\` IS NOT NULL AND \`revoked_at\` <= NOW() - INTERVAL ${INACTIVE_KEY_RETENTION_DAYS} DAY)
+          OR (\`expires_at\` IS NOT NULL AND \`expires_at\` <= NOW() - INTERVAL ${INACTIVE_KEY_RETENTION_DAYS} DAY)
+        )`,
+    [userUuid]
+  )
+
+  const inactiveWhere = `\`user_uuid\` = ?
+    AND (\`revoked_at\` IS NOT NULL OR (\`expires_at\` IS NOT NULL AND \`expires_at\` <= NOW()))`
+  const [[countRow]] = await conn.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS \`total\` FROM \`developer_api_keys\` WHERE ${inactiveWhere}`,
+    [userUuid]
+  )
+  const excess = Math.min(
+    Math.max(Number(countRow?.total ?? 0) - MAX_INACTIVE_KEYS, 0),
+    1000
+  )
+  if (!excess) return
+
+  const [staleRows] = await conn.query<RowDataPacket[]>(
+    `SELECT \`sid\` FROM \`developer_api_keys\`
+      WHERE ${inactiveWhere}
+      ORDER BY COALESCE(\`revoked_at\`, \`expires_at\`, \`created_at\`) DESC, \`sid\` DESC
+      LIMIT ? OFFSET ?`,
+    [userUuid, excess, MAX_INACTIVE_KEYS]
+  )
+  if (!staleRows.length) return
+  await conn.execute(
+    `DELETE FROM \`developer_api_keys\`
+      WHERE \`user_uuid\` = ? AND \`sid\` IN (${staleRows.map(() => '?').join(', ')})`,
+    [userUuid, ...staleRows.map(row => String(row.sid))]
+  )
+}
+
 export async function createApiKey(
   userUuid: string,
   input: {
-    appSid: string
     name: string
     permissions: ApiKeyPermission[]
     expiresInDays: number | null
   }
 ): Promise<{ apiKey: DeveloperApiKey, key: string }> {
-  const [apps] = await useDb().query<RowDataPacket[]>(
-    "SELECT `sid` FROM `developer_apps` WHERE `sid` = ? AND `user_uuid` = ? AND `status` = 'active' LIMIT 1",
-    [input.appSid, userUuid]
-  )
-  if (!apps[0]) {
-    throw createError({ statusCode: 400, statusMessage: 'Choose an active App you own', data: { field: 'appSid' } })
-  }
-
-  const [[countRow]] = await useDb().query<RowDataPacket[]>(
-    'SELECT COUNT(*) AS `total` FROM `developer_api_keys` WHERE `user_uuid` = ? AND `revoked_at` IS NULL',
-    [userUuid]
-  )
-  if (Number(countRow?.total ?? 0) >= MAX_ACTIVE_KEYS) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: `You can have at most ${MAX_ACTIVE_KEYS} active API keys`
-    })
-  }
-
   const sid = shortId()
   const key = `${API_KEY_PREFIX}${randomBytes(32).toString('base64url')}`
   const keyPrefix = key.slice(0, 24)
-  if (input.expiresInDays === null) {
-    await useDb().execute(
-      `INSERT INTO \`developer_api_keys\`
-         (\`sid\`, \`user_uuid\`, \`app_sid\`, \`name\`, \`key_prefix\`, \`key_hash\`, \`permissions\`, \`expires_at\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
-      [sid, userUuid, input.appSid, input.name, keyPrefix, hashApiKey(key), JSON.stringify(input.permissions)]
+  const expiresAt = input.expiresInDays === null
+    ? null
+    : new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)
+
+  const conn = await useDb().getConnection()
+  try {
+    await conn.beginTransaction()
+    // Serialize creation for one account so concurrent requests cannot exceed the
+    // active-key cap or race the history cleanup.
+    await conn.execute('SELECT `uuid` FROM `users` WHERE `uuid` = ? FOR UPDATE', [userUuid])
+    await pruneApiKeyHistory(conn, userUuid)
+
+    const [[countRow]] = await conn.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS \`total\`
+         FROM \`developer_api_keys\`
+        WHERE \`user_uuid\` = ? AND \`revoked_at\` IS NULL
+          AND (\`expires_at\` IS NULL OR \`expires_at\` > NOW())`,
+      [userUuid]
     )
-  } else {
-    const expiresAt = new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)
-    await useDb().execute(
+    if (Number(countRow?.total ?? 0) >= MAX_ACTIVE_KEYS) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `You can have at most ${MAX_ACTIVE_KEYS} active API keys`
+      })
+    }
+
+    await conn.execute(
       `INSERT INTO \`developer_api_keys\`
-         (\`sid\`, \`user_uuid\`, \`app_sid\`, \`name\`, \`key_prefix\`, \`key_hash\`, \`permissions\`, \`expires_at\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [sid, userUuid, input.appSid, input.name, keyPrefix, hashApiKey(key), JSON.stringify(input.permissions), expiresAt]
+         (\`sid\`, \`user_uuid\`, \`name\`, \`key_prefix\`, \`key_hash\`, \`permissions\`, \`expires_at\`)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [sid, userUuid, input.name, keyPrefix, hashApiKey(key), JSON.stringify(input.permissions), expiresAt]
     )
+    await conn.commit()
+  } catch (error) {
+    await conn.rollback()
+    throw error
+  } finally {
+    conn.release()
   }
 
   const [rows] = await useDb().query<ApiKeyRow[]>(
     `SELECT ${KEY_COLUMNS}
        FROM \`developer_api_keys\` k
-       JOIN \`developer_apps\` a ON a.\`sid\` = k.\`app_sid\`
        JOIN \`users\` u ON u.\`uuid\` = k.\`user_uuid\`
       WHERE k.\`sid\` = ? AND k.\`user_uuid\` = ?
       LIMIT 1`,
@@ -269,11 +311,7 @@ export async function createApiKey(
 }
 
 export function readApiKeyInput(body: Record<string, unknown>) {
-  const appSid = String(body?.appSid ?? '').trim()
   const name = String(body?.name ?? '').trim()
-  if (!appSid) {
-    throw createError({ statusCode: 400, statusMessage: 'Choose an App', data: { field: 'appSid' } })
-  }
   if (!name || name.length > 80) {
     throw createError({
       statusCode: 400,
@@ -314,7 +352,7 @@ export function readApiKeyInput(body: Record<string, unknown>) {
     expiresInDays = days
   }
 
-  return { appSid, name, permissions, expiresInDays }
+  return { name, permissions, expiresInDays }
 }
 
 export async function revokeApiKey(userUuid: string, sid: string): Promise<boolean> {

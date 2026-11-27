@@ -4,33 +4,22 @@
       <div>
         <h2 class="section-title">API Keys</h2>
         <p class="keys-lead">
-          Create keys for server-to-server access to the BITS Open API. Keys act as your account and can only manage
-          your own snippets and groups.
+          Create account-level keys for server-to-server access to the BITS Open API. Keys can only manage your own
+          snippets and groups; they are not tied to an App.
         </p>
       </div>
-      <Button label="New API key" size="small" :disabled="!apps.length" @click="openCreate">
+      <Button label="New API key" size="small" @click="openCreate">
         <template #icon><Plus /></template>
       </Button>
     </div>
 
     <section class="group">
       <h3 class="group-title">
-        Active keys
+        API keys
         <span v-if="total" class="keys-total">{{ total }}</span>
       </h3>
 
-      <div v-if="!apps.length && !appsPending" class="card">
-        <div class="empty-state">
-          <Box aria-hidden="true" />
-          <p class="empty-title">Create an App first</p>
-          <p class="empty-desc">
-            Every API key belongs to an App.
-            <NuxtLink to="/developer/apps" class="inline-link">Create an App</NuxtLink>
-            to continue.
-          </p>
-        </div>
-      </div>
-      <div v-else-if="!apiKeys.length && !pending" class="card">
+      <div v-if="!apiKeys.length && !pending" class="card">
         <div class="empty-state">
           <Lock aria-hidden="true" />
           <p class="empty-title">No API keys yet</p>
@@ -42,7 +31,6 @@
           <thead>
             <tr>
               <th>Name</th>
-              <th>App</th>
               <th>Key</th>
               <th>Permissions</th>
               <th>Last used</th>
@@ -54,20 +42,9 @@
           <tbody>
             <tr v-for="key in apiKeys" :key="key.sid">
               <td>
-                <span class="key-name">{{ key.name }}</span>
-              </td>
-              <td>
-                <div class="app-cell">
-                  <span class="app-icon" :class="{ 'app-icon--fallback': !appIcon(key.appSid) || brokenIcons.has(key.appSid) }">
-                    <img v-if="appIcon(key.appSid) && !brokenIcons.has(key.appSid)" :src="appIcon(key.appSid)!"
-                      :alt="`${key.appName} icon`" width="24" height="24" loading="lazy"
-                      @error="brokenIcons.add(key.appSid)">
-                    <Box v-else aria-hidden="true" />
-                  </span>
-                  <div class="app-meta">
-                    <span class="app-name">{{ key.appName }}</span>
-                    <span class="app-type">{{ appTypeLabel(key.appType) }}</span>
-                  </div>
+                <div class="key-name-row">
+                  <span class="key-name">{{ key.name }}</span>
+                  <span class="key-status" :class="`key-status--${key.status}`">{{ key.status }}</span>
                 </div>
               </td>
               <td><code class="key-prefix">{{ key.keyPrefix }}…</code></td>
@@ -97,13 +74,6 @@
   <Dialog v-model:visible="createOpen" modal :draggable="false" header="New API key"
     :style="{ width: '34rem', maxWidth: '94vw' }">
     <div class="dialog-form">
-      <label class="field" for="key-app">
-        <span>App</span>
-        <Select id="key-app" v-model="form.appSid" :options="apps" option-label="name" option-value="sid" filter
-          placeholder="Select an App" fluid />
-        <span class="field-hint">Website and Service Apps can both issue API keys.</span>
-      </label>
-
       <label class="field" for="key-name">
         <span>Name</span>
         <InputText id="key-name" v-model="form.name" maxlength="80" autocomplete="off"
@@ -114,8 +84,10 @@
         <legend>Permissions</legend>
         <p class="field-hint">Access is limited to your own content.</p>
         <div class="permission-options">
-          <label v-for="permission in PERMISSIONS" :key="permission.value" class="check-field">
-            <Checkbox v-model="form.permissions" :value="permission.value" binary />
+          <label v-for="permission in PERMISSIONS" :key="permission.value" class="check-field"
+            :for="`permission-${permission.value.replace(':', '-')}`">
+            <Checkbox :input-id="`permission-${permission.value.replace(':', '-')}`" v-model="form.permissions"
+              :value="permission.value" :binary="false" />
             <span>
               <strong>{{ permission.label }}</strong>
               <small>{{ permission.description }}</small>
@@ -139,7 +111,7 @@
   </Dialog>
 
   <Dialog v-model:visible="createdOpen" modal :draggable="false" header="API key created"
-    :style="{ width: '38rem', maxWidth: '94vw' }" :closable="true">
+    :style="{ width: '38rem', maxWidth: '94vw' }" :closable="true" @hide="clearCreatedKey">
     <div class="created-key">
       <p class="created-warning">
         Copy this key now. It is shown only once and cannot be recovered after you close this dialog.
@@ -147,7 +119,7 @@
       <label class="field" for="created-key-value">
         <span>{{ createdName }}</span>
         <div class="key-copy-row">
-          <InputText id="created-key-value" :model-value="createdKey" readonly fluid />
+          <InputText id="created-key-value" :model-value="createdKey" readonly autocomplete="off" spellcheck="false" fluid />
           <Button label="Copy" severity="secondary" outlined @click="copyCreatedKey" />
         </div>
       </label>
@@ -161,35 +133,23 @@
 </template>
 
 <script setup lang="ts">
-import Box from '@primeicons/vue/box'
 import Lock from '@primeicons/vue/lock'
 import Plus from '@primeicons/vue/plus'
-
-interface DeveloperApp {
-  sid: string
-  name: string
-  iconUrl: string | null
-  appType: 'website' | 'service'
-  status: string
-}
 
 type ApiKeyPermission = 'content:read' | 'content:create' | 'content:update' | 'content:delete'
 
 interface DeveloperApiKey {
   sid: string
   name: string
-  appSid: string
-  appName: string
-  appType: 'website' | 'service'
   keyPrefix: string
   permissions: ApiKeyPermission[]
   expiresAt: string | null
+  status: 'active' | 'expired'
   lastUsedAt: string | null
   createdAt: string
 }
 
 interface KeyForm {
-  appSid: string
   name: string
   permissions: ApiKeyPermission[]
   expiry: number
@@ -218,10 +178,9 @@ const revokingSid = ref('')
 const dialogError = ref('')
 const createdKey = ref('')
 const createdName = ref('')
-const brokenIcons = reactive(new Set<string>())
 
 function blankForm(): KeyForm {
-  return { appSid: '', name: '', permissions: ['content:read'], expiry: 90 }
+  return { name: '', permissions: ['content:read'], expiry: 90 }
 }
 
 const form = ref<KeyForm>(blankForm())
@@ -229,33 +188,19 @@ const form = ref<KeyForm>(blankForm())
 const { data, refresh, pending } = await useFetch<{ apiKeys: DeveloperApiKey[], total: number }>(
   '/api/developer/api-keys'
 )
-const { data: appData, pending: appsPending } = await useFetch<{ apps: DeveloperApp[], total: number }>(
-  '/api/developer/apps',
-  { query: { limit: 100, offset: 0 } }
-)
 
 const apiKeys = computed(() => data.value?.apiKeys ?? [])
 const total = computed(() => data.value?.total ?? 0)
-const apps = computed(() => appData.value?.apps ?? [])
 
 const valid = computed(() => {
   const name = form.value.name.trim()
-  return !!form.value.appSid && !!name && name.length <= 80 && form.value.permissions.length > 0
+  return !!name && name.length <= 80 && form.value.permissions.length > 0
 })
 
 function openCreate() {
   form.value = blankForm()
-  form.value.appSid = apps.value[0]?.sid ?? ''
   dialogError.value = ''
   createOpen.value = true
-}
-
-function appIcon(sid: string) {
-  return apps.value.find(app => app.sid === sid)?.iconUrl ?? null
-}
-
-function appTypeLabel(type: DeveloperApp['appType']) {
-  return type === 'service' ? 'Service' : 'Website'
 }
 
 function permissionLabel(permission: ApiKeyPermission) {
@@ -287,7 +232,6 @@ async function submitCreate() {
     const res = await $fetch<{ apiKey: DeveloperApiKey, key: string }>('/api/developer/api-keys', {
       method: 'POST',
       body: {
-        appSid: form.value.appSid,
         name: form.value.name.trim(),
         permissions: form.value.permissions,
         expiresInDays: form.value.expiry || null
@@ -314,6 +258,11 @@ async function copyCreatedKey() {
   } catch {
     toast.add({ severity: 'error', summary: 'Could not copy the API key', life: 4000 })
   }
+}
+
+function clearCreatedKey() {
+  createdKey.value = ''
+  createdName.value = ''
 }
 
 function askRevoke(key: DeveloperApiKey) {
@@ -420,54 +369,32 @@ useHead({ title: 'API Keys' })
   }
 }
 
-.key-name,
-.app-name {
+.key-name {
   font-weight: 500;
 }
 
-.app-cell {
+.key-name-row {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  min-width: 9rem;
+  gap: 0.45rem;
 }
 
-.app-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-}
-
-.app-type {
-  font-size: 0.7rem;
-  color: var(--p-text-muted-color);
-}
-
-.app-icon {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  overflow: hidden;
+.key-status {
+  padding: 0.08rem 0.38rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--p-content-background);
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: capitalize;
 
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  &--active {
+    color: var(--p-green-600, #16a34a);
   }
 
-  svg {
-    width: 0.8rem;
-    height: 0.8rem;
-    opacity: 0.55;
-  }
-
-  &--fallback {
-    background: color-mix(in srgb, var(--p-text-color) 6%, var(--p-content-background));
+  &--expired {
+    color: var(--p-text-muted-color);
+    text-decoration: line-through;
   }
 }
 
@@ -556,7 +483,7 @@ useHead({ title: 'API Keys' })
 
 .permission-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.55rem;
   margin-top: 0.55rem;
 }
@@ -626,14 +553,14 @@ useHead({ title: 'API Keys' })
 }
 
 @media screen and (max-width: 640px) {
+  .permission-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .keys-head {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
-  }
-
-  .permission-options {
-    grid-template-columns: 1fr;
   }
 }
 </style>

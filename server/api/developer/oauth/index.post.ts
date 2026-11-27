@@ -1,5 +1,6 @@
 // 为已创建的 App 注册 OAuth 服务
 export default defineEventHandler(async event => {
+  setHeader(event, 'cache-control', 'no-store')
   const user = await requireDeveloperUser(event)
   await enforceUserRateLimit(event, user.uuid, 'developer:oauth:create', 10, 3600)
 

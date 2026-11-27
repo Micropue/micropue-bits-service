@@ -1,12 +1,14 @@
 import type { H3Event } from 'h3'
 
-// 控制台写接口的同源校验（CSRF 兜底）
+// 控制台与开发者中心的 Cookie 写接口同源校验（CSRF 兜底）
 // Cookie 本身是 HttpOnly + sameSite=lax，跨站表单提交带不上 Cookie；这里再加一道浏览器来源检查：
 // 1) Sec-Fetch-Site 存在时必须是 same-origin / none（浏览器设置，脚本无法伪造）
 // 2) Origin 存在时，其主机名必须属于本站可信用主机集合
 //    —— 生产常挂在反向代理/CDN 后面：请求的 Host 可能是上游地址，反向代理的域名在 x-forwarded-host，
 //       也可能两边都不是，所以再把站点公开域名（runtimeConfig.public.siteUrl）一并纳入白名单
 // shortcut: 比的是主机名（不含端口/协议），代理若改写端口也不会误拦；若将来出现多域名部署，把域名加进 siteUrl 或扩展白名单
+
+const PROTECTED_PREFIXES = ['/api/dashboard', '/api/developer']
 
 // 本站可信主机名集合（不带协议与端口）
 function trustedHostnames(event: H3Event): string[] {
@@ -29,7 +31,7 @@ function trustedHostnames(event: H3Event): string[] {
 export default defineEventHandler(event => {
   const method = (event.method || 'GET').toUpperCase()
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return
-  if (!event.path.startsWith('/api/dashboard')) return
+  if (!PROTECTED_PREFIXES.some(prefix => event.path.startsWith(prefix))) return
 
   const site = getRequestHeader(event, 'sec-fetch-site')?.toLowerCase()
   if (site && site !== 'same-origin' && site !== 'none') {

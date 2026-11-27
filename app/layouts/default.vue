@@ -293,6 +293,7 @@ header {
 }
 
 main {
-    height: calc(100% - 80px);
+    height: calc(100% - 70px);
+    min-height: 0;
 }
 </style>

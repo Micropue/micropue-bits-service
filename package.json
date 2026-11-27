@@ -3,11 +3,14 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "prebuild": "npm run openapi:build",
     "build": "nuxt build",
     "start": "node --env-file-if-exists=.env --env-file-if-exists=.env.production .output/server/index.mjs",
     "dev": "nuxt dev --host",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "openapi:build": "node scripts/build-openapi.mjs",
+    "test:openapi": "node scripts/openapi.test.mjs",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
@@ -37,6 +40,7 @@
     "@primevue/nuxt-module": "^4.5.5",
     "@types/nodemailer": "^8.0.2",
     "@types/qrcode": "^1.5.6",
-    "sass-embedded": "1.105.1"
+    "sass-embedded": "1.105.1",
+    "yaml": "^2.9.1"
   }
 }

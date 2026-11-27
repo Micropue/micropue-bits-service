@@ -96,7 +96,7 @@ export const DOC_CHAPTERS: DocChapter[] = [
             'Details — add the title, description, tags, visibility, group and code.'
           ]
         },
-        { type: 'p', text: 'The code editor highlights syntax based on the selected language. Bits proposes a URL name from the title; you can change it before publishing. URL names use lowercase letters, numbers and single hyphens (up to 40 characters). If you leave it blank, a duplicate name gets a numeric suffix automatically. If you enter a name that is already taken, Bits asks you to choose another one.' },
+        { type: 'p', text: 'The code editor highlights syntax based on the selected language. The URL name is generated from Name and is read-only while you create the snippet. It uses lowercase Latin letters, numbers and single hyphens (up to 40 characters). Bits checks availability as you type; if the generated URL is already used in your account, choose a different Name before publishing.' },
         {
           type: 'ul',
           items: [
@@ -121,7 +121,7 @@ export const DOC_CHAPTERS: DocChapter[] = [
             '详情 — 填写名称、介绍、标签、可见性、分组，并粘贴代码。'
           ]
         },
-        { type: 'p', text: '代码编辑器会根据所选语言高亮。Bits 会根据名称推荐 URL，你可以在发布前修改；URL 名只能使用小写字母、数字和单个连字符，最长 40 个字符。留空时，重名会自动追加数字后缀；手动填写的 URL 已被占用时，会提示你换一个。' },
+        { type: 'p', text: '代码编辑器会根据所选语言高亮。URL 名由 Name 生成，在创建过程中只读；它只使用小写拉丁字母、数字和单个连字符，最长 40 个字符。Bits 会随输入检测可用性；如果生成的 URL 已被当前账户占用，请修改 Name 后再发布。' },
         {
           type: 'ul',
           items: [
@@ -146,7 +146,7 @@ export const DOC_CHAPTERS: DocChapter[] = [
       en: [
         { type: 'h', text: 'Edit a snippet' },
         { type: 'p', text: 'Open your profile and choose Edit on a snippet card, or open the snippet and choose Edit snippet. The editor is the same as the creation form and lives at /{username}/{slug}/edit.' },
-        { type: 'p', text: 'You can change the URL name (slug) as well as the title, description, language, dependencies, tags, group, visibility and code. After saving a new URL, Bits opens the snippet at its new address. Old links, including /raw and /edit links, redirect to the new URL. Private snippets only redirect for their owner.' },
+        { type: 'p', text: 'URL name is read-only and follows Name. Leaving Name unchanged keeps the existing URL; changing Name generates a new URL and checks it for conflicts. You can also change the description, language, dependencies, tags, group, visibility and code. After saving a new URL, Bits opens the snippet at its new address. Old links, including /raw and /edit links, redirect to the new URL. Private snippets only redirect for their owner.' },
         { type: 'h', text: 'Delete a snippet' },
         { type: 'p', text: 'Use Delete on the snippet page or the edit screen, then confirm. Deleted snippets stop resolving immediately. Deletion is soft: a site administrator can restore the snippet later.' },
         { type: 'note', text: 'Deleting a group never deletes its snippets; it only removes the grouping.' }
@@ -154,7 +154,7 @@ export const DOC_CHAPTERS: DocChapter[] = [
       zh: [
         { type: 'h', text: '编辑代码段' },
         { type: 'p', text: '在个人主页的代码段卡片上点 Edit，或在代码段页面点 Edit snippet。编辑器与创建表单一致，地址为 /{username}/{slug}/edit。' },
-        { type: 'p', text: 'URL 名（slug）与名称、介绍、语言、依赖、标签、分组、可见性和代码都可以修改。保存新 URL 后，页面会跳转到新地址；旧链接（包括 /raw 和 /edit）会自动重定向。私有代码段的旧链接只对作者本人重定向。' },
+        { type: 'p', text: 'URL 名只读，并跟随 Name 同步。Name 不变时保留原 URL；修改 Name 会生成新 URL 并检测冲突。介绍、语言、依赖、标签、分组、可见性和代码也都可以修改。保存新 URL 后，页面会跳转到新地址；旧链接（包括 /raw 和 /edit）会自动重定向。私有代码段的旧链接只对作者本人重定向。' },
         { type: 'h', text: '删除代码段' },
         { type: 'p', text: '在代码段页面或编辑页点 Delete 并确认。删除后链接立即失效。删除是软删除，站点管理员之后可以恢复。' },
         { type: 'note', text: '删除分组不会删除组内代码段，只会解除分组归属。' }
@@ -439,11 +439,11 @@ export const DOC_CHAPTERS: DocChapter[] = [
         { type: 'h', text: 'Why can I not publish?' },
         { type: 'p', text: 'Public and unlisted content needs a username. Set one under Account → Profile.' },
         { type: 'h', text: 'Why did my URL get a -2?' },
-        { type: 'p', text: 'The URL name was already used in your account. The display title is unchanged; the suffix keeps URLs unique.' },
+        { type: 'p', text: 'Some automatically generated group URLs receive a numeric suffix when that URL is already used. Snippet editors instead derive the URL from Name and ask you to choose another Name when it is taken.' },
         { type: 'h', text: 'Why does my link return 404?' },
         { type: 'p', text: 'The content may be private, deleted, or owned by another account. Private and deleted content is hidden from visitors.' },
         { type: 'h', text: 'Can I change the URL?' },
-        { type: 'p', text: 'Yes. Edit the snippet and change its URL name. The old URL redirects to the new one, including /raw and /edit. URL names must be unique within your account.' },
+        { type: 'p', text: 'Yes. Edit the snippet and change its Name; the read-only URL name updates with it. Bits checks the generated URL before saving. The old URL redirects to the new one, including /raw and /edit. URL names must be unique within your account.' },
         { type: 'h', text: 'How do I delete content?' },
         { type: 'p', text: 'Use Delete from your profile, the snippet page, or the edit screen. Groups can be deleted from the profile or the group page.' },
         { type: 'h', text: 'Who can restore deleted content?' },
@@ -453,11 +453,11 @@ export const DOC_CHAPTERS: DocChapter[] = [
         { type: 'h', text: '为什么不能发布？' },
         { type: 'p', text: '公开 / 不可搜索内容要求先设置用户名。请到 Account → Profile 设置。' },
         { type: 'h', text: '为什么 URL 后面多了 -2？' },
-        { type: 'p', text: '该 URL 名在你的账户下已被占用。显示名称不变，数字后缀用于保持 URL 唯一。' },
+        { type: 'p', text: '部分自动生成的分组 URL 在已被占用时会追加数字后缀。代码段编辑器则根据 Name 生成 URL；如果已被占用，需要修改 Name。' },
         { type: 'h', text: '为什么链接返回 404？' },
         { type: 'p', text: '内容可能是私有的、已删除的，或属于其他账户。私有与已删除内容不会对访客开放。' },
         { type: 'h', text: '可以修改 URL 吗？' },
-        { type: 'p', text: '可以。编辑代码段时修改 URL 名即可；旧地址（包括 /raw 和 /edit）会自动重定向到新地址。同一账户内的 URL 名必须唯一。' },
+        { type: 'p', text: '可以。编辑代码段时修改 Name，只读的 URL 名会同步更新；保存前 Bits 会检测生成的 URL。旧地址（包括 /raw 和 /edit）会自动重定向到新地址。同一账户内的 URL 名必须唯一。' },
         { type: 'h', text: '如何删除内容？' },
         { type: 'p', text: '在个人主页、代码段页面或编辑页使用 Delete；分组可在个人主页或分组页面删除。' },
         { type: 'h', text: '谁能恢复已删除内容？' },
@@ -480,9 +480,9 @@ export const DOC_CHAPTERS: DocChapter[] = [
           type: 'ul',
           items: [
             'Your account must have a username, a password and two-factor authentication enabled.',
-            'Every integration starts with an App.',
-            'Website Apps can use OAuth and API Keys.',
-            'Service Apps are for server-to-server integrations and can only use API Keys.'
+            'OAuth integrations start with an App.',
+            'API Keys are account-level credentials and do not belong to an App.',
+            'Apps use OAuth profile scopes; API Keys are limited to the content permissions you select.'
           ]
         },
         { type: 'h', text: 'Sections' },
@@ -490,13 +490,13 @@ export const DOC_CHAPTERS: DocChapter[] = [
           type: 'table',
           headers: ['Section', 'Purpose'],
           rows: [
-            ['Apps', 'Application identity, type, homepage, icon and description'],
-            ['OAuth', 'Authorization-code, PKCE, refresh and device flows for Website Apps'],
+            ['Apps', 'OAuth application identity, homepage, icon and description'],
+            ['OAuth', 'Authorization-code, PKCE, refresh and device flows'],
             ['API Keys', 'Scoped server-to-server keys for the Open API'],
             ['Docs', 'Reference chapters for each integration method']
           ]
         },
-        { type: 'p', text: 'The machine-readable API description is available at /openapi.json (OpenAPI 3.1, API version 1.0.0).' },
+        { type: 'p', text: 'The machine-readable API description is available at /api/v1/openapi.json and /openapi.json (OpenAPI 3.1, API version 1.0.0).' },
         { type: 'note', text: 'OAuth and API Keys act on your account. Keep client secrets and API keys private, and revoke anything you no longer use.' }
       ],
       zh: [
@@ -506,9 +506,9 @@ export const DOC_CHAPTERS: DocChapter[] = [
           type: 'ul',
           items: [
             '账户必须已设置用户名、密码并开启双重验证。',
-            '每个集成都需要先创建一个 App。',
-            'Website App 可以使用 OAuth 与 API Key。',
-            'Service App 面向服务端集成，只能使用 API Key。'
+            'OAuth 集成需要先创建一个 App。',
+            'API Key 属于账户，不隶属于任何 App。',
+            'App 通过 OAuth 获取资料范围；API Key 只能使用你勾选的内容权限。'
           ]
         },
         { type: 'h', text: '主要入口' },
@@ -516,13 +516,13 @@ export const DOC_CHAPTERS: DocChapter[] = [
           type: 'table',
           headers: ['入口', '用途'],
           rows: [
-            ['Apps', '应用名称、类型、主页、图标和介绍'],
-            ['OAuth', 'Website App 的授权码、PKCE、刷新与设备流'],
+            ['Apps', 'OAuth 应用名称、主页、图标和介绍'],
+            ['OAuth', '授权码、PKCE、刷新与设备流'],
             ['API Keys', '用于开放 API 的细分权限服务端密钥'],
             ['Docs', '各类接入方式的完整参考']
           ]
         },
-        { type: 'p', text: '机器可读的接口描述位于 /openapi.json（OpenAPI 3.1，API 版本 1.0.0）。' },
+        { type: 'p', text: '机器可读的接口描述位于 /api/v1/openapi.json 与 /openapi.json（OpenAPI 3.1，API 版本 1.0.0）。' },
         { type: 'note', text: 'OAuth 与 API Key 都以你的账户身份操作。请妥善保管 Client Secret 与 API Key，不再使用时及时撤销。' }
       ]
     }
@@ -531,21 +531,13 @@ export const DOC_CHAPTERS: DocChapter[] = [
     slug: 'developer/apps',
     title: { en: 'Apps', zh: '应用（Apps）' },
     summary: {
-      en: 'Create a Website or Service App for your integration.',
-      zh: '为集成创建 Website 或 Service 类型的应用。'
+      en: 'Create an App for an OAuth integration.',
+      zh: '为 OAuth 集成创建应用。'
     },
     blocks: {
       en: [
         { type: 'h', text: 'Create an App' },
-        { type: 'p', text: 'Open Developer → Apps and choose New app. Enter the application name, type, homepage URL, optional icon URL and description.' },
-        {
-          type: 'table',
-          headers: ['Type', 'Use it for', 'OAuth', 'API Keys'],
-          rows: [
-            ['Website', 'Apps with a browser-based sign-in flow', 'Yes', 'Yes'],
-            ['Service', 'Background jobs and server-to-server tools', 'No', 'Yes']
-          ]
-        },
+        { type: 'p', text: 'Open Developer → Apps and choose New app. Enter the application name, homepage URL, optional icon URL and description.' },
         { type: 'h', text: 'Application fields' },
         {
           type: 'ul',
@@ -553,27 +545,18 @@ export const DOC_CHAPTERS: DocChapter[] = [
             'Name: up to 80 characters; shown on authorization screens.',
             'Homepage URL: a valid http(s) URL.',
             'Icon URL: optional; shown beside the App.',
-            'Description: up to 500 characters.',
-            'Type: Website or Service.'
+            'Description: up to 500 characters.'
           ]
         },
-        { type: 'h', text: 'Changing the type' },
-        { type: 'p', text: 'A Website App can become a Service App only after its OAuth service is deleted. This prevents existing OAuth clients from silently losing their service. Service Apps cannot register OAuth.' },
+        { type: 'h', text: 'OAuth services' },
+        { type: 'p', text: 'Every App can register one OAuth service. Server-to-server access uses a separate, account-level API Key and does not require an App.' },
         { type: 'h', text: 'Deleting an App' },
-        { type: 'p', text: 'Deleting an App also deletes its OAuth service, OAuth tokens and API keys. This cannot be undone. The confirmation dialog asks you to type the exact delete phrase.' },
-        { type: 'note', text: 'Use Service Apps for API-only integrations. They never expose an OAuth client ID or secret.' }
+        { type: 'p', text: 'Deleting an App also deletes its OAuth service and OAuth tokens. API Keys belong to your account and are not deleted. This cannot be undone. The confirmation dialog asks you to type the exact delete phrase.' },
+        { type: 'note', text: 'Use API Keys for API-only integrations. Apps are only needed when you want an OAuth client ID and secret.' }
       ],
       zh: [
         { type: 'h', text: '创建应用' },
-        { type: 'p', text: '打开 Developer → Apps，点击 New app，填写应用名称、类型、主页 URL、可选图标 URL 和介绍。' },
-        {
-          type: 'table',
-          headers: ['类型', '适用场景', 'OAuth', 'API Key'],
-          rows: [
-            ['Website', '需要浏览器登录授权的应用', '支持', '支持'],
-            ['Service', '后台任务与服务端工具', '不支持', '支持']
-          ]
-        },
+        { type: 'p', text: '打开 Developer → Apps，点击 New app，填写应用名称、主页 URL、可选图标 URL 和介绍。' },
         { type: 'h', text: '字段说明' },
         {
           type: 'ul',
@@ -581,15 +564,14 @@ export const DOC_CHAPTERS: DocChapter[] = [
             '名称：最多 80 个字符，会显示在授权页面。',
             '主页 URL：合法的 http(s) 地址。',
             '图标 URL：可选，显示在应用名称旁。',
-            '介绍：最多 500 个字符。',
-            '类型：Website 或 Service。'
+            '介绍：最多 500 个字符。'
           ]
         },
-        { type: 'h', text: '修改类型' },
-        { type: 'p', text: 'Website App 必须先删除已注册的 OAuth 服务，才能改为 Service；这样可以避免已有 OAuth 客户端突然失效。Service App 不能注册 OAuth。' },
+        { type: 'h', text: 'OAuth 服务' },
+        { type: 'p', text: '每个 App 可以注册一个 OAuth 服务。纯服务端访问请使用独立的账户级 API Key，不需要创建 App。' },
         { type: 'h', text: '删除应用' },
-        { type: 'p', text: '删除 App 会同时删除它的 OAuth 服务、OAuth 令牌和 API Key，且无法恢复。确认弹窗会要求原样输入删除短语。' },
-        { type: 'note', text: '纯 API 集成请选择 Service App；它不会生成 OAuth Client ID 或 Client Secret。' }
+        { type: 'p', text: '删除 App 会同时删除它的 OAuth 服务与 OAuth 令牌；API Key 属于账户，不会被删除。此操作无法恢复，确认弹窗会要求原样输入删除短语。' },
+        { type: 'note', text: '纯 API 集成请使用 API Key。只有在需要 OAuth Client ID 与 Client Secret 时才需要创建 App。' }
       ]
     }
   },
@@ -597,12 +579,12 @@ export const DOC_CHAPTERS: DocChapter[] = [
     slug: 'developer/oauth',
     title: { en: 'OAuth', zh: 'OAuth 授权' },
     summary: {
-      en: 'Connect a Website App with OAuth 2.0 and PKCE.',
-      zh: '通过 OAuth 2.0 与 PKCE 接入 Website App。'
+      en: 'Connect an App with OAuth 2.0 and PKCE.',
+      zh: '通过 OAuth 2.0 与 PKCE 接入应用。'
     },
     blocks: {
       en: [
-        { type: 'p', text: 'OAuth is available only for Website Apps. Register a service under Developer → OAuth, choose an App, add its redirect URIs and configure wildcard matching, device flow and token expiry.' },
+        { type: 'p', text: 'Register a service under Developer → OAuth, choose an App, add its redirect URIs and configure wildcard matching, device flow and token expiry.' },
         { type: 'h', text: 'Credentials' },
         {
           type: 'ul',
@@ -658,7 +640,7 @@ GET  /oauth/device` },
         { type: 'note', text: 'OAuth grants profile access only. To manage snippets and groups programmatically, create an API Key instead.' }
       ],
       zh: [
-        { type: 'p', text: 'OAuth 仅适用于 Website App。在 Developer → OAuth 注册服务，选择 App，填写重定向 URI，并配置通配符、设备流和令牌有效期。' },
+        { type: 'p', text: '在 Developer → OAuth 注册服务，选择 App，填写重定向 URI，并配置通配符、设备流和令牌有效期。' },
         { type: 'h', text: '凭据' },
         {
           type: 'ul',
@@ -725,7 +707,7 @@ GET  /oauth/device` },
     blocks: {
       en: [
         { type: 'h', text: 'Create a key' },
-        { type: 'p', text: 'Open Developer → API Keys and choose New API key. Select an App you own, name the key, choose permissions and an expiry of 30, 90, 365 days or never.' },
+        { type: 'p', text: 'Open Developer → API Keys and choose New API key. Name the key, choose permissions and an expiry of 30, 90, 365 days or never. No App selection is required.' },
         { type: 'h', text: 'Permissions' },
         {
           type: 'table',
@@ -745,7 +727,7 @@ GET  /oauth/device` },
             'The list shows a prefix, permissions, expiry, creation time and last-used time.',
             'Revoke a key at any time; requests using it fail immediately.',
             'A user can have up to 50 active keys.',
-            'Keys belong to both an App and your account.'
+            'Keys belong to your account, not to an App.'
           ]
         },
         { type: 'p', text: 'API Keys cannot change account details, security settings, email, passwords, OAuth grants or social links. They only operate on your content through the Open API.' },
@@ -753,7 +735,7 @@ GET  /oauth/device` },
       ],
       zh: [
         { type: 'h', text: '创建密钥' },
-        { type: 'p', text: '打开 Developer → API Keys，点击 New API key。选择一个自己的 App，填写名称，勾选权限，并选择 30、90、365 天或永不过期。' },
+        { type: 'p', text: '打开 Developer → API Keys，点击 New API key。填写名称、勾选权限，并选择 30、90、365 天或永不过期；不需要选择 App。' },
         { type: 'h', text: '权限' },
         {
           type: 'table',
@@ -773,7 +755,7 @@ GET  /oauth/device` },
             '列表显示前缀、权限、过期时间、创建时间和上次使用时间。',
             '可以随时撤销；撤销后使用该 Key 的请求会立即失败。',
             '每个用户最多保留 50 个有效 Key。',
-            'Key 同时归属于某个 App 和你的账户。'
+            'Key 属于你的账户，不隶属于任何 App。'
           ]
         },
         { type: 'p', text: 'API Key 不能修改账户资料、安全设置、邮箱、密码、OAuth 授权或社交链接，只能通过开放 API 操作你的内容。' },
@@ -790,7 +772,7 @@ GET  /oauth/device` },
     },
     blocks: {
       en: [
-        { type: 'p', text: 'The Open API is versioned under /api/v1. It accepts API Keys only; site cookies and OAuth access tokens are rejected. The machine-readable specification is at /openapi.json.' },
+        { type: 'p', text: 'The Open API is versioned under /api/v1. It accepts API Keys only; site cookies and OAuth access tokens are rejected. API metadata is at /api/v1 and the machine-readable OpenAPI 3.1 document is available at /api/v1/openapi.json and /openapi.json. API Keys belong to your account and are not tied to an App.' },
         { type: 'h', text: 'Authentication' },
         { type: 'code', language: 'bash', text: 'curl https://bits.micropue.com.cn/api/v1/me \\\n  -H "Authorization: Bearer bits_sk_YOUR_KEY"' },
         { type: 'p', text: 'You can also send the key in the X-API-Key header. Never put it in a query string.' },
@@ -800,16 +782,21 @@ GET  /oauth/device` },
           headers: ['Operation', 'Limit'],
           rows: [
             ['Read requests', '120 per minute per key'],
-            ['Write requests', '30 per minute per key']
+            ['Write requests', '30 per minute per key'],
+            ['Account reads, across all keys', '240 per minute'],
+            ['Account writes, across all keys', '60 per minute'],
+            ['Invalid authentication attempts', '30 per minute per IP address']
           ]
         },
-        { type: 'p', text: 'Exceeding a limit returns 429. API rate limiting fails closed: if the rate-limit store is unavailable, requests are rejected rather than allowed through.' },
+        { type: 'p', text: 'Both the per-key and account-wide limits apply. Exceeding either returns 429. API rate limiting fails closed: if the rate-limit store is unavailable, requests are rejected rather than allowed through.' },
         { type: 'h', text: 'Endpoints' },
         {
           type: 'table',
           headers: ['Method and path', 'Permission', 'Purpose'],
           rows: [
-            ['GET /api/v1/me', 'content:read', 'Current user, App and key summary'],
+            ['GET /api/v1', 'None', 'API name, version, documentation and OpenAPI URL'],
+            ['GET /api/v1/openapi.json', 'None', 'OpenAPI 3.1 specification'],
+            ['GET /api/v1/me', 'content:read', 'Current user and key summary'],
             ['GET /api/v1/snippets', 'content:read', 'List your snippets'],
             ['POST /api/v1/snippets', 'content:create', 'Create a snippet'],
             ['GET /api/v1/snippets/{slug}', 'content:read', 'Read one snippet'],
@@ -823,7 +810,8 @@ GET  /oauth/device` },
           ]
         },
         { type: 'h', text: 'List, search and paginate' },
-        { type: 'p', text: 'List endpoints accept limit (1–50, default 20), offset, q for a title/description search, and visibility=public|unlisted|private. Responses include a pagination object with total and hasMore.' },
+        { type: 'p', text: 'List endpoints accept limit (1–50, default 20), offset (0–10,000), q for a title/description search, and visibility=public|unlisted|private. Responses include a pagination object with total and hasMore. Snippet list items omit code; read one snippet to get its code body.' },
+        { type: 'p', text: 'Snippet dependencies are limited to 50 unique values and must belong to the selected language.' },
         { type: 'code', language: 'bash', text: 'curl "https://bits.micropue.com.cn/api/v1/snippets?limit=20&offset=0&visibility=public&q=vue" \\\n  -H "X-API-Key: bits_sk_YOUR_KEY"' },
         { type: 'h', text: 'Create a snippet' },
         { type: 'code', language: 'json', text: `{
@@ -839,22 +827,38 @@ GET  /oauth/device` },
         { type: 'h', text: 'Update and rename' },
         { type: 'p', text: 'PATCH is partial: omitted fields keep their current values. Send slug to rename. A successful rename returns meta.previousSlug and meta.slugChanged; the old public URL redirects to the new one.' },
         { type: 'h', text: 'Errors' },
+        { type: 'p', text: 'Write requests must use Content-Type: application/json. Errors use RFC 9457 application/problem+json. Every response includes X-Request-Id and X-API-Version: v1. Rate limits are returned in X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset and the equivalent RateLimit-* headers; a 429 also includes Retry-After.' },
+        { type: 'code', language: 'json', text: `{
+  "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/conflict",
+  "title": "Conflict",
+  "status": 409,
+  "code": "conflict",
+  "detail": "This URL is already taken",
+  "requestId": "req_662cac18ac6248209a45ac27743fe4e8",
+  "errors": [
+    { "path": "slug", "message": "This URL is already taken" }
+  ]
+}` },
         {
           type: 'table',
           headers: ['Status', 'Meaning'],
           rows: [
             ['400', 'Invalid field or malformed body'],
             ['401', 'Missing, invalid or expired API key'],
-            ['403', 'Missing permission, suspended App or disabled account'],
+            ['403', 'Missing permission or disabled account'],
             ['404', 'Content not found in your account'],
             ['409', 'URL name already taken'],
-            ['429', 'Rate limit exceeded']
+            ['413', 'Request body exceeds 2 MB'],
+            ['415', 'Write request is not application/json'],
+            ['429', 'Rate limit exceeded'],
+            ['500', 'Unexpected server error'],
+            ['503', 'Rate-limit store unavailable']
           ]
         },
         { type: 'note', text: 'The Open API only manages your own snippets and groups. It cannot change account profile, email, password, 2FA, Passkeys, followers, favorites or OAuth grants.' }
       ],
       zh: [
-        { type: 'p', text: '开放 API 的版本前缀为 /api/v1，只接受 API Key；站点 Cookie 与 OAuth Access Token 都会被拒绝。机器可读规范位于 /openapi.json。' },
+        { type: 'p', text: '开放 API 的版本前缀为 /api/v1，只接受 API Key；站点 Cookie 与 OAuth Access Token 都会被拒绝。API Key 属于账户，不隶属于任何 App。API 元信息位于 /api/v1，OpenAPI 3.1 规范可从 /api/v1/openapi.json 与 /openapi.json 获取。' },
         { type: 'h', text: '认证' },
         { type: 'code', language: 'bash', text: 'curl https://bits.micropue.com.cn/api/v1/me \\\n  -H "Authorization: Bearer bits_sk_YOUR_KEY"' },
         { type: 'p', text: '也可以通过 X-API-Key 请求头传递。不要把 Key 放在 URL 查询参数中。' },
@@ -864,16 +868,21 @@ GET  /oauth/device` },
           headers: ['操作', '限制'],
           rows: [
             ['读请求', '每个 Key 每分钟 120 次'],
-            ['写请求', '每个 Key 每分钟 30 次']
+            ['写请求', '每个 Key 每分钟 30 次'],
+            ['账号读请求（所有 Key 合计）', '每分钟 240 次'],
+            ['账号写请求（所有 Key 合计）', '每分钟 60 次'],
+            ['无效认证尝试', '每个 IP 每分钟 30 次']
           ]
         },
-        { type: 'p', text: '超过限制会返回 429。开放 API 的限流采用故障关闭策略：限流存储不可用时请求会被拒绝，而不是直接放行。' },
+        { type: 'p', text: '单 Key 与账号级限制同时生效，任一超限都会返回 429。开放 API 的限流采用故障关闭策略：限流存储不可用时请求会被拒绝，而不是直接放行。' },
         { type: 'h', text: '端点' },
         {
           type: 'table',
           headers: ['方法与路径', '所需权限', '用途'],
           rows: [
-            ['GET /api/v1/me', 'content:read', '当前用户、App 与 Key 摘要'],
+            ['GET /api/v1', '无需权限', 'API 名称、版本、文档与 OpenAPI 地址'],
+            ['GET /api/v1/openapi.json', '无需权限', 'OpenAPI 3.1 规范'],
+            ['GET /api/v1/me', 'content:read', '当前用户与 Key 摘要'],
             ['GET /api/v1/snippets', 'content:read', '列出自己的代码段'],
             ['POST /api/v1/snippets', 'content:create', '新建代码段'],
             ['GET /api/v1/snippets/{slug}', 'content:read', '读取单个代码段'],
@@ -887,7 +896,8 @@ GET  /oauth/device` },
           ]
         },
         { type: 'h', text: '列表、搜索与分页' },
-        { type: 'p', text: '列表端点支持 limit（1–50，默认 20）、offset、q（按名称 / 介绍搜索）以及 visibility=public|unlisted|private。响应中的 pagination 包含 total 和 hasMore。' },
+        { type: 'p', text: '列表端点支持 limit（1–50，默认 20）、offset（0–10,000）、q（按名称 / 介绍搜索）以及 visibility=public|unlisted|private。响应中的 pagination 包含 total 和 hasMore。代码段列表不返回代码正文，读取单个代码段时才会返回。' },
+        { type: 'p', text: '代码段依赖最多 50 个唯一值，且必须属于所选语言。' },
         { type: 'code', language: 'bash', text: 'curl "https://bits.micropue.com.cn/api/v1/snippets?limit=20&offset=0&visibility=public&q=vue" \\\n  -H "X-API-Key: bits_sk_YOUR_KEY"' },
         { type: 'h', text: '新建代码段' },
         { type: 'code', language: 'json', text: `{
@@ -903,16 +913,32 @@ GET  /oauth/device` },
         { type: 'h', text: '更新与改名' },
         { type: 'p', text: 'PATCH 是局部更新：未传字段保持原值。传入 slug 即可改名；成功后返回 meta.previousSlug 与 meta.slugChanged，旧公开地址会自动重定向到新地址。' },
         { type: 'h', text: '错误状态' },
+        { type: 'p', text: '写请求必须使用 Content-Type: application/json。错误响应遵循 RFC 9457，使用 application/problem+json。所有响应都包含 X-Request-Id 与 X-API-Version: v1。限流信息通过 X-RateLimit-Limit、X-RateLimit-Remaining、X-RateLimit-Reset 以及等效的 RateLimit-* 响应头返回；429 还会包含 Retry-After。' },
+        { type: 'code', language: 'json', text: `{
+  "type": "https://bits.micropue.com.cn/docs/developer/open-api#errors/conflict",
+  "title": "Conflict",
+  "status": 409,
+  "code": "conflict",
+  "detail": "This URL is already taken",
+  "requestId": "req_662cac18ac6248209a45ac27743fe4e8",
+  "errors": [
+    { "path": "slug", "message": "This URL is already taken" }
+  ]
+}` },
         {
           type: 'table',
           headers: ['状态码', '含义'],
           rows: [
             ['400', '字段无效或请求体格式错误'],
             ['401', 'API Key 缺失、无效或已过期'],
-            ['403', '缺少权限、App 被停用或账户被禁用'],
+            ['403', '缺少权限或账户被禁用'],
             ['404', '自己的账户下找不到该内容'],
             ['409', 'URL 名已被占用'],
-            ['429', '超过节流限制']
+            ['413', '请求体超过 2 MB'],
+            ['415', '写请求不是 application/json'],
+            ['429', '超过节流限制'],
+            ['500', '服务器内部错误'],
+            ['503', '限流存储不可用']
           ]
         },
         { type: 'note', text: '开放 API 只能管理自己的代码段与分组，不能修改账户资料、邮箱、密码、双重验证、Passkey、关注、收藏或 OAuth 授权。' }
